@@ -23,6 +23,7 @@ export const BarbershopSchema = z.object({
   address: AddressSchema,
   logoUrl: z.string().url("URL inválida").optional(),
   contact: z.string().min(8, "Contato obrigatório"),
+  slug: z.string().max(50, "Descrição muito longa"),
   workingHours: z.array(WorkingHourSchema).min(1, "Informe pelo menos um horário de funcionamento"),
 });
 

@@ -83,6 +83,13 @@ const app = express();
 
 app.use(express.json());
 
+app.use(
+  cors({
+    origin: "http://localhost:5173", // ou o URL do frontend de produção
+    credentials: true,
+  })
+);
+
 // --- Barbearia ---
 // CRIAÇÃO
 app.post("/barbershops", async (req, res) => {
@@ -143,6 +150,18 @@ app.delete("/barbershops/:id", async (req, res) => {
     res.json({ message: "Barbearia removida com sucesso" });
   } catch (e) {
     res.status(400).json({ error: "ID inválido" });
+  }
+});
+
+app.get("/barbershops/slug/:slug", async (req, res) => {
+  try {
+    const barbershop = await Barbershop.findOne({ slug: req.params.slug });
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada" });
+    }
+    res.json(barbershop); // Isso retorna o _id também!
+  } catch (e) {
+    res.status(400).json({ error: "Erro na busca pela barbearia" });
   }
 });
 
