@@ -2,6 +2,7 @@ import express from "express";
 import mongoose, { Schema, model } from "mongoose";
 import cors from "cors";
 import { z } from "zod";
+import twilio from "twilio";
 import "dotenv/config";
 
 import Barbershop from "./models/Barbershop.js";
@@ -78,6 +79,19 @@ const bookingSchema = z.object({
   time: z.string(),
 });
 
+const sendMessage = async (to, message) => {
+  const client2 = "cliente2";
+  client.messages
+    .create({
+      from: "whatsapp:+14155238886",
+      // contentSid: "HX229f5a04fd0510ce1b071852155d3e75",
+      // contentVariables: '{"1":"12/1","2":"3pm"}',
+      body: `${client2} teste`,
+      to: "whatsapp:+554891319311",
+    })
+    .then((message) => console.log(message));
+};
+
 // --- App Express ---
 const app = express();
 
@@ -89,6 +103,12 @@ app.use(
     credentials: true,
   })
 );
+
+const accountSid = "ACfbf9955ebbc98189a60eb71e3f5b007b"; // Substitua pelo seu Account SID
+const authToken = "03da1955e69c03b02972d14bb328d8b6"; // Substitua pelo seu Auth Token
+
+// Inicialize o cliente Twilio
+const client = twilio(accountSid, authToken);
 
 // --- Barbearia ---
 // CRIAÇÃO
@@ -198,13 +218,16 @@ app.post("/barbershops/:id/services", async (req, res) => {
 });
 
 app.get("/barbershops/:id/services", async (req, res) => {
+  const message = `Novo agendamento: e`;
+  const barbeiroNumber = "+14155238886"; // Assumindo que o número do barbeiro está no objeto barbershop
+
   res.json(await Service.find({ barbershop: req.params.id }));
 });
 
 // --- Agendamentos ---
-app.post("/bookings", async (req, res) => {
+app.post("/barbershops/:id/bookings", async (req, res) => {
   try {
-    const data = bookingSchema.parse(req.body);
+    const data = bookingSchema.parse({ ...req.body, barbershop: req.params.id });
 
     // Verifica conflito de horário do barbeiro
     const conflict = await Booking.findOne({
@@ -215,12 +238,62 @@ app.post("/bookings", async (req, res) => {
 
     const created = await Booking.create({ ...data, time: new Date(data.time) });
 
-    // Mock WhatsApp: substituir pelo envio real
-    console.log("[WhatsApp] ->", data.customer.whatsapp, "[Cliente] Agendamento confirmado");
+    const message = `Novo agendamento: ${data.customer.name} - ${data.time}`;
+    const barbeiroNumber = "5548991319311"; // Assumindo que o número do barbeiro está no objeto barbersh
+
+    // await sendMessage(barbeiroNumber, message);
+
     res.status(201).json(created);
   } catch (e) {
     res.status(400).json({ error: e.errors || e.message });
   }
+});
+
+app.get("/barbershops/:barbershopId/barbers/:barberId/free-slots", async (req, res) => {
+  const { date } = req.query; // "2025-05-10"
+  const { barberId } = req.params;
+
+  // Pega o barbeiro e sua disponibilidade
+  const barber = await Barber.findById(barberId);
+  if (!barber) return res.status(404).json({ error: "Barbeiro não encontrado" });
+
+  // Descobre se ele trabalha nesse dia
+  const data = new Date();
+  const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+  const dia = diasSemana[data.getDay()];
+  const slot = barber.availability.find((a) => a.day === dia);
+  if (!slot) return res.json([]); // Não trabalha nesse dia
+
+  // Gera os horários base (slots)
+  let slots = [];
+  let [hAtual, mAtual] = slot.start.split(":").map(Number);
+  const [hEnd, mEnd] = slot.end.split(":").map(Number);
+  while (hAtual < hEnd || (hAtual === hEnd && mAtual < mEnd)) {
+    slots.push(`${String(hAtual).padStart(2, "0")}:${String(mAtual).padStart(2, "0")}`);
+    mAtual += 30;
+    if (mAtual >= 60) {
+      hAtual++;
+      mAtual = 0;
+    }
+  }
+
+  // Busca bookings já feitos para esse barbeiro naquela data
+  const bookings = await Booking.find({
+    barber: barberId,
+    time: {
+      $gte: startOfDay(data),
+      $lt: endOfDay(data),
+    },
+  });
+
+  const ocupados = bookings.map((b) => {
+    const hora = new Date(b.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
+    return hora;
+  });
+
+  // Filtra só slots livres
+  const livres = slots.filter((slot) => !ocupados.includes(slot));
+  res.json(livres);
 });
 
 // Listar agendamentos da barbearia
