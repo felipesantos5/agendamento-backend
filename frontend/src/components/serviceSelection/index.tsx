@@ -2,6 +2,7 @@ import axios from "axios"
 import { useEffect, useState } from "react"
 import { Card } from "../ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { Label } from "../ui/label";
 
 interface services {
   _id: string;
@@ -56,7 +57,7 @@ export default function ServiceSelection({
     fetchData();
   }, [id]);
 
-  console.log(`barbers`, barbers)
+  console.log(`services`, services)
 
   return (
     <div className="space-y-6">
@@ -65,14 +66,14 @@ export default function ServiceSelection({
         <p className="mt-1 text-sm text-gray-500">Escolha qual serviço você deseja agendar</p>
       </div>
       <div className="space-y-4">
-        <label className="block text-sm font-medium text-gray-700">Serviço</label>
+        <Label className="block text-sm font-medium text-gray-700">Serviço</Label>
         <Select value={selectedService} onValueChange={onSelectService}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Selecione um serviço" />
           </SelectTrigger>
           <SelectContent>
             {services.map((service) => (
-              <SelectItem key={service._id} value={service._id}>
+              <SelectItem key={service._id} value={service.name}>
                 {service.name}
               </SelectItem>
             ))}
@@ -81,7 +82,7 @@ export default function ServiceSelection({
       </div>
 
       <div className="space-y-4">
-        <label className="block text-sm font-medium text-gray-700">Barbeiro</label>
+        <Label className="block text-sm font-medium text-gray-700">Barbeiro</Label>
         <Select value={selectedBarber} onValueChange={onSelectBarber}>
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Selecione um barbeiro" />

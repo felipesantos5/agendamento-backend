@@ -306,6 +306,49 @@ app.get("/customers/:phone/bookings", async (req, res) => {
   res.json(await Booking.find({ "customer.phone": req.params.phone }).populate("barbershop barber service"));
 });
 
+app.get("/barbers/:barberId/bookings", async (req, res) => {
+  const { day } = req.query; // Ex: "2024-06-10"
+
+  if (!day) return res.status(400).json({ error: "Informe o dia" });
+
+  // Monta o início e fim do dia para o filtro
+  const start = new Date(`${day}T00:00:00.000Z`);
+  const end = new Date(`${day}T23:59:59.999Z`);
+
+  const bookings = await Booking.find({
+    barber: req.params.barberId,
+    date: { $gte: start, $lte: end },
+    status: { $ne: "canceled" },
+  });
+  res.json(bookings);
+});
+
+// dias disponveis
+app.get("/barbers/:barberId/available-slots", async (req, res) => {
+  const { day } = req.query;
+  // Supondo horários das 08h às 18h, intervalos de 30min
+  const slots = [];
+  for (let i = 8; i < 18; i++) {
+    slots.push(`${i.toString().padStart(2, "0")}:00`);
+    slots.push(`${i.toString().padStart(2, "0")}:30`);
+  }
+
+  const start = new Date(`${day}T00:00:00.000Z`);
+  const end = new Date(`${day}T23:59:59.999Z`);
+
+  const bookings = await Booking.find({
+    barber: req.params.barberId,
+    date: { $gte: start, $lte: end },
+    status: { $ne: "canceled" },
+  });
+
+  // Mapeia horários ocupados
+  const bookedTimes = bookings.map((b) => b.date.toISOString().slice(11, 16));
+  const available = slots.filter((slot) => !bookedTimes.includes(slot));
+
+  res.json({ slots: available });
+});
+
 // --- Inicialização ---
 const PORT = 3001;
 app.listen(PORT, () => {
