@@ -7,7 +7,10 @@ import "dotenv/config";
 import { parseISO, startOfDay, endOfDay } from "date-fns";
 
 import Barbershop from "./models/Barbershop.js";
-import { BarbershopSchema, BarbershopUpdateSchema } from "./validations/barbershopValidation.js";
+import {
+  BarbershopSchema,
+  BarbershopUpdateSchema,
+} from "./validations/barbershopValidation.js";
 
 // --- Conexão MongoDB ---
 const connectDB = async () => {
@@ -60,7 +63,9 @@ const Booking = model(
 const barberSchema = z.object({
   name: z.string(),
   barbershop: z.string(),
-  availability: z.array(z.object({ day: z.string(), start: z.string(), end: z.string() })),
+  availability: z.array(
+    z.object({ day: z.string(), start: z.string(), end: z.string() })
+  ),
 });
 
 const serviceSchema = z.object({
@@ -225,141 +230,140 @@ app.get("/barbershops/:id/services", async (req, res) => {
 });
 
 // --- Agendamentos ---
-// app.post("/barbershops/:id/bookings", async (req, res) => {
-//   try {
-//     const data = bookingSchema.parse({ ...req.body, barbershop: req.params.id });
-
-//     // Verifica conflito de horário do barbeiro
-//     const conflict = await Booking.findOne({
-//       barber: data.barber,
-//       time: new Date(data.time),
-//     });
-//     if (conflict) return res.status(409).json({ error: "Horário já agendado para esse barbeiro." });
-
-//     const created = await Booking.create({ ...data, time: new Date(data.time) });
-
-//     const message = `Novo agendamento: ${data.customer.name} - ${data.time}`;
-//     const barbeiroNumber = "5548991319311"; // Assumindo que o número do barbeiro está no objeto barbersh
-
-//     // await sendMessage(barbeiroNumber, message);
-
-//     res.status(201).json(created);
-//   } catch (e) {
-//     res.status(400).json({ error: e.errors || e.message });
-//   }
-// });
-
-app.get("/barbershops/:barbershopId/barbers/:barberId/free-slots", async (req, res) => {
-  try {
-    const { date } = req.query; // Espera "YYYY-MM-DD"
-    const { barberId } = req.params;
-
-    if (!date) {
-      return res.status(400).json({ error: "A data deve ser fornecida." });
-    }
-
-    const barber = await Barber.findById(barberId);
-    if (!barber) {
-      return res.status(404).json({ error: "Barbeiro não encontrado." });
-    }
-
-    // `parseISO` converte "2025-06-02" para uma data em UTC no início do dia.
-    const selectedDate = parseISO(date);
-
-    // Mapeia o dia da semana (0=Domingo, 1=Segunda, etc.)
-    const dayOfWeekName = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"][selectedDate.getUTCDay()];
-
-    const workHours = barber.availability.find((a) => a.day === dayOfWeekName);
-    if (!workHours) {
-      return res.json([]); // Retorna lista vazia se o barbeiro não trabalha
-    }
-
-    // Gera todos os slots de 30 minutos do dia
-    const slotInterval = 30;
-    const allSlots = [];
-    const [startHour, startMinute] = workHours.start.split(":").map(Number);
-    const [endHour, endMinute] = workHours.end.split(":").map(Number);
-
-    const dayStart = new Date(selectedDate);
-    dayStart.setUTCHours(startHour, startMinute, 0, 0);
-
-    const dayEnd = new Date(selectedDate);
-    dayEnd.setUTCHours(endHour, endMinute, 0, 0);
-
-    let currentSlot = new Date(dayStart);
-    while (currentSlot < dayEnd) {
-      allSlots.push(currentSlot.toISOString().slice(11, 16)); // Formato "HH:mm"
-      currentSlot.setUTCMinutes(currentSlot.getUTCMinutes() + slotInterval);
-    }
-
-    // Busca agendamentos existentes para o dia inteiro (em UTC)
-    const bookings = await Booking.find({
-      barber: barberId,
-      time: {
-        $gte: startOfDay(selectedDate),
-        $lt: endOfDay(selectedDate),
-      },
-    });
-
-    // Extrai apenas os horários "HH:mm" dos agendamentos existentes
-    const bookedTimes = bookings.map(b => {
-        const bookingDate = new Date(b.time);
-        const hour = String(bookingDate.getUTCHours()).padStart(2, '0');
-        const minute = String(bookingDate.getUTCMinutes()).padStart(2, '0');
-        return `${hour}:${minute}`;
-    });
-
-    // Filtra os slots, retornando apenas os que NÃO estão na lista de agendados
-    const freeSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
-
-    res.json(freeSlots);
-
-  } catch (error) {
-    console.error("Erro ao buscar horários livres:", error);
-    res.status(500).json({ error: "Erro interno ao processar a solicitação." });
-  }
-});
-
-// Listar agendamentos da barbearia
 app.post("/barbershops/:id/bookings", async (req, res) => {
   try {
-    // 1. Validar os dados recebidos com Zod
     const data = bookingSchema.parse({
       ...req.body,
       barbershop: req.params.id,
     });
 
-    const bookingTime = new Date(data.time);
-
-    // 2. Verificar se o horário já foi agendado (dupla checagem de segurança)
+    // Verifica conflito de horário do barbeiro
     const conflict = await Booking.findOne({
       barber: data.barber,
-      time: bookingTime,
+      time: new Date(data.time),
     });
+    if (conflict)
+      return res
+        .status(409)
+        .json({ error: "Horário já agendado para esse barbeiro." });
 
-    if (conflict) {
-      return res.status(409).json({ error: "Este horário acabou de ser preenchido. Por favor, escolha outro." });
-    }
-
-    // 3. Se não houver conflito, criar o agendamento no banco
-    const createdBooking = await Booking.create({
+    const created = await Booking.create({
       ...data,
-      time: bookingTime,
+      time: new Date(data.time),
     });
 
-    res.status(201).json(createdBooking);
+    const message = `Novo agendamento: ${data.customer.name} - ${data.time}`;
+    const barbeiroNumber = "5548991319311"; // Assumindo que o número do barbeiro está no objeto barbersh
 
+    // await sendMessage(barbeiroNumber, message);
+
+    res.status(201).json(created);
   } catch (e) {
-    if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos.", details: e.errors });
+    res.status(400).json({ error: e.errors || e.message });
+  }
+});
+
+app.get(
+  "/barbershops/:barbershopId/barbers/:barberId/free-slots",
+  async (req, res) => {
+    try {
+      const { date } = req.query;
+      const { barberId } = req.params;
+
+      if (!date || !barberId) {
+        return res
+          .status(400)
+          .json({ error: "Data e ID do barbeiro são obrigatórios." });
+      }
+
+      const barber = await Barber.findById(barberId);
+      if (!barber) {
+        return res.json([]); // Retorna vazio se o barbeiro não existe
+      }
+
+      const selectedDate = parseISO(date);
+      const dayOfWeekName = [
+        "Domingo",
+        "Segunda-feira",
+        "Terça-feira",
+        "Quarta-feira",
+        "Quinta-feira",
+        "Sexta-feira",
+        "Sábado",
+      ][selectedDate.getUTCDay()];
+      const workHours = barber.availability.find(
+        (a) => a.day === dayOfWeekName
+      );
+
+      if (!workHours) {
+        return res.json([]); // Barbeiro não trabalha neste dia
+      }
+
+      const allSlots = [];
+      const [startHour, startMinute] = workHours.start.split(":").map(Number);
+      const [endHour, endMinute] = workHours.end.split(":").map(Number);
+      let currentSlot = new Date(selectedDate);
+      currentSlot.setUTCHours(startHour, startMinute, 0, 0);
+      const dayEnd = new Date(selectedDate);
+      dayEnd.setUTCHours(endHour, endMinute, 0, 0);
+
+      while (currentSlot < dayEnd) {
+        allSlots.push(currentSlot.toISOString().slice(11, 16));
+        currentSlot.setUTCMinutes(currentSlot.getUTCMinutes() + 30);
+      }
+
+      const bookings = await Booking.find({
+        barber: barberId,
+        time: { $gte: startOfDay(selectedDate), $lt: endOfDay(selectedDate) },
+      });
+
+      const bookedTimes = new Set(
+        bookings.map((b) => new Date(b.time).toISOString().slice(11, 16))
+      );
+
+      // ✅ NOVO: Mapeia todos os horários e adiciona o status 'isBooked'
+      const slotsWithStatus = allSlots.map((time) => ({
+        time: time,
+        isBooked: bookedTimes.has(time),
+      }));
+
+      res.json(slotsWithStatus);
+    } catch (error) {
+      console.error("Erro ao buscar status dos horários:", error);
+      res
+        .status(500)
+        .json({ error: "Erro interno ao processar a solicitação." });
     }
-    res.status(500).json({ error: "Erro interno ao criar agendamento." });
+  }
+);
+
+// Listar agendamentos da barbearia
+app.get("/barbershops/:id/bookings", async (req, res) => {
+  try {
+    const barbershopId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(barbershopId)) {
+      return res.status(400).json({ error: "ID da barbearia inválido." });
+    }
+
+    const bookings = await Booking.find({ barbershop: barbershopId })
+      .populate("barber", "name") // Popula o barbeiro e pega apenas o nome
+      .populate("service", "name price"); // Popula o serviço e pega nome e preço
+
+    res.json(bookings);
+  } catch (error) {
+    console.error("Erro ao buscar agendamentos:", error);
+    res.status(500).json({ error: "Falha ao buscar agendamentos." });
   }
 });
 
 // Listar agendamentos do cliente
 app.get("/customers/:phone/bookings", async (req, res) => {
-  res.json(await Booking.find({ "customer.phone": req.params.phone }).populate("barbershop barber service"));
+  res.json(
+    await Booking.find({ "customer.phone": req.params.phone }).populate(
+      "barbershop barber service"
+    )
+  );
 });
 
 app.get("/barbers/:barberId/bookings", async (req, res) => {

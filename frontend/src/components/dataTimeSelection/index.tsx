@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import axios from "axios";
 
+interface TimeSlot {
+  time: string;
+  isBooked: boolean;
+}
+
 interface DateTimeSelectionProps {
   formData: {
     date: string;
@@ -21,33 +26,32 @@ export default function DateTimeSelection({
 }: DateTimeSelectionProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  // ✅ NOVO: O estado agora armazena a lista de objetos TimeSlot
+  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
 
   // Efeito para buscar horários disponíveis quando a data ou o barbeiro mudam
   useEffect(() => {
-    const fetchAvailableTimes = async () => {
+    const fetchTimeSlots = async () => {
       if (formData.date && selectedBarber && barbershopId) {
         setLoadingTimes(true);
+        setTimeSlots([]);
         try {
           const response = await axios.get(
             `http://localhost:3001/barbershops/${barbershopId}/barbers/${selectedBarber}/free-slots`,
-            {
-              params: { date: formData.date },
-            }
+            { params: { date: formData.date } }
           );
-          setAvailableTimes(response.data);
+          setTimeSlots(response.data);
         } catch (error) {
           console.error("Erro ao buscar horários:", error);
-          setAvailableTimes([]); // Limpa os horários em caso de erro
         } finally {
           setLoadingTimes(false);
         }
       } else {
-        setAvailableTimes([]); // Limpa se não houver data ou barbeiro selecionado
+        setTimeSlots([]);
       }
     };
-
-    fetchAvailableTimes();
+    fetchTimeSlots();
   }, [formData.date, selectedBarber, barbershopId]);
 
   // --- Lógica do Calendário ---
@@ -93,9 +97,12 @@ export default function DateTimeSelection({
     const today = new Date();
     const selectedDate = new Date(year, month, day);
     return (
-      selectedDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      selectedDate <
+      new Date(today.getFullYear(), today.getMonth(), today.getDate())
     );
   };
+
+  console.log("timeSlots", timeSlots);
   // --- Fim da Lógica do Calendário ---
 
   return (
@@ -197,30 +204,33 @@ export default function DateTimeSelection({
         {loadingTimes ? (
           <p className="text-sm text-gray-500">Carregando horários...</p>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
-            {availableTimes.length > 0 ? (
-              availableTimes.map((time) => (
-                <button
-                  key={time}
-                  type="button"
-                  onClick={() => updateFormData({ time })}
-                  className={`rounded-md border p-2 text-center text-sm transition-colors ${
-                    formData.time === time
-                      ? "border-rose-500 bg-rose-50 text-rose-700"
-                      : "border-gray-200 hover:border-rose-200 hover:bg-rose-50/50"
-                  }`}
-                >
-                  {time}
-                </button>
-              ))
-            ) : (
-              formData.date &&
-              selectedBarber && (
-                <p className="col-span-3 text-sm text-gray-500">
-                  Nenhum horário disponível para este dia.
-                </p>
-              )
-            )}
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+            {timeSlots.length > 0
+              ? timeSlots.map((slot) => (
+                  <button
+                    key={slot.time}
+                    type="button"
+                    // ✅ NOVO: Desabilita o botão se o horário estiver ocupado
+                    disabled={slot.isBooked}
+                    onClick={() => updateFormData({ time: slot.time })}
+                    // ✅ NOVO: Classes de estilo condicionais
+                    className={`rounded-md border p-2 text-center text-sm transition-colors ${
+                      formData.time === slot.time && !slot.isBooked
+                        ? "border-rose-500 bg-rose-50 text-rose-700 font-semibold" // Estilo para horário selecionado
+                        : slot.isBooked
+                        ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 line-through" // Estilo para horário ocupado
+                        : "border-gray-200 hover:border-rose-300 hover:bg-rose-50/50" // Estilo para horário livre
+                    }`}
+                  >
+                    {slot.time}
+                  </button>
+                ))
+              : formData.date &&
+                !selectedBarber && (
+                  <p className="col-span-3 text-sm text-gray-500">
+                    Nenhum horário disponível para este dia.
+                  </p>
+                )}
           </div>
         )}
       </div>
