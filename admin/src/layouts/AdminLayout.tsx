@@ -3,14 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { Outlet, Link, useParams, useLocation } from "react-router-dom";
 import axios from "axios"; // Para buscar dados da barbearia
-import {
-  LayoutDashboard,
-  Settings,
-  Users,
-  Scissors,
-  CalendarDays,
-  ShieldAlert,
-} from "lucide-react"; // Ícones de exemplo
+import { LayoutDashboard, Settings, Users, Scissors, CalendarDays, ShieldAlert } from "lucide-react"; // Ícones de exemplo
 
 // Tipo para os dados básicos da barbearia que podem ser úteis no layout
 interface BarbershopContextData {
@@ -21,16 +14,13 @@ interface BarbershopContextData {
 
 // Contexto para compartilhar dados da barbearia com as páginas filhas (opcional, mas útil)
 // Você pode preferir passar props via Outlet context.
-export const BarbershopAdminContext =
-  React.createContext<BarbershopContextData | null>(null);
+export const BarbershopAdminContext = React.createContext<BarbershopContextData | null>(null);
 
 export function AdminLayout() {
   const { barbershopSlug } = useParams<{ barbershopSlug: string }>();
   const location = useLocation(); // Para destacar o link ativo
 
-  const [barbershop, setBarbershop] = useState<BarbershopContextData | null>(
-    null
-  );
+  const [barbershop, setBarbershop] = useState<BarbershopContextData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,9 +35,7 @@ export function AdminLayout() {
       setIsLoading(true);
       try {
         // Esta rota já existe no seu backend para buscar por slug
-        const response = await axios.get(
-          `http://localhost:3001/barbershops/slug/${barbershopSlug}`
-        );
+        const response = await axios.get(`http://localhost:3001/barbershops/slug/${barbershopSlug}`);
         if (response.data) {
           setBarbershop({
             _id: response.data._id,
@@ -70,11 +58,7 @@ export function AdminLayout() {
   }, [barbershopSlug]);
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        Carregando painel da barbearia...
-      </div>
-    );
+    return <div className="flex justify-center items-center min-h-screen">Carregando painel da barbearia...</div>;
   }
 
   if (error || !barbershop) {
@@ -132,29 +116,19 @@ export function AdminLayout() {
         <aside className="w-64 bg-gray-900 text-gray-200 p-5 space-y-4 flex flex-col">
           <div>
             <h1 className="text-2xl font-bold text-white mb-1">Painel</h1>
-            <h2
-              className="text-sm font-medium text-rose-400 truncate"
-              title={barbershop.name}
-            >
+            <h2 className="text-sm font-medium text-rose-400 truncate" title={barbershop.name}>
               {barbershop.name}
             </h2>
           </div>
           <nav className="flex flex-col space-y-1 mt-4 flex-grow">
             {navItems.map((item) => {
-              const isActive =
-                location.pathname === `/admin/${barbershopSlug}/${item.to}` ||
-                (item.to === "dashboard" &&
-                  location.pathname === `/admin/${barbershopSlug}`);
+              const isActive = location.pathname === `/admin/${barbershopSlug}/${item.to}` || (item.to === "dashboard" && location.pathname === `/admin/${barbershopSlug}`);
               return (
                 <Link
                   key={item.label}
                   to={item.to} // Rotas relativas ao path do AdminLayout
                   className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors
-                    ${
-                      isActive
-                        ? "bg-rose-600 text-white"
-                        : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                    }`}
+                    ${isActive ? "bg-rose-600 text-white" : "text-gray-300 hover:bg-gray-800 hover:text-white"}`}
                 >
                   {item.icon}
                   {item.label}

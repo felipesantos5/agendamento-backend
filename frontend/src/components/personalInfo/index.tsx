@@ -1,104 +1,183 @@
-import { PhoneFormat } from "@/helper/phoneFormater"
+// frontend/src/components/personalInfo/index.tsx
+
+import React, { useState, useEffect } from "react";
+
+// Supondo que você tenha o PhoneFormat em um local como "@/lib/phoneUtils"
+// Se não, você pode defini-lo aqui ou importá-lo de onde estiver.
+// Exemplo de definição (se não estiver importando):
+const PhoneFormat = (value: string = ""): string => {
+  if (!value) return "";
+  return value
+    .replace(/\D/g, "")
+    .slice(0, 11)
+    .replace(/^(\d{2})(\d)/, "($1) $2")
+    .replace(/(\d{5})(\d)/, "$1-$2");
+};
 
 interface PersonalInfoProps {
   formData: {
-    name: string
-    email: string
-    phone: string
-    [key: string]: string
-  }
-  updateFormData: (data: Partial<{ name: string; email: string; phone: string }>) => void
+    name: string;
+    email: string;
+    phone: string;
+    date: string; // Adicionando 'date' aqui se for usado no resumo
+    time: string; // Adicionando 'time' aqui se for usado no resumo
+    service?: string; // ID do serviço
+    barber?: string; // ID do barbeiro (anteriormente attendant)
+    [key: string]: string | undefined; // Permitir outros campos
+  };
+  updateFormData: (
+    data: Partial<{ name: string; email: string; phone: string }>
+  ) => void;
+  // Props opcionais para exibir os nomes no resumo, se disponíveis
+  serviceNameDisplay?: string;
+  barberNameDisplay?: string;
 }
 
-export default function PersonalInfo({ formData, updateFormData }: PersonalInfoProps) {
-    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // 1. Pega o valor do input (que pode estar formatado).
-    const inputValue = e.target.value;
+export default function PersonalInfo({
+  formData,
+  updateFormData,
+  serviceNameDisplay,
+  barberNameDisplay,
+}: PersonalInfoProps) {
+  const [isPhoneValid, setIsPhoneValid] = useState(true);
+  const [phoneErrorMessage, setPhoneErrorMessage] = useState("");
 
-    // 2. Remove todos os caracteres não numéricos.
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
     const digitsOnly = inputValue.replace(/\D/g, "");
 
-    // 3. Atualiza o estado `formData.phone` apenas com os dígitos.
-    updateFormData({ phone: digitsOnly });
+    updateFormData({ phone: digitsOnly.slice(0, 11) }); // Limita a 11 dígitos no estado
+
+    if (digitsOnly.length > 0 && digitsOnly.length < 11) {
+      setIsPhoneValid(false);
+      setPhoneErrorMessage("Celular incompleto. (DDD + 9 dígitos)");
+    } else if (digitsOnly.length === 11) {
+      // Poderia adicionar validação de DDDs válidos ou prefixos de celular aqui
+      setIsPhoneValid(true);
+      setPhoneErrorMessage("");
+    } else if (digitsOnly.length === 0) {
+      setIsPhoneValid(true); // Campo vazio é válido até ser 'required' no submit
+      setPhoneErrorMessage("");
+    } else {
+      setIsPhoneValid(false); // Mais de 11 dígitos não é permitido pela formatação
+      setPhoneErrorMessage("Número de celular muito longo.");
+    }
+  };
+
+  // Formatar a data corretamente para exibição
+  const formatDateForDisplay = (dateString: string): string => {
+    if (!dateString) return "";
+    // Corrige o problema do "dia anterior" interpretando a data como local
+    const parts = dateString.split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1; // Mês é 0-indexado no JS Date
+      const day = parseInt(parts[2], 10);
+      const localDate = new Date(year, month, day);
+      return localDate.toLocaleDateString("pt-BR", {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      });
+    }
+    return "Data inválida"; // Fallback
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Dados pessoais</h2>
-        <p className="mt-1 text-sm text-gray-500">Por favor informe seus dados de contato</p>
+        <h2 className="text-xl font-semibold text-gray-900">Dados Pessoais</h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Por favor, informe seus dados de contato.
+        </p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Nome Completo
+          <label
+            htmlFor="name"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Nome Completo <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             id="name"
+            name="name"
             value={formData.name}
             onChange={(e) => updateFormData({ name: e.target.value })}
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-rose-500 focus:outline-none focus:ring-rose-500 sm:text-sm"
-            placeholder="John Doe"
+            placeholder="Seu nome completo"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email
+          <label
+            htmlFor="email"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Email <span className="text-red-500">*</span>
           </label>
           <input
             type="email"
             id="email"
+            name="email"
             value={formData.email}
             onChange={(e) => updateFormData({ email: e.target.value })}
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-rose-500 focus:outline-none focus:ring-rose-500 sm:text-sm"
-            placeholder="john@example.com"
+            placeholder="seu@email.com"
             required
           />
         </div>
 
         <div>
-          <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-            Celular
+          <label
+            htmlFor="phone"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Celular (WhatsApp) <span className="text-red-500">*</span>
           </label>
           <input
             type="tel"
             id="phone"
+            name="phone"
             value={PhoneFormat(formData.phone)}
             onChange={handlePhoneChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-rose-500 focus:outline-none focus:ring-rose-500 sm:text-sm"
-            placeholder="(123) 456-7890"
+            className={`mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-rose-500 sm:text-sm ${
+              !isPhoneValid && formData.phone.length > 0
+                ? "border-red-500 focus:border-red-500"
+                : "border-gray-300 focus:border-rose-500"
+            }`}
+            placeholder="(XX) XXXXX-XXXX"
             required
+            maxLength={15} // Tamanho da string formatada (XX) XXXXX-XXXX
           />
+          {!isPhoneValid && formData.phone.length > 0 && (
+            <p className="mt-1 text-xs text-red-600">{phoneErrorMessage}</p>
+          )}
         </div>
       </div>
 
-      <div className="rounded-md bg-gray-50 p-4">
-        <h3 className="text-sm font-medium text-gray-900">Resumo do agendamento</h3>
-        <div className="mt-2 space-y-2 text-sm text-gray-600">
+      <div className="rounded-md bg-gray-100 p-4">
+        <h3 className="text-sm font-semibold text-gray-800">
+          Resumo do Agendamento
+        </h3>
+        <div className="mt-2 space-y-1 text-sm text-gray-700">
           {formData.service && (
             <div className="flex justify-between">
               <span>Serviço:</span>
               <span className="font-medium">
-                {formData.service === "haircut" && "Haircut"}
-                {formData.service === "color" && "Hair Coloring"}
-                {formData.service === "highlights" && "Highlights"}
-                {formData.service === "blowout" && "Blowout"}
+                {serviceNameDisplay || `ID: ${formData.service}`}
               </span>
             </div>
           )}
 
-          {formData.attendant && (
+          {formData.barber && ( // Mudado de formData.attendant para formData.barber
             <div className="flex justify-between">
-              <span>Stylist:</span>
+              <span>Profissional:</span>
               <span className="font-medium">
-                {formData.attendant === "emma" && "Emma Wilson"}
-                {formData.attendant === "james" && "James Taylor"}
-                {formData.attendant === "sophia" && "Sophia Garcia"}
-                {formData.attendant === "michael" && "Michael Chen"}
+                {barberNameDisplay || `ID: ${formData.barber}`}
               </span>
             </div>
           )}
@@ -107,23 +186,19 @@ export default function PersonalInfo({ formData, updateFormData }: PersonalInfoP
             <div className="flex justify-between">
               <span>Data:</span>
               <span className="font-medium">
-                {new Date(formData.date).toLocaleDateString("pt-br", {
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
+                {formatDateForDisplay(formData.date)}
               </span>
             </div>
           )}
 
           {formData.time && (
             <div className="flex justify-between">
-              <span>Horario:</span>
-              <span className="font-medium">{formData.time} horas</span>
+              <span>Horário:</span>
+              <span className="font-medium">{formData.time}</span>
             </div>
           )}
         </div>
       </div>
     </div>
-  )
+  );
 }

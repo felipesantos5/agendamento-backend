@@ -9,6 +9,8 @@ import { AdminLayout } from "./layouts/AdminLayout";
 // import { DashboardPage } from "./pages/admin/DashboardPage"; // Exemplo de página
 import { BarbeariaConfigPage } from "./pages/BarbeariaPage";
 import { ServicesPage } from "./pages/ServicesPage";
+import { BarberPage } from "./pages/BarberPage";
+import { AgendamentosPage } from "./pages/AgendamentosPage";
 // Importe outras páginas: FuncionariosPage, ServicosPage, AgendamentosPage
 
 // Simulação de autenticação e contexto da barbearia
@@ -40,6 +42,8 @@ function App() {
           {/* <Route path="dashboard" element={<DashboardPage />} /> */}
           <Route path="configuracoes" element={<BarbeariaConfigPage />} />
           <Route path="servicos" element={<ServicesPage />} />
+          <Route path="funcionarios" element={<BarberPage />} />
+          <Route path="agendamentos" element={<AgendamentosPage />} />
           {/* Adicione outras páginas aqui:
           <Route path="funcionarios" element={<FuncionariosPage />} />
           <Route path="servicos" element={<ServicosPage />} />
@@ -49,20 +53,9 @@ function App() {
 
         {/* Fallback para slugs não encontrados ou página inicial do admin.seudominio.com */}
         {/* Você pode querer uma página que lista barbearias ou um login geral aqui */}
-        <Route
-          path="/"
-          element={
-            <div>
-              Página inicial do Admin (ou redirecionar para login/seleção de
-              barbearia)
-            </div>
-          }
-        />
+        <Route path="/" element={<div>Página inicial do Admin (ou redirecionar para login/seleção de barbearia)</div>} />
 
-        <Route
-          path="*"
-          element={<div>Erro 404 - Página Admin Não Encontrada</div>}
-        />
+        <Route path="*" element={<div>Erro 404 - Página Admin Não Encontrada</div>} />
       </Routes>
     </BrowserRouter>
   );
