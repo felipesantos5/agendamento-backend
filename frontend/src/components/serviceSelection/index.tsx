@@ -73,7 +73,7 @@ export default function ServiceSelection({
           </SelectTrigger>
           <SelectContent>
             {services.map((service) => (
-              <SelectItem key={service._id} value={service.name}>
+              <SelectItem key={service._id} value={service._id}>
                 {service.name}
               </SelectItem>
             ))}

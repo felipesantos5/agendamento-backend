@@ -1,110 +1,136 @@
-import { useState } from "react"
-import { Calendar, Clock } from "lucide-react"
+import { useState, useEffect } from "react";
+import { Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import axios from "axios";
 
 interface DateTimeSelectionProps {
   formData: {
-    date: string
-    time: string
-    [key: string]: string
-  }
-  updateFormData: (data: Partial<{ date: string; time: string }>) => void
+    date: string;
+    time: string;
+    [key: string]: string;
+  };
+  updateFormData: (data: Partial<{ date: string; time: string }>) => void;
+  barbershopId: string | undefined;
+  selectedBarber: string | undefined;
 }
 
-export default function DateTimeSelection({ formData, updateFormData }: DateTimeSelectionProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date())
+export default function DateTimeSelection({
+  formData,
+  updateFormData,
+  barbershopId,
+  selectedBarber,
+}: DateTimeSelectionProps) {
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
+  const [loadingTimes, setLoadingTimes] = useState(false);
 
-  // Generate dates for the current month
-  const getDaysInMonth = (year: number, month: number) => {
-    return new Date(year, month + 1, 0).getDate()
-  }
+  // Efeito para buscar horários disponíveis quando a data ou o barbeiro mudam
+  useEffect(() => {
+    const fetchAvailableTimes = async () => {
+      if (formData.date && selectedBarber && barbershopId) {
+        setLoadingTimes(true);
+        try {
+          const response = await axios.get(
+            `http://localhost:3001/barbershops/${barbershopId}/barbers/${selectedBarber}/free-slots`,
+            {
+              params: { date: formData.date },
+            }
+          );
+          setAvailableTimes(response.data);
+        } catch (error) {
+          console.error("Erro ao buscar horários:", error);
+          setAvailableTimes([]); // Limpa os horários em caso de erro
+        } finally {
+          setLoadingTimes(false);
+        }
+      } else {
+        setAvailableTimes([]); // Limpa se não houver data ou barbeiro selecionado
+      }
+    };
 
-  const getFirstDayOfMonth = (year: number, month: number) => {
-    return new Date(year, month, 1).getDay()
-  }
+    fetchAvailableTimes();
+  }, [formData.date, selectedBarber, barbershopId]);
 
-  const year = currentMonth.getFullYear()
-  const month = currentMonth.getMonth()
-  const daysInMonth = getDaysInMonth(year, month)
-  const firstDayOfMonth = getFirstDayOfMonth(year, month)
+  // --- Lógica do Calendário ---
+  const getDaysInMonth = (year: number, month: number) =>
+    new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year: number, month: number) =>
+    new Date(year, month, 1).getDay();
 
+  const year = currentMonth.getFullYear();
+  const month = currentMonth.getMonth();
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDayOfMonth = getFirstDayOfMonth(year, month);
   const monthNames = [
-    "January",
-    "February",
-    "March",
-    "April",
-    "May",
-    "June",
-    "July",
-    "August",
-    "September",
-    "October",
-    "November",
-    "December",
-  ]
+    "Janeiro",
+    "Fevereiro",
+    "Março",
+    "Abril",
+    "Maio",
+    "Junho",
+    "Julho",
+    "Agosto",
+    "Setembro",
+    "Outubro",
+    "Novembro",
+    "Dezembro",
+  ];
+  const days = Array(firstDayOfMonth)
+    .fill(null)
+    .concat(Array.from({ length: daysInMonth }, (_, i) => i + 1));
 
-  // Available time slots
-  const timeSlots = [
-    "9:00 AM",
-    "10:00 AM",
-    "11:00 AM",
-    "12:00 PM",
-    "1:00 PM",
-    "2:00 PM",
-    "3:00 PM",
-    "4:00 PM",
-    "5:00 PM",
-  ]
-
-  // Generate calendar days
-  const days = []
-  for (let i = 0; i < firstDayOfMonth; i++) {
-    days.push(null) // Empty cells for days before the 1st of the month
-  }
-
-  for (let i = 1; i <= daysInMonth; i++) {
-    days.push(i)
-  }
-
-  const handlePrevMonth = () => {
-    setCurrentMonth(new Date(year, month - 1, 1))
-  }
-
-  const handleNextMonth = () => {
-    setCurrentMonth(new Date(year, month + 1, 1))
-  }
+  const handlePrevMonth = () => setCurrentMonth(new Date(year, month - 1, 1));
+  const handleNextMonth = () => setCurrentMonth(new Date(year, month + 1, 1));
 
   const handleDateSelect = (day: number) => {
-    const selectedDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-    updateFormData({ date: selectedDate })
-  }
+    const selectedDate = `${year}-${String(month + 1).padStart(
+      2,
+      "0"
+    )}-${String(day).padStart(2, "0")}`;
+    updateFormData({ date: selectedDate, time: "" }); // Reseta a hora ao mudar a data
+  };
 
   const isDateInPast = (day: number) => {
-    const today = new Date()
-    const selectedDate = new Date(year, month, day)
-    return selectedDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  }
+    const today = new Date();
+    const selectedDate = new Date(year, month, day);
+    return (
+      selectedDate < new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    );
+  };
+  // --- Fim da Lógica do Calendário ---
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Choose Date & Time</h2>
-        <p className="mt-1 text-sm text-gray-500">Select when you'd like to visit us</p>
+        <h2 className="text-xl font-semibold text-gray-900">
+          Escolha a Data e Hora
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Selecione quando você gostaria de nos visitar
+        </p>
       </div>
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="flex items-center text-sm font-medium text-gray-700">
             <Calendar className="mr-2 h-4 w-4" />
-            Select Date
+            Selecione a Data
           </label>
           <div className="flex items-center space-x-2">
-            <button type="button" onClick={handlePrevMonth} className="rounded-md p-1 text-gray-500 hover:bg-gray-100">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+            >
               <ChevronLeft className="h-5 w-5" />
             </button>
             <span className="text-sm font-medium">
               {monthNames[month]} {year}
             </span>
-            <button type="button" onClick={handleNextMonth} className="rounded-md p-1 text-gray-500 hover:bg-gray-100">
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="rounded-md p-1 text-gray-500 hover:bg-gray-100"
+            >
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
@@ -112,7 +138,7 @@ export default function DateTimeSelection({ formData, updateFormData }: DateTime
 
         <div className="overflow-hidden rounded-lg border border-gray-200">
           <div className="grid grid-cols-7 bg-gray-50 text-center">
-            {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((day) => (
+            {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
               <div key={day} className="py-2 text-xs font-medium text-gray-500">
                 {day}
               </div>
@@ -120,19 +146,28 @@ export default function DateTimeSelection({ formData, updateFormData }: DateTime
           </div>
           <div className="grid grid-cols-7 gap-px bg-gray-200">
             {days.map((day, index) => (
-              <div key={index} className={`bg-white p-2 ${!day ? "cursor-default" : "cursor-pointer"}`}>
+              <div
+                key={index}
+                className={`bg-white p-2 ${
+                  !day ? "cursor-default" : "cursor-pointer"
+                }`}
+              >
                 {day && (
                   <button
                     type="button"
                     disabled={isDateInPast(day)}
                     onClick={() => handleDateSelect(day)}
-                    className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm ${isDateInPast(day)
+                    className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full text-sm ${
+                      isDateInPast(day)
                         ? "cursor-not-allowed text-gray-300"
                         : formData.date ===
-                          `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-                          ? "bg-rose-500 text-white"
-                          : "hover:bg-rose-100"
-                      }`}
+                          `${year}-${String(month + 1).padStart(
+                            2,
+                            "0"
+                          )}-${String(day).padStart(2, "0")}`
+                        ? "bg-rose-500 text-white"
+                        : "hover:bg-rose-100"
+                    }`}
                   >
                     {day}
                   </button>
@@ -146,31 +181,49 @@ export default function DateTimeSelection({ formData, updateFormData }: DateTime
       <div className="space-y-4">
         <label className="flex items-center text-sm font-medium text-gray-700">
           <Clock className="mr-2 h-4 w-4" />
-          Select Time
+          Selecione o Horário
         </label>
-        <div className="grid grid-cols-3 gap-2">
-          {timeSlots.map((time) => (
-            <button
-              key={time}
-              type="button"
-              disabled={!formData.date}
-              onClick={() => updateFormData({ time })}
-              className={`rounded-md border p-2 text-center text-sm transition-colors ${!formData.date
-                  ? "cursor-not-allowed border-gray-200 bg-gray-50 text-gray-300"
-                  : formData.time === time
-                    ? "border-rose-500 bg-rose-50 text-rose-700"
-                    : "border-gray-200 hover:border-rose-200 hover:bg-rose-50/50"
-                }`}
-            >
-              {time}
-            </button>
-          ))}
-        </div>
-        {!formData.date && <p className="text-xs text-gray-500">Please select a date first</p>}
+        {!selectedBarber && (
+          <p className="text-xs text-red-500">
+            Por favor, selecione um barbeiro na etapa anterior.
+          </p>
+        )}
+        {!formData.date && selectedBarber && (
+          <p className="text-xs text-gray-500">
+            Por favor, selecione uma data primeiro.
+          </p>
+        )}
+
+        {loadingTimes ? (
+          <p className="text-sm text-gray-500">Carregando horários...</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-2">
+            {availableTimes.length > 0 ? (
+              availableTimes.map((time) => (
+                <button
+                  key={time}
+                  type="button"
+                  onClick={() => updateFormData({ time })}
+                  className={`rounded-md border p-2 text-center text-sm transition-colors ${
+                    formData.time === time
+                      ? "border-rose-500 bg-rose-50 text-rose-700"
+                      : "border-gray-200 hover:border-rose-200 hover:bg-rose-50/50"
+                  }`}
+                >
+                  {time}
+                </button>
+              ))
+            ) : (
+              formData.date &&
+              selectedBarber && (
+                <p className="col-span-3 text-sm text-gray-500">
+                  Nenhum horário disponível para este dia.
+                </p>
+              )
+            )}
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
-
-// Import for the ChevronLeft and ChevronRight icons
-import { ChevronLeft, ChevronRight } from "lucide-react"

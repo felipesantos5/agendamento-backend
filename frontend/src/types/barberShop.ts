@@ -1,6 +1,6 @@
 interface Customer {
   name: string;
-  whatsapp: string;
+  phone: string;
 }
 
 export interface Data {

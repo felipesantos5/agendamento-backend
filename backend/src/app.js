@@ -4,6 +4,7 @@ import cors from "cors";
 import { z } from "zod";
 import twilio from "twilio";
 import "dotenv/config";
+import { parseISO, startOfDay, endOfDay } from "date-fns";
 
 import Barbershop from "./models/Barbershop.js";
 import { BarbershopSchema, BarbershopUpdateSchema } from "./validations/barbershopValidation.js";
@@ -50,7 +51,6 @@ const Booking = model(
     customer: {
       name: String,
       phone: String,
-      whatsapp: String,
     },
     time: Date,
     status: { type: String, default: "booked" },
@@ -75,7 +75,7 @@ const bookingSchema = z.object({
   barbershop: z.string(),
   barber: z.string(),
   service: z.string(),
-  customer: z.object({ name: z.string(), phone: z.string(), whatsapp: z.string() }),
+  customer: z.object({ name: z.string(), phone: z.string() }),
   time: z.string(),
 });
 
@@ -225,80 +225,136 @@ app.get("/barbershops/:id/services", async (req, res) => {
 });
 
 // --- Agendamentos ---
-app.post("/barbershops/:id/bookings", async (req, res) => {
-  try {
-    const data = bookingSchema.parse({ ...req.body, barbershop: req.params.id });
+// app.post("/barbershops/:id/bookings", async (req, res) => {
+//   try {
+//     const data = bookingSchema.parse({ ...req.body, barbershop: req.params.id });
 
-    // Verifica conflito de horário do barbeiro
-    const conflict = await Booking.findOne({
-      barber: data.barber,
-      time: new Date(data.time),
-    });
-    if (conflict) return res.status(409).json({ error: "Horário já agendado para esse barbeiro." });
+//     // Verifica conflito de horário do barbeiro
+//     const conflict = await Booking.findOne({
+//       barber: data.barber,
+//       time: new Date(data.time),
+//     });
+//     if (conflict) return res.status(409).json({ error: "Horário já agendado para esse barbeiro." });
 
-    const created = await Booking.create({ ...data, time: new Date(data.time) });
+//     const created = await Booking.create({ ...data, time: new Date(data.time) });
 
-    const message = `Novo agendamento: ${data.customer.name} - ${data.time}`;
-    const barbeiroNumber = "5548991319311"; // Assumindo que o número do barbeiro está no objeto barbersh
+//     const message = `Novo agendamento: ${data.customer.name} - ${data.time}`;
+//     const barbeiroNumber = "5548991319311"; // Assumindo que o número do barbeiro está no objeto barbersh
 
-    // await sendMessage(barbeiroNumber, message);
+//     // await sendMessage(barbeiroNumber, message);
 
-    res.status(201).json(created);
-  } catch (e) {
-    res.status(400).json({ error: e.errors || e.message });
-  }
-});
+//     res.status(201).json(created);
+//   } catch (e) {
+//     res.status(400).json({ error: e.errors || e.message });
+//   }
+// });
 
 app.get("/barbershops/:barbershopId/barbers/:barberId/free-slots", async (req, res) => {
-  const { date } = req.query; // "2025-05-10"
-  const { barberId } = req.params;
+  try {
+    const { date } = req.query; // Espera "YYYY-MM-DD"
+    const { barberId } = req.params;
 
-  // Pega o barbeiro e sua disponibilidade
-  const barber = await Barber.findById(barberId);
-  if (!barber) return res.status(404).json({ error: "Barbeiro não encontrado" });
-
-  // Descobre se ele trabalha nesse dia
-  const data = new Date();
-  const diasSemana = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
-  const dia = diasSemana[data.getDay()];
-  const slot = barber.availability.find((a) => a.day === dia);
-  if (!slot) return res.json([]); // Não trabalha nesse dia
-
-  // Gera os horários base (slots)
-  let slots = [];
-  let [hAtual, mAtual] = slot.start.split(":").map(Number);
-  const [hEnd, mEnd] = slot.end.split(":").map(Number);
-  while (hAtual < hEnd || (hAtual === hEnd && mAtual < mEnd)) {
-    slots.push(`${String(hAtual).padStart(2, "0")}:${String(mAtual).padStart(2, "0")}`);
-    mAtual += 30;
-    if (mAtual >= 60) {
-      hAtual++;
-      mAtual = 0;
+    if (!date) {
+      return res.status(400).json({ error: "A data deve ser fornecida." });
     }
+
+    const barber = await Barber.findById(barberId);
+    if (!barber) {
+      return res.status(404).json({ error: "Barbeiro não encontrado." });
+    }
+
+    // `parseISO` converte "2025-06-02" para uma data em UTC no início do dia.
+    const selectedDate = parseISO(date);
+
+    // Mapeia o dia da semana (0=Domingo, 1=Segunda, etc.)
+    const dayOfWeekName = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"][selectedDate.getUTCDay()];
+
+    const workHours = barber.availability.find((a) => a.day === dayOfWeekName);
+    if (!workHours) {
+      return res.json([]); // Retorna lista vazia se o barbeiro não trabalha
+    }
+
+    // Gera todos os slots de 30 minutos do dia
+    const slotInterval = 30;
+    const allSlots = [];
+    const [startHour, startMinute] = workHours.start.split(":").map(Number);
+    const [endHour, endMinute] = workHours.end.split(":").map(Number);
+
+    const dayStart = new Date(selectedDate);
+    dayStart.setUTCHours(startHour, startMinute, 0, 0);
+
+    const dayEnd = new Date(selectedDate);
+    dayEnd.setUTCHours(endHour, endMinute, 0, 0);
+
+    let currentSlot = new Date(dayStart);
+    while (currentSlot < dayEnd) {
+      allSlots.push(currentSlot.toISOString().slice(11, 16)); // Formato "HH:mm"
+      currentSlot.setUTCMinutes(currentSlot.getUTCMinutes() + slotInterval);
+    }
+
+    // Busca agendamentos existentes para o dia inteiro (em UTC)
+    const bookings = await Booking.find({
+      barber: barberId,
+      time: {
+        $gte: startOfDay(selectedDate),
+        $lt: endOfDay(selectedDate),
+      },
+    });
+
+    // Extrai apenas os horários "HH:mm" dos agendamentos existentes
+    const bookedTimes = bookings.map(b => {
+        const bookingDate = new Date(b.time);
+        const hour = String(bookingDate.getUTCHours()).padStart(2, '0');
+        const minute = String(bookingDate.getUTCMinutes()).padStart(2, '0');
+        return `${hour}:${minute}`;
+    });
+
+    // Filtra os slots, retornando apenas os que NÃO estão na lista de agendados
+    const freeSlots = allSlots.filter(slot => !bookedTimes.includes(slot));
+
+    res.json(freeSlots);
+
+  } catch (error) {
+    console.error("Erro ao buscar horários livres:", error);
+    res.status(500).json({ error: "Erro interno ao processar a solicitação." });
   }
-
-  // Busca bookings já feitos para esse barbeiro naquela data
-  const bookings = await Booking.find({
-    barber: barberId,
-    time: {
-      $gte: startOfDay(data),
-      $lt: endOfDay(data),
-    },
-  });
-
-  const ocupados = bookings.map((b) => {
-    const hora = new Date(b.time).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", hour12: false });
-    return hora;
-  });
-
-  // Filtra só slots livres
-  const livres = slots.filter((slot) => !ocupados.includes(slot));
-  res.json(livres);
 });
 
 // Listar agendamentos da barbearia
-app.get("/barbershops/:id/bookings", async (req, res) => {
-  res.json(await Booking.find({ barbershop: req.params.id }).populate("barber service"));
+app.post("/barbershops/:id/bookings", async (req, res) => {
+  try {
+    // 1. Validar os dados recebidos com Zod
+    const data = bookingSchema.parse({
+      ...req.body,
+      barbershop: req.params.id,
+    });
+
+    const bookingTime = new Date(data.time);
+
+    // 2. Verificar se o horário já foi agendado (dupla checagem de segurança)
+    const conflict = await Booking.findOne({
+      barber: data.barber,
+      time: bookingTime,
+    });
+
+    if (conflict) {
+      return res.status(409).json({ error: "Este horário acabou de ser preenchido. Por favor, escolha outro." });
+    }
+
+    // 3. Se não houver conflito, criar o agendamento no banco
+    const createdBooking = await Booking.create({
+      ...data,
+      time: bookingTime,
+    });
+
+    res.status(201).json(createdBooking);
+
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: "Dados inválidos.", details: e.errors });
+    }
+    res.status(500).json({ error: "Erro interno ao criar agendamento." });
+  }
 });
 
 // Listar agendamentos do cliente

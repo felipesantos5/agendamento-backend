@@ -1,3 +1,5 @@
+import { PhoneFormat } from "@/helper/phoneFormater"
+
 interface PersonalInfoProps {
   formData: {
     name: string
@@ -9,17 +11,28 @@ interface PersonalInfoProps {
 }
 
 export default function PersonalInfo({ formData, updateFormData }: PersonalInfoProps) {
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // 1. Pega o valor do input (que pode estar formatado).
+    const inputValue = e.target.value;
+
+    // 2. Remove todos os caracteres não numéricos.
+    const digitsOnly = inputValue.replace(/\D/g, "");
+
+    // 3. Atualiza o estado `formData.phone` apenas com os dígitos.
+    updateFormData({ phone: digitsOnly });
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Your Details</h2>
-        <p className="mt-1 text-sm text-gray-500">Please provide your contact information</p>
+        <h2 className="text-xl font-semibold text-gray-900">Dados pessoais</h2>
+        <p className="mt-1 text-sm text-gray-500">Por favor informe seus dados de contato</p>
       </div>
 
       <div className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Full Name
+            Nome Completo
           </label>
           <input
             type="text"
@@ -34,7 +47,7 @@ export default function PersonalInfo({ formData, updateFormData }: PersonalInfoP
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email Address
+            Email
           </label>
           <input
             type="email"
@@ -49,13 +62,13 @@ export default function PersonalInfo({ formData, updateFormData }: PersonalInfoP
 
         <div>
           <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-            Phone Number
+            Celular
           </label>
           <input
             type="tel"
             id="phone"
-            value={formData.phone}
-            onChange={(e) => updateFormData({ phone: e.target.value })}
+            value={PhoneFormat(formData.phone)}
+            onChange={handlePhoneChange}
             className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-rose-500 focus:outline-none focus:ring-rose-500 sm:text-sm"
             placeholder="(123) 456-7890"
             required
@@ -64,11 +77,11 @@ export default function PersonalInfo({ formData, updateFormData }: PersonalInfoP
       </div>
 
       <div className="rounded-md bg-gray-50 p-4">
-        <h3 className="text-sm font-medium text-gray-900">Appointment Summary</h3>
+        <h3 className="text-sm font-medium text-gray-900">Resumo do agendamento</h3>
         <div className="mt-2 space-y-2 text-sm text-gray-600">
           {formData.service && (
             <div className="flex justify-between">
-              <span>Service:</span>
+              <span>Serviço:</span>
               <span className="font-medium">
                 {formData.service === "haircut" && "Haircut"}
                 {formData.service === "color" && "Hair Coloring"}
@@ -92,11 +105,11 @@ export default function PersonalInfo({ formData, updateFormData }: PersonalInfoP
 
           {formData.date && (
             <div className="flex justify-between">
-              <span>Date:</span>
+              <span>Data:</span>
               <span className="font-medium">
-                {new Date(formData.date).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
+                {new Date(formData.date).toLocaleDateString("pt-br", {
+                  weekday: "long",
+                  month: "long",
                   day: "numeric",
                 })}
               </span>
@@ -105,8 +118,8 @@ export default function PersonalInfo({ formData, updateFormData }: PersonalInfoP
 
           {formData.time && (
             <div className="flex justify-between">
-              <span>Time:</span>
-              <span className="font-medium">{formData.time}</span>
+              <span>Horario:</span>
+              <span className="font-medium">{formData.time} horas</span>
             </div>
           )}
         </div>
