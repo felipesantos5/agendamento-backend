@@ -84,19 +84,6 @@ const bookingSchema = z.object({
   time: z.string(),
 });
 
-const sendMessage = async (to, message) => {
-  const client2 = "cliente2";
-  client.messages
-    .create({
-      from: "whatsapp:+14155238886",
-      // contentSid: "HX229f5a04fd0510ce1b071852155d3e75",
-      // contentVariables: '{"1":"12/1","2":"3pm"}',
-      body: `${client2} teste`,
-      to: "whatsapp:+554891319311",
-    })
-    .then((message) => console.log(message));
-};
-
 // --- App Express ---
 const app = express();
 
@@ -109,11 +96,91 @@ app.use(
   })
 );
 
+async function setBarbershopContext(req, res, next) {
+  const identifier = req.params.slugOuIdBarbearia; // Pega o identificador da URL
+
+  if (!identifier) {
+    // Se suas rotas não tiverem esse parâmetro, você precisaria de outra forma
+    // de identificar a barbearia (ex: um cabeçalho X-Barbershop-Slug)
+    return res
+      .status(400)
+      .json({ error: "Identificador da barbearia não fornecido na rota." });
+  }
+
+  try {
+    let barbershopContext;
+    // Verifica se o identificador é um ObjectId válido
+    if (mongoose.Types.ObjectId.isValid(identifier)) {
+      barbershopContext = await Barbershop.findById(identifier)
+        .select("_id name")
+        .lean();
+    } else {
+      // Se não for ObjectId, assume que é um slug
+      barbershopContext = await Barbershop.findOne({ slug: identifier })
+        .select("_id name")
+        .lean();
+    }
+
+    if (!barbershopContext) {
+      return res.status(404).json({ error: "Barbearia não encontrada." });
+    }
+
+    // Adiciona o ID da barbearia (e talvez o nome) ao objeto da requisição
+    // para que as rotas subsequentes possam usá-lo.
+    req.barbershopIdContexto = barbershopContext._id.toString();
+    req.barbershopNameContexto = barbershopContext.name;
+    next(); // Prossegue para a próxima função de middleware ou para a rota
+  } catch (error) {
+    console.error("Erro no middleware setBarbershopContext:", error);
+    return res
+      .status(500)
+      .json({ error: "Erro interno ao definir o contexto da barbearia." });
+  }
+}
+
 const accountSid = "ACfbf9955ebbc98189a60eb71e3f5b007b"; // Substitua pelo seu Account SID
-const authToken = "03da1955e69c03b02972d14bb328d8b6"; // Substitua pelo seu Auth Token
+const authToken = "48d997484cb70c6a082f98dbe43e1091"; // Substitua pelo seu Auth Token
+const twilioWhatsappNumber = "+14155238886";
 
 // Inicialize o cliente Twilio
 const client = twilio(accountSid, authToken);
+
+async function sendWhatsAppConfirmation(
+  customerName,
+  customerPhone,
+  bookingDate
+) {
+  try {
+    // Formata a data e hora para uma leitura amigável
+    const formattedDate = new Date(bookingDate).toLocaleDateString("pt-BR");
+    const formattedTime = new Date(bookingDate).toLocaleTimeString("pt-BR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "America/Sao_Paulo",
+    });
+
+    const messageBody = `Olá, ${customerName}! Seu agendamento para o dia ${formattedDate} às ${formattedTime} foi confirmado com sucesso. ✅`;
+
+    await client.messages.create({
+      from: `whatsapp:${twilioWhatsappNumber}`,
+      to: `whatsapp:+55${customerPhone}`, // Garante o formato internacional
+      body: messageBody,
+      // Para produção com templates, o formato seria um pouco diferente:
+      // contentSid: 'SEU_CONTENT_SID_DO_TEMPLATE',
+      // contentVariables: JSON.stringify({
+      //   1: customerName,
+      //   2: formattedDate,
+      //   3: formattedTime,
+      // }),
+    });
+
+    console.log(`Mensagem de confirmação enviada para ${customerName}`);
+  } catch (error) {
+    console.error("Erro ao enviar mensagem de WhatsApp:", error);
+    // É importante que um erro aqui não impeça o agendamento de ser confirmado para o usuário.
+    // Você pode querer adicionar um sistema de log ou alerta para esses casos.
+  }
+}
 
 // --- Barbearia ---
 // CRIAÇÃO
@@ -237,29 +304,39 @@ app.post("/barbershops/:id/bookings", async (req, res) => {
       barbershop: req.params.id,
     });
 
-    // Verifica conflito de horário do barbeiro
+    const bookingTime = new Date(data.time);
+
     const conflict = await Booking.findOne({
       barber: data.barber,
-      time: new Date(data.time),
+      time: bookingTime,
     });
-    if (conflict)
-      return res
-        .status(409)
-        .json({ error: "Horário já agendado para esse barbeiro." });
 
-    const created = await Booking.create({
+    if (conflict) {
+      return res.status(409).json({
+        error:
+          "Este horário acabou de ser preenchido. Por favor, escolha outro.",
+      });
+    }
+
+    const createdBooking = await Booking.create({
       ...data,
-      time: new Date(data.time),
+      time: bookingTime,
     });
 
-    const message = `Novo agendamento: ${data.customer.name} - ${data.time}`;
-    const barbeiroNumber = "5548991319311"; // Assumindo que o número do barbeiro está no objeto barbersh
+    // ✅ CHAMA A FUNÇÃO DE ENVIO APÓS O SUCESSO DO AGENDAMENTO ✅
+    if (createdBooking) {
+      // Chama a função sem esperar (em "segundo plano") para não atrasar a resposta ao frontend
+      sendWhatsAppConfirmation(
+        createdBooking.customer.name,
+        createdBooking.customer.phone,
+        createdBooking.time
+      );
+    }
 
-    // await sendMessage(barbeiroNumber, message);
-
-    res.status(201).json(created);
+    res.status(201).json(createdBooking);
   } catch (e) {
-    res.status(400).json({ error: e.errors || e.message });
+    console.error("ERRO AO CRIAR AGENDAMENTO:", e);
+    // ... (resto do seu 'catch' block)
   }
 });
 
@@ -277,9 +354,7 @@ app.get(
       }
 
       const barber = await Barber.findById(barberId);
-      if (!barber) {
-        return res.json([]); // Retorna vazio se o barbeiro não existe
-      }
+      if (!barber) return res.json([]);
 
       const selectedDate = parseISO(date);
       const dayOfWeekName = [
@@ -295,34 +370,52 @@ app.get(
         (a) => a.day === dayOfWeekName
       );
 
-      if (!workHours) {
-        return res.json([]); // Barbeiro não trabalha neste dia
-      }
+      if (!workHours) return res.json([]);
 
-      const allSlots = [];
+      // ✅ CORREÇÃO: Geração de horários locais de forma simples e direta
+      const allLocalSlots = [];
       const [startHour, startMinute] = workHours.start.split(":").map(Number);
       const [endHour, endMinute] = workHours.end.split(":").map(Number);
-      let currentSlot = new Date(selectedDate);
-      currentSlot.setUTCHours(startHour, startMinute, 0, 0);
-      const dayEnd = new Date(selectedDate);
-      dayEnd.setUTCHours(endHour, endMinute, 0, 0);
+      const slotInterval = 30; // 30 minutos
 
-      while (currentSlot < dayEnd) {
-        allSlots.push(currentSlot.toISOString().slice(11, 16));
-        currentSlot.setUTCMinutes(currentSlot.getUTCMinutes() + 30);
+      let currentHour = startHour;
+      let currentMinute = startMinute;
+
+      while (
+        currentHour < endHour ||
+        (currentHour === endHour && currentMinute < endMinute)
+      ) {
+        const timeString = `${String(currentHour).padStart(2, "0")}:${String(
+          currentMinute
+        ).padStart(2, "0")}`;
+        allLocalSlots.push(timeString);
+
+        currentMinute += slotInterval;
+        if (currentMinute >= 60) {
+          currentHour++;
+          currentMinute = 0;
+        }
       }
 
+      // Busca os agendamentos existentes (esta parte já estava correta)
       const bookings = await Booking.find({
         barber: barberId,
         time: { $gte: startOfDay(selectedDate), $lt: endOfDay(selectedDate) },
       });
 
+      // Converte a hora UTC do banco para a hora local do Brasil (esta parte já estava correta)
       const bookedTimes = new Set(
-        bookings.map((b) => new Date(b.time).toISOString().slice(11, 16))
+        bookings.map((booking) => {
+          return new Date(booking.time).toLocaleTimeString("pt-BR", {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "America/Sao_Paulo", // Fuso horário do Brasil
+          });
+        })
       );
 
-      // ✅ NOVO: Mapeia todos os horários e adiciona o status 'isBooked'
-      const slotsWithStatus = allSlots.map((time) => ({
+      // Mapeia todos os horários locais e adiciona o status 'isBooked'
+      const slotsWithStatus = allLocalSlots.map((time) => ({
         time: time,
         isBooked: bookedTimes.has(time),
       }));
