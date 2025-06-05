@@ -13,6 +13,7 @@ import { PhoneFormat } from "@/helper/phoneFormater";
 import { CepFormat } from "@/helper/cepFormarter";
 import { ImageUploader } from "./ImageUploader";
 import apiClient from "@/services/api";
+import { ColorSelector } from "@/components/themeColorPicker";
 
 // Tipos para os dados da barbearia (espelhando seus schemas do backend)
 interface Address {
@@ -41,6 +42,7 @@ interface BarbershopData {
   contact: string;
   slug: string;
   workingHours: WorkingHour[];
+  themeColor: string;
 }
 
 // Estado inicial para o formulário (parcial, pois será preenchido após o fetch)
@@ -57,6 +59,7 @@ const initialBarbershopState: Partial<BarbershopData> = {
     complemento: "",
   },
   logoUrl: "",
+  themeColor: "",
   contact: "",
   slug: "",
   workingHours: [],
@@ -135,6 +138,13 @@ export function BarbeariaConfigPage() {
     setFormData((prev) => ({
       ...prev,
       address: { ...prev?.address, [name]: value } as Address,
+    }));
+  };
+
+  const handleThemeColorChange = (newColor: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      themeColor: newColor,
     }));
   };
 
@@ -282,6 +292,15 @@ export function BarbeariaConfigPage() {
             {isUploading && <p className="text-sm text-blue-600 mt-2">Enviando logo...</p>}
           </div>
 
+          <div className="space-y-2">
+            <ColorSelector
+              label="Cor Principal da Loja"
+              color={formData.themeColor || "#D10000"} // Usa a cor do formData ou um fallback
+              onChange={handleThemeColorChange}
+            />
+            <p className="text-xs text-muted-foreground">Esta cor será usada em botões e destaques na página da sua barbearia.</p>
+          </div>
+
           {/* <div className="space-y-2">
             <Label htmlFor="logoUrl">URL da Logo</Label>
             <Input id="logoUrl" name="logoUrl" type="url" value={formData.logoUrl || ""} onChange={handleInputChange} />
@@ -392,7 +411,7 @@ export function BarbeariaConfigPage() {
           {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
         </CardContent>
         <CardFooter>
-          <Button type="submit" disabled={isLoading || isUploading}>
+          <Button type="submit" disabled={isLoading || isUploading} className="cursor-pointer">
             {isLoading ? (isUploading ? "Enviando Imagem..." : "Salvando...") : "Salvar Configurações"}
           </Button>
         </CardFooter>
