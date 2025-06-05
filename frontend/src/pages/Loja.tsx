@@ -11,6 +11,7 @@ import ServiceSelection from "@/components/serviceSelection";
 import DateTimeSelection from "@/components/dataTimeSelection";
 import PersonalInfo from "@/components/personalInfo";
 import StepIndicator from "@/components/stepIndicator";
+import { SocialLinks } from "@/components/socialLinks";
 
 // Type Definitions
 type Barbershop = {
@@ -18,6 +19,8 @@ type Barbershop = {
   name: string;
   logoUrl: string;
   themeColor: string;
+  instagram: string;
+  contact: string;
 };
 
 type Service = {
@@ -66,18 +69,10 @@ export const Loja = () => {
         const barbershopResponse = await axios.get(`http://localhost:3001/barbershops/slug/${slug}`);
         const currentBarbershop = barbershopResponse.data;
         setBarbershop(currentBarbershop);
-        document.title = `Agendamento em ${currentBarbershop.name}`;
+        document.title = `${currentBarbershop.name}`;
 
         if (currentBarbershop?.themeColor) {
           document.documentElement.style.setProperty("--loja-theme-color", currentBarbershop.themeColor);
-
-          // Opcional: Criar uma cor para o hover (ex: um pouco mais escura)
-          // Isso é mais complexo de fazer dinamicamente com JS para todas as cores.
-          // Uma abordagem mais simples para hover é usar opacidade ou uma classe Tailwind que escureça.
-          // Ex: document.documentElement.style.setProperty('--loja-theme-color-hover', calcularCorHover(currentBarbershop.themeColor));
-        } else {
-          // Fallback se não houver themeColor definida (usa a cor padrão do botão)
-          document.documentElement.style.removeProperty("--loja-theme-color");
         }
 
         if (currentBarbershop?._id) {
@@ -207,90 +202,93 @@ export const Loja = () => {
   }
 
   return (
-    <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-md py-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-8">
-        {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto mb-4" />}
+    <div className="flex flex-col min-h-screen">
+      <main className="bg-gray-50 flex-grow">
+        <div className="mx-auto max-w-md py-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-8">
+          {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto mb-4" />}
 
-        {/* <div className="mb-8 text-center">
+          {/* <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 md:text-3xl mt-6">Agende seu Horário</h1>
           <p className="mt-2 text-gray-600">
             Complete os passos abaixo para garantir seu horário em <span className="font-semibold">{barbershop.name}</span>
           </p>
         </div> */}
 
-        <div className="mb-8">
-          <StepIndicator currentStep={currentStep} totalSteps={totalSteps} />
-        </div>
+          <div className="mb-8">
+            <StepIndicator currentStep={currentStep} totalSteps={totalSteps} />
+          </div>
 
-        <div className="rounded-lg bg-white p-6 shadow-sm md:p-8">
-          <form onSubmit={handleSubmit}>
-            {currentStep === 1 && (
-              <ServiceSelection
-                // ✅ PASSAR LISTAS PARA ServiceSelection
-                services={allServices}
-                barbers={allBarbers}
-                selectedService={formData.service}
-                selectedBarber={formData.barber}
-                onSelectService={(serviceId) => updateFormData({ service: serviceId })}
-                onSelectBarber={(barberId) => updateFormData({ barber: barberId })}
-              />
-            )}
-
-            {currentStep === 2 && (
-              <DateTimeSelection
-                formData={formData}
-                updateFormData={updateFormData}
-                barbershopId={barbershop?._id}
-                selectedBarber={formData.barber}
-                selectedServiceId={formData.service}
-              />
-            )}
-
-            {currentStep === 3 && (
-              <PersonalInfo
-                formData={formData}
-                updateFormData={updateFormData}
-                serviceNameDisplay={selectedServiceName}
-                barberNameDisplay={selectedBarberName}
-              />
-            )}
-
-            <div className="mt-8 flex justify-between">
-              <Button type="button" variant="outline" onClick={handlePrevious} className={`cursor-pointer ${currentStep === 1 ? "invisible" : ""}`}>
-                <ChevronLeft className="mr-1 h-4 w-4" />
-                Voltar
-              </Button>
-
-              {currentStep < totalSteps ? (
-                <Button
-                  type="button"
-                  onClick={handleNext}
-                  className="bg-[var(--loja-theme-color)] text-white cursor-pointer hover:brightness-90 hover:bg-[var(--loja-theme-color)]"
-                  disabled={isNextButtonDisabled}
-                >
-                  Próximo
-                  <ChevronRight className="ml-1 h-4 w-4" />
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  className="bg-[var(--loja-theme-color)] text-white hover:brightness-90 hover:bg-[var(--loja-theme-color)] cursor-pointer"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? "Agendando..." : "Confirmar Agendamento"}
-                  <Check className="ml-1 h-4 w-4" />
-                </Button>
+          <div className="rounded-lg bg-white p-6 shadow-sm md:p-8">
+            <form onSubmit={handleSubmit}>
+              {currentStep === 1 && (
+                <ServiceSelection
+                  // ✅ PASSAR LISTAS PARA ServiceSelection
+                  services={allServices}
+                  barbers={allBarbers}
+                  selectedService={formData.service}
+                  selectedBarber={formData.barber}
+                  onSelectService={(serviceId) => updateFormData({ service: serviceId })}
+                  onSelectBarber={(barberId) => updateFormData({ barber: barberId })}
+                />
               )}
-            </div>
 
-            {message && (
-              <div className="mt-6 text-center">
-                <p className={`text-sm ${message.includes("sucesso") ? "text-green-600" : "text-red-600"}`}>{message}</p>
+              {currentStep === 2 && (
+                <DateTimeSelection
+                  formData={formData}
+                  updateFormData={updateFormData}
+                  barbershopId={barbershop?._id}
+                  selectedBarber={formData.barber}
+                  selectedServiceId={formData.service}
+                />
+              )}
+
+              {currentStep === 3 && (
+                <PersonalInfo
+                  formData={formData}
+                  updateFormData={updateFormData}
+                  serviceNameDisplay={selectedServiceName}
+                  barberNameDisplay={selectedBarberName}
+                />
+              )}
+
+              <div className="mt-8 flex justify-between">
+                <Button type="button" variant="outline" onClick={handlePrevious} className={`cursor-pointer ${currentStep === 1 ? "invisible" : ""}`}>
+                  <ChevronLeft className="mr-1 h-4 w-4" />
+                  Voltar
+                </Button>
+
+                {currentStep < totalSteps ? (
+                  <Button
+                    type="button"
+                    onClick={handleNext}
+                    className="bg-[var(--loja-theme-color)] text-white cursor-pointer hover:brightness-90 hover:bg-[var(--loja-theme-color)]"
+                    disabled={isNextButtonDisabled}
+                  >
+                    Próximo
+                    <ChevronRight className="ml-1 h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button
+                    type="submit"
+                    className="bg-[var(--loja-theme-color)] text-white hover:brightness-90 hover:bg-[var(--loja-theme-color)] cursor-pointer"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? "Agendando..." : "Confirmar Agendamento"}
+                    <Check className="ml-1 h-4 w-4" />
+                  </Button>
+                )}
               </div>
-            )}
-          </form>
+
+              {message && (
+                <div className="mt-6 text-center">
+                  <p className={`text-sm ${message.includes("sucesso") ? "text-green-600" : "text-red-600"}`}>{message}</p>
+                </div>
+              )}
+            </form>
+          </div>
         </div>
-      </div>
-    </main>
+      </main>
+      {barbershop && <SocialLinks instagramUrl={barbershop.instagram} whatsappNumber={barbershop.contact} barbershopName={barbershop.name} />}
+    </div>
   );
 };

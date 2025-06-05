@@ -41,6 +41,7 @@ interface BarbershopData {
   logoUrl?: string;
   contact: string;
   slug: string;
+  instagram: string;
   workingHours: WorkingHour[];
   themeColor: string;
 }
@@ -61,6 +62,7 @@ const initialBarbershopState: Partial<BarbershopData> = {
   logoUrl: "",
   themeColor: "",
   contact: "",
+  instagram: "",
   slug: "",
   workingHours: [],
 };
@@ -274,6 +276,11 @@ export function BarbeariaConfigPage() {
               <Input id="slug" name="slug" value={formData.slug || ""} onChange={handleInputChange} required />
               <p className="text-xs text-gray-500">Ex: nome-da-barbearia (usado na URL da sua página)</p>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="slug">Instagram</Label>
+            <Input id="instagram" name="instagram" value={formData.instagram || ""} onChange={handleInputChange} />
           </div>
 
           <div className="space-y-2">

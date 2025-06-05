@@ -39,12 +39,12 @@ export default function ServiceSelection({
       <div className="space-y-4">
         <Label className="block text-sm font-medium text-gray-700">Serviço</Label>
         <Select value={selectedService} onValueChange={onSelectService}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full cursor-pointer">
             <SelectValue placeholder="Selecione um serviço" />
           </SelectTrigger>
           <SelectContent>
             {services.map((service) => (
-              <SelectItem key={service._id} value={service._id}>
+              <SelectItem key={service._id} value={service._id} className="cursor-pointer">
                 {service.name}
               </SelectItem>
             ))}
@@ -55,12 +55,12 @@ export default function ServiceSelection({
       <div className="space-y-4">
         <Label className="block text-sm font-medium text-gray-700">Barbeiro</Label>
         <Select value={selectedBarber} onValueChange={onSelectBarber}>
-          <SelectTrigger className="w-full">
+          <SelectTrigger className="w-full cursor-pointer">
             <SelectValue placeholder="Selecione um barbeiro" />
           </SelectTrigger>
           <SelectContent>
             {barbers.map((barber) => (
-              <SelectItem key={barber._id} value={barber._id}>
+              <SelectItem key={barber._id} value={barber._id} className="cursor-pointer">
                 {barber.name}
               </SelectItem>
             ))}

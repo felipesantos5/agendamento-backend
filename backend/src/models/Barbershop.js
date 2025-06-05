@@ -17,7 +17,8 @@ const BarbershopSchema = new mongoose.Schema(
     description: { type: String, trim: true },
     address: { type: AddressSchema, required: true },
     logoUrl: { type: String },
-    contact: { type: String, required: true },
+    contact: { type: String },
+    instagram: { type: String },
     slug: { type: String, required: true, unique: true },
     workingHours: [
       {
