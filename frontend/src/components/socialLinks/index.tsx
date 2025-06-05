@@ -42,14 +42,8 @@ export function SocialLinks({
 }: AppFooterProps) {
   const whatsappLink = formatWhatsAppLink(whatsappNumber);
 
-  // Não renderiza o rodapé se não houver informações de contato ou nome
-  // (ou você pode optar por renderizar apenas o copyright)
-  // if (!instagramUrl && !whatsappLink && !barbershopName) {
-  //   return null;
-  // }
-
   return (
-    <footer className="bg-gray-100 dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800 py-6 mb-2 text-center">
+    <footer className="bg-gray-100 dark:bg-neutral-900 border-t border-gray-200 dark:border-neutral-800 py-6 text-center">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-6 flex justify-between items-center">
         <p className="text-xs text-neutral-700">
           Agendamentos por{" "}
