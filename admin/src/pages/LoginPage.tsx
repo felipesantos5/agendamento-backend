@@ -18,7 +18,7 @@ export function LoginPage() {
 
   if (auth.isAuthenticated) {
     // Se já autenticado, redireciona para o dashboard da barbearia do usuário
-    return <Navigate to={`/${auth.user?.barbershopSlug}/dashboard`} replace />;
+    return <Navigate to={`/${auth.user?.barbershopSlug}/configuracoes`} replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -56,7 +56,7 @@ export function LoginPage() {
             </div>
             {error && <p className="text-sm text-red-500">{error}</p>}
           </CardContent>
-          <CardFooter>
+          <CardFooter className="mt-4">
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>

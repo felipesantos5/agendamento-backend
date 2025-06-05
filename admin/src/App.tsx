@@ -23,7 +23,7 @@ function App() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/:barbershopSlug" element={<AdminLayout />}>
-            <Route path="dashboard" element={<DashboardPage />} />
+            <Route path="metricas" element={<DashboardPage />} />
             <Route path="configuracoes" element={<BarbeariaConfigPage />} />
             <Route path="servicos" element={<ServicesPage />} />
             <Route path="funcionarios" element={<BarberPage />} />

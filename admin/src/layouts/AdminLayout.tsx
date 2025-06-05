@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Outlet, Link, useParams, useLocation } from "react-router-dom";
-import { LayoutDashboard, Settings, Users, Scissors, CalendarDays, ShieldAlert } from "lucide-react"; // Ícones de exemplo
+import { LayoutDashboard, Settings, Users, Scissors, CalendarDays, ShieldAlert, LogOut } from "lucide-react"; // Ícones de exemplo
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/services/api";
 
@@ -84,14 +84,14 @@ export function AdminLayout() {
 
   const navItems = [
     {
-      to: "dashboard",
-      label: "Dashboard",
-      icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
-    },
-    {
       to: "configuracoes",
       label: "Minha Barbearia",
       icon: <Settings className="mr-2 h-4 w-4" />,
+    },
+    {
+      to: "metricas",
+      label: "Metricas",
+      icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
     },
     {
       to: "funcionarios",
@@ -112,17 +112,15 @@ export function AdminLayout() {
 
   return (
     <BarbershopAdminContext.Provider value={barbershop}>
-      {" "}
-      {/* Opcional: usar Context API */}
       <div className="flex min-h-screen bg-gray-100">
-        <aside className="w-64 bg-gray-900 text-gray-200 p-5 space-y-4 flex flex-col">
+        <aside className="w-64 bg-neutral-950 text-gray-200 p-5 space-y-4 flex flex-col">
           <div>
             <h1 className="text-2xl font-bold text-white mb-1">Painel</h1>
-            <h2 className="text-sm font-medium text-rose-400 truncate" title={barbershop.name}>
+            <h2 className="text-sm font-medium text-zinc-100 truncate" title={barbershop.name}>
               {barbershop.name}
             </h2>
           </div>
-          <nav className="flex flex-col space-y-1 mt-4 flex-grow">
+          <nav className="flex flex-col items-baseline space-y-1 mt-4 flex-grow">
             {navItems.map((item) => {
               const isActive =
                 location.pathname === `/admin/${barbershopSlug}/${item.to}` ||
@@ -139,8 +137,15 @@ export function AdminLayout() {
                 </Link>
               );
             })}
+            <button
+              onClick={logout}
+              className={`w-full cursor-pointer flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors text-gray-300 hover:bg-gray-800`}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sair
+            </button>
           </nav>
-          <button onClick={logout}>logout</button>
+
           {/* Você pode adicionar um botão de logout aqui */}
         </aside>
         <main className="flex-1 p-6 overflow-auto">
