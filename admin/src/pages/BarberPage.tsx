@@ -1,6 +1,5 @@
 import { useEffect, useState, ChangeEvent, FormEvent } from "react";
 import { useOutletContext } from "react-router-dom";
-import axios from "axios";
 
 // Importações de componentes ShadCN/UI
 import { Button } from "@/components/ui/button";
@@ -17,11 +16,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Edit2, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import apiClient from "@/services/api";
 
 // Contexto do AdminLayout (para obter barbershopId)
 interface AdminOutletContext {
@@ -72,7 +71,7 @@ export function BarberPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get(`http://localhost:3001/barbershops/${barbershopId}/barbers`);
+      const response = await apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/barbers`);
       setBarbers(response.data);
     } catch (err) {
       console.error("Erro ao buscar funcionários:", err);
@@ -151,9 +150,9 @@ export function BarberPage() {
 
     try {
       if (dialogMode === "add") {
-        await axios.post(`http://localhost:3001/barbershops/${barbershopId}/barbers`, barberDataPayload);
+        await apiClient.post(`http://localhost:3001/barbershops/${barbershopId}/barbers`, barberDataPayload);
       } else if (currentBarberForm._id) {
-        await axios.put(`http://localhost:3001/barbershops/${barbershopId}/barbers/${currentBarberForm._id}`, barberDataPayload);
+        await apiClient.put(`http://localhost:3001/barbershops/${barbershopId}/barbers/${currentBarberForm._id}`, barberDataPayload);
       }
       setIsDialogOpen(false);
       fetchBarbers();
@@ -167,7 +166,7 @@ export function BarberPage() {
     if (!barberToDelete || !barbershopId) return;
     setError(null);
     try {
-      await axios.delete(`http://localhost:3001/barbershops/${barbershopId}/barbers/${barberToDelete._id}`);
+      await apiClient.delete(`http://localhost:3001/barbershops/${barbershopId}/barbers/${barberToDelete._id}`);
       setBarberToDelete(null);
       fetchBarbers();
     } catch (err: any) {
@@ -216,23 +215,10 @@ export function BarberPage() {
                   <Button variant="outline" size="sm" onClick={() => openEditDialog(barber)}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button variant="destructive" size="sm" onClick={() => setBarberToDelete(barber)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                        <AlertDialogDescription>This action cannot be undone. This will permanently delete your account and remove your data from our servers.</AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction>Continue</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+
+                  <Button variant="destructive" size="sm" onClick={() => setBarberToDelete(barber)}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -281,13 +267,23 @@ export function BarberPage() {
                       <Label htmlFor={`start-${index}`} className="sr-only">
                         Início
                       </Label>
-                      <Input id={`start-${index}`} type="time" value={slot.start} onChange={(e) => handleAvailabilityChange(index, "start", e.target.value)} />
+                      <Input
+                        id={`start-${index}`}
+                        type="time"
+                        value={slot.start}
+                        onChange={(e) => handleAvailabilityChange(index, "start", e.target.value)}
+                      />
                     </div>
                     <div className="flex-1">
                       <Label htmlFor={`end-${index}`} className="sr-only">
                         Fim
                       </Label>
-                      <Input id={`end-${index}`} type="time" value={slot.end} onChange={(e) => handleAvailabilityChange(index, "end", e.target.value)} />
+                      <Input
+                        id={`end-${index}`}
+                        type="time"
+                        value={slot.end}
+                        onChange={(e) => handleAvailabilityChange(index, "end", e.target.value)}
+                      />
                     </div>
                     <Button type="button" variant="ghost" size="icon" onClick={() => removeAvailabilitySlot(index)}>
                       <Trash2 className="h-4 w-4 text-red-500" />
@@ -318,8 +314,8 @@ export function BarberPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Deleção</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja remover o funcionário "{barberToDelete?.name}"? Os agendamentos existentes para este profissional não serão afetados, mas ele não estará mais disponível para novos
-              agendamentos.
+              Tem certeza que deseja remover o funcionário "{barberToDelete?.name}"? Os agendamentos existentes para este profissional não serão
+              afetados, mas ele não estará mais disponível para novos agendamentos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

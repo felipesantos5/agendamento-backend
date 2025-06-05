@@ -1,7 +1,7 @@
 // frontend/src/pages/Loja.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 
 // Component Imports
@@ -16,6 +16,7 @@ import StepIndicator from "@/components/stepIndicator";
 type Barbershop = {
   _id: string;
   name: string;
+  logoUrl: string;
 };
 
 type Service = {
@@ -43,8 +44,7 @@ const initialFormData = {
 
 export const Loja = () => {
   const { slug } = useParams<{ slug: string }>();
-
-  console.log(`slug`, slug);
+  const navigate = useNavigate();
 
   // --- State Management ---
   const [barbershop, setBarbershop] = useState<Barbershop | null>(null);
@@ -129,8 +129,26 @@ export const Loja = () => {
     };
 
     try {
-      await axios.post(`http://localhost:3001/barbershops/${barbershop?._id}/bookings`, bookingPayload);
-      setMessage("Agendamento realizado com sucesso! ✅");
+      const response = await axios.post(`http://localhost:3001/barbershops/${barbershop?._id}/bookings`, bookingPayload);
+
+      if (response.status === 201 && barbershop) {
+        navigate("/agendamento-sucesso", {
+          replace: true,
+          state: {
+            bookingDetails: {
+              barbershopName: barbershop.name,
+              customerName: name,
+              serviceName: selectedServiceName || "Serviço Indisponível",
+              barberName: selectedBarberName || "Profissional Indisponível",
+              date: date,
+              time: time,
+            },
+            barbershopSlug: slug,
+          },
+        });
+      } else {
+        setMessage("Houve um problema ao confirmar seu agendamento");
+      }
       setFormData(initialFormData);
       setCurrentStep(1);
     } catch (err) {
@@ -153,6 +171,19 @@ export const Loja = () => {
     return allBarbers.find((b) => b._id === formData.barber)?.name;
   }, [allBarbers, formData.barber]);
 
+  // ... dentro do seu componente Loja, antes do return
+
+  // Lógica para desabilitar o botão "Próximo" condicionalmente
+  let isNextButtonDisabled = false;
+  if (currentStep === 1) {
+    // Na primeira etapa, desabilita se serviço OU barbeiro não estiverem selecionados
+    isNextButtonDisabled = !formData.service || !formData.barber;
+  } else if (currentStep === 2) {
+    // Na segunda etapa, desabilita se data OU hora não estiverem selecionadas
+    isNextButtonDisabled = !formData.date || !formData.time;
+  }
+  // Para currentStep === 3, o botão "Próximo" não é mostrado, é o de "Confirmar Agendamento".
+
   // --- Render Logic ---
   if (!barbershop) {
     return (
@@ -164,9 +195,11 @@ export const Loja = () => {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-md px-4 py-8 md:max-w-lg md:px-6 md:py-12">
+      <div className="mx-auto max-w-md py-8 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-12">
+        {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto" />}
+
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 md:text-3xl">Agende seu Horário</h1>
+          <h1 className="text-2xl font-bold text-gray-900 md:text-3xl mt-6">Agende seu Horário</h1>
           <p className="mt-2 text-gray-600">
             Complete os passos abaixo para garantir seu horário em <span className="font-semibold">{barbershop.name}</span>
           </p>
@@ -190,9 +223,24 @@ export const Loja = () => {
               />
             )}
 
-            {currentStep === 2 && <DateTimeSelection formData={formData} updateFormData={updateFormData} barbershopId={barbershop?._id} selectedBarber={formData.barber} />}
+            {currentStep === 2 && (
+              <DateTimeSelection
+                formData={formData}
+                updateFormData={updateFormData}
+                barbershopId={barbershop?._id}
+                selectedBarber={formData.barber}
+                selectedServiceId={formData.service}
+              />
+            )}
 
-            {currentStep === 3 && <PersonalInfo formData={formData} updateFormData={updateFormData} serviceNameDisplay={selectedServiceName} barberNameDisplay={selectedBarberName} />}
+            {currentStep === 3 && (
+              <PersonalInfo
+                formData={formData}
+                updateFormData={updateFormData}
+                serviceNameDisplay={selectedServiceName}
+                barberNameDisplay={selectedBarberName}
+              />
+            )}
 
             <div className="mt-8 flex justify-between">
               <Button type="button" variant="outline" onClick={handlePrevious} className={`${currentStep === 1 ? "invisible" : ""}`}>
@@ -201,7 +249,12 @@ export const Loja = () => {
               </Button>
 
               {currentStep < totalSteps ? (
-                <Button type="button" onClick={handleNext} className="bg-rose-600 text-white hover:bg-rose-700">
+                <Button
+                  type="button"
+                  onClick={handleNext}
+                  className="bg-rose-600 text-white hover:bg-rose-700 cursor-pointer"
+                  disabled={isNextButtonDisabled}
+                >
                   Próximo
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>

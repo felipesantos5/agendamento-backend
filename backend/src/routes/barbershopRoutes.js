@@ -1,9 +1,6 @@
 import express from "express";
 import Barbershop from "../models/Barbershop.js"; // Ajuste o caminho
-import {
-  BarbershopSchema as BarbershopValidationSchema,
-  BarbershopUpdateSchema,
-} from "../validations/barbershopValidation.js"; // Renomeado para evitar conflito com o modelo Mongoose
+import { BarbershopSchema as BarbershopValidationSchema, BarbershopUpdateSchema } from "../validations/barbershopValidation.js"; // Renomeado para evitar conflito com o modelo Mongoose
 
 const router = express.Router();
 
@@ -53,11 +50,7 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   try {
     const data = BarbershopUpdateSchema.parse(req.body);
-    const updated = await Barbershop.findByIdAndUpdate(
-      req.params.id,
-      { $set: data },
-      { new: true, runValidators: true }
-    );
+    const updated = await Barbershop.findByIdAndUpdate(req.params.id, { $set: data }, { new: true, runValidators: true });
     if (!updated) {
       return res.status(404).json({ error: "Barbearia não encontrada" });
     }

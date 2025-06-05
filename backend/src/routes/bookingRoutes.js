@@ -3,7 +3,7 @@ import Booking from "../models/Booking.js";
 import Barber from "../models/Barber.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
-// import { sendWhatsAppConfirmation } from "../services/twilioService.js";
+import { sendWhatsAppConfirmation } from "../services/twilioService.js";
 
 const router = express.Router({ mergeParams: true });
 
@@ -31,29 +31,20 @@ router.post("/", async (req, res) => {
       time: bookingTime,
     });
 
-    // if (createdBooking) {
-    //   sendWhatsAppConfirmation(
-    //     createdBooking.customer.name,
-    //     createdBooking.customer.phone, // Ajuste para whatsapp se necessário
-    //     createdBooking.time
-    //   );
-    // }
+    if (createdBooking) {
+      sendWhatsAppConfirmation(createdBooking.customer.name, createdBooking.customer.phone, createdBooking.time);
+    }
+
     res.status(201).json(createdBooking);
   } catch (e) {
     console.error("ERRO AO CRIAR AGENDAMENTO:", e);
     if (e instanceof z.ZodError) {
-      return res
-        .status(400)
-        .json({ error: "Dados de agendamento inválidos.", details: e.errors });
+      return res.status(400).json({ error: "Dados de agendamento inválidos.", details: e.errors });
     }
     if (e.name === "CastError") {
-      return res
-        .status(400)
-        .json({ error: "ID inválido fornecido para um dos campos." });
+      return res.status(400).json({ error: "ID inválido fornecido para um dos campos." });
     }
-    res
-      .status(500)
-      .json({ error: "Ocorreu um erro interno ao processar sua solicitação." });
+    res.status(500).json({ error: "Ocorreu um erro interno ao processar sua solicitação." });
   }
 });
 
@@ -65,14 +56,10 @@ router.get("/", async (req, res) => {
     const barbershopId = req.params.barbershopId;
 
     if (!barbershopId || !mongoose.Types.ObjectId.isValid(barbershopId)) {
-      return res
-        .status(400)
-        .json({ error: "ID da barbearia inválido ou não fornecido." });
+      return res.status(400).json({ error: "ID da barbearia inválido ou não fornecido." });
     }
 
-    const bookings = await Booking.find({ barbershop: barbershopId })
-      .populate("barber", "name")
-      .populate("service", "name price");
+    const bookings = await Booking.find({ barbershop: barbershopId }).populate("barber", "name").populate("service", "name price");
 
     res.json(bookings);
   } catch (error) {

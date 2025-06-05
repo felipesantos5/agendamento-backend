@@ -25,20 +25,13 @@ interface PersonalInfoProps {
     barber?: string; // ID do barbeiro (anteriormente attendant)
     [key: string]: string | undefined; // Permitir outros campos
   };
-  updateFormData: (
-    data: Partial<{ name: string; email: string; phone: string }>
-  ) => void;
+  updateFormData: (data: Partial<{ name: string; email: string; phone: string }>) => void;
   // Props opcionais para exibir os nomes no resumo, se disponíveis
   serviceNameDisplay?: string;
   barberNameDisplay?: string;
 }
 
-export default function PersonalInfo({
-  formData,
-  updateFormData,
-  serviceNameDisplay,
-  barberNameDisplay,
-}: PersonalInfoProps) {
+export default function PersonalInfo({ formData, updateFormData, serviceNameDisplay, barberNameDisplay }: PersonalInfoProps) {
   const [isPhoneValid, setIsPhoneValid] = useState(true);
   const [phoneErrorMessage, setPhoneErrorMessage] = useState("");
 
@@ -50,7 +43,6 @@ export default function PersonalInfo({
 
     if (digitsOnly.length > 0 && digitsOnly.length < 11) {
       setIsPhoneValid(false);
-      setPhoneErrorMessage("Celular incompleto. (DDD + 9 dígitos)");
     } else if (digitsOnly.length === 11) {
       // Poderia adicionar validação de DDDs válidos ou prefixos de celular aqui
       setIsPhoneValid(true);
@@ -87,17 +79,12 @@ export default function PersonalInfo({
     <div className="space-y-6">
       <div>
         <h2 className="text-xl font-semibold text-gray-900">Dados Pessoais</h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Por favor, informe seus dados de contato.
-        </p>
+        <p className="mt-1 text-sm text-gray-500">Por favor, informe seus dados de contato.</p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label
-            htmlFor="name"
-            className="block text-sm font-medium text-gray-700"
-          >
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700">
             Nome Completo <span className="text-red-500">*</span>
           </label>
           <input
@@ -113,10 +100,7 @@ export default function PersonalInfo({
         </div>
 
         <div>
-          <label
-            htmlFor="email"
-            className="block text-sm font-medium text-gray-700"
-          >
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700">
             Email <span className="text-red-500">*</span>
           </label>
           <input
@@ -132,10 +116,7 @@ export default function PersonalInfo({
         </div>
 
         <div>
-          <label
-            htmlFor="phone"
-            className="block text-sm font-medium text-gray-700"
-          >
+          <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
             Celular (WhatsApp) <span className="text-red-500">*</span>
           </label>
           <input
@@ -145,49 +126,37 @@ export default function PersonalInfo({
             value={PhoneFormat(formData.phone)}
             onChange={handlePhoneChange}
             className={`mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-rose-500 sm:text-sm ${
-              !isPhoneValid && formData.phone.length > 0
-                ? "border-red-500 focus:border-red-500"
-                : "border-gray-300 focus:border-rose-500"
+              !isPhoneValid && formData.phone.length > 0 ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-rose-500"
             }`}
             placeholder="(XX) XXXXX-XXXX"
             required
             maxLength={15} // Tamanho da string formatada (XX) XXXXX-XXXX
           />
-          {!isPhoneValid && formData.phone.length > 0 && (
-            <p className="mt-1 text-xs text-red-600">{phoneErrorMessage}</p>
-          )}
+          {!isPhoneValid && formData.phone.length > 0 && <p className="mt-1 text-xs text-red-600">{phoneErrorMessage}</p>}
         </div>
       </div>
 
       <div className="rounded-md bg-gray-100 p-4">
-        <h3 className="text-sm font-semibold text-gray-800">
-          Resumo do Agendamento
-        </h3>
+        <h3 className="text-sm font-semibold text-gray-800">Resumo do Agendamento</h3>
         <div className="mt-2 space-y-1 text-sm text-gray-700">
           {formData.service && (
             <div className="flex justify-between">
               <span>Serviço:</span>
-              <span className="font-medium">
-                {serviceNameDisplay || `ID: ${formData.service}`}
-              </span>
+              <span className="font-medium">{serviceNameDisplay || `ID: ${formData.service}`}</span>
             </div>
           )}
 
           {formData.barber && ( // Mudado de formData.attendant para formData.barber
             <div className="flex justify-between">
               <span>Profissional:</span>
-              <span className="font-medium">
-                {barberNameDisplay || `ID: ${formData.barber}`}
-              </span>
+              <span className="font-medium">{barberNameDisplay || `ID: ${formData.barber}`}</span>
             </div>
           )}
 
           {formData.date && (
             <div className="flex justify-between">
               <span>Data:</span>
-              <span className="font-medium">
-                {formatDateForDisplay(formData.date)}
-              </span>
+              <span className="font-medium">{formatDateForDisplay(formData.date)}</span>
             </div>
           )}
 

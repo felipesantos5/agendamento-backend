@@ -1,21 +1,12 @@
 import { useEffect, useState, ChangeEvent, FormEvent } from "react";
 import { useOutletContext } from "react-router-dom";
-import axios from "axios";
 
 // Importações de componentes ShadCN/UI
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +29,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { PlusCircle, Edit2, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import apiClient from "@/services/api";
 
 // Contexto do AdminLayout (para obter barbershopId)
 interface AdminOutletContext {
@@ -65,8 +57,7 @@ const initialServiceFormState: ServiceFormData = {
 };
 
 export function ServicesPage() {
-  const { barbershopId, barbershopName } =
-    useOutletContext<AdminOutletContext>();
+  const { barbershopId, barbershopName } = useOutletContext<AdminOutletContext>();
 
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,9 +65,7 @@ export function ServicesPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit">("add");
-  const [currentServiceForm, setCurrentServiceForm] = useState<
-    Partial<Service>
-  >(initialServiceFormState);
+  const [currentServiceForm, setCurrentServiceForm] = useState<Partial<Service>>(initialServiceFormState);
   const [serviceToDelete, setServiceToDelete] = useState<Service | null>(null);
 
   const fetchServices = async () => {
@@ -84,9 +73,7 @@ export function ServicesPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await axios.get(
-        `http://localhost:3001/barbershops/${barbershopId}/services`
-      );
+      const response = await apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/services`);
       setServices(response.data);
     } catch (err) {
       console.error("Erro ao buscar serviços:", err);
@@ -100,16 +87,11 @@ export function ServicesPage() {
     fetchServices();
   }, [barbershopId]);
 
-  const handleFormInputChange = (
-    e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
+  const handleFormInputChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setCurrentServiceForm((prev) => ({
       ...prev,
-      [name]:
-        name === "price" || name === "duration"
-          ? parseFloat(value) || 0
-          : value,
+      [name]: name === "price" || name === "duration" ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -144,16 +126,10 @@ export function ServicesPage() {
 
     try {
       if (dialogMode === "add") {
-        await axios.post(
-          `http://localhost:3001/barbershops/${barbershopId}/services`,
-          serviceDataPayload
-        );
+        await apiClient.post(`http://localhost:3001/barbershops/${barbershopId}/services`, serviceDataPayload);
       } else if (currentServiceForm._id) {
         // Certifique-se que seu backend espera o payload sem o barbershopId aqui, pois ele já está na URL
-        await axios.put(
-          `http://localhost:3001/barbershops/${barbershopId}/services/${currentServiceForm._id}`,
-          serviceDataPayload
-        );
+        await apiClient.put(`http://localhost:3001/barbershops/${barbershopId}/services/${currentServiceForm._id}`, serviceDataPayload);
       }
       setIsDialogOpen(false);
       fetchServices(); // Re-busca a lista de serviços para atualizar a tabela
@@ -167,9 +143,7 @@ export function ServicesPage() {
     if (!serviceToDelete || !barbershopId) return;
     setError(null);
     try {
-      await axios.delete(
-        `http://localhost:3001/barbershops/${barbershopId}/services/${serviceToDelete._id}`
-      );
+      await apiClient.delete(`http://localhost:3001/barbershops/${barbershopId}/services/${serviceToDelete._id}`);
       setServiceToDelete(null); // Fecha o AlertDialog de confirmação
       fetchServices(); // Re-busca a lista
     } catch (err: any) {
@@ -179,34 +153,23 @@ export function ServicesPage() {
     }
   };
 
-  if (isLoading && services.length === 0)
-    return <p className="text-center p-10">Carregando serviços...</p>;
+  if (isLoading && services.length === 0) return <p className="text-center p-10">Carregando serviços...</p>;
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Gerenciar Serviços - {barbershopName}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Adicione, edite ou remova os serviços oferecidos.
-          </p>
+          <p className="text-sm text-muted-foreground">Adicione, edite ou remova os serviços oferecidos.</p>
         </div>
         <Button onClick={openAddDialog}>
           <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Serviço
         </Button>
       </CardHeader>
       <CardContent>
-        {error && (
-          <p className="mb-4 text-sm text-red-600 bg-red-100 p-3 rounded-md">
-            {error}
-          </p>
-        )}
+        {error && <p className="mb-4 text-sm text-red-600 bg-red-100 p-3 rounded-md">{error}</p>}
         <Table>
-          <TableCaption>
-            {services.length === 0 && !isLoading
-              ? "Nenhum serviço cadastrado ainda."
-              : "Lista dos seus serviços atuais."}
-          </TableCaption>
+          <TableCaption>{services.length === 0 && !isLoading ? "Nenhum serviço cadastrado ainda." : "Lista dos seus serviços atuais."}</TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
@@ -220,40 +183,24 @@ export function ServicesPage() {
             {services.map((service) => (
               <TableRow key={service._id}>
                 <TableCell className="font-medium">{service.name}</TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-xs truncate">
-                  {service.description}
-                </TableCell>
-                <TableCell className="text-right">
-                  {service.price.toFixed(2)}
-                </TableCell>
+                <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{service.description}</TableCell>
+                <TableCell className="text-right">{service.price.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{service.duration}</TableCell>
                 <TableCell className="text-right space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => openEditDialog(service)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => openEditDialog(service)}>
                     <Edit2 className="h-4 w-4" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => setServiceToDelete(service)}
-                      >
+                      <Button variant="destructive" size="sm" onClick={() => setServiceToDelete(service)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Are you absolutely sure?
-                        </AlertDialogTitle>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          This action cannot be undone. This will permanently
-                          delete your account and remove your data from our
-                          servers.
+                          This action cannot be undone. This will permanently delete your account and remove your data from our servers.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -274,15 +221,9 @@ export function ServicesPage() {
         <DialogContent className="sm:max-w-[425px]">
           <form onSubmit={handleSaveService}>
             <DialogHeader>
-              <DialogTitle>
-                {dialogMode === "add"
-                  ? "Adicionar Novo Serviço"
-                  : "Editar Serviço"}
-              </DialogTitle>
+              <DialogTitle>{dialogMode === "add" ? "Adicionar Novo Serviço" : "Editar Serviço"}</DialogTitle>
               <DialogDescription>
-                {dialogMode === "add"
-                  ? "Preencha os detalhes do novo serviço."
-                  : "Modifique os detalhes do serviço existente."}
+                {dialogMode === "add" ? "Preencha os detalhes do novo serviço." : "Modifique os detalhes do serviço existente."}
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -290,14 +231,7 @@ export function ServicesPage() {
                 <Label htmlFor="name" className="text-right">
                   Nome
                 </Label>
-                <Input
-                  id="name"
-                  name="name"
-                  value={currentServiceForm.name || ""}
-                  onChange={handleFormInputChange}
-                  className="col-span-3"
-                  required
-                />
+                <Input id="name" name="name" value={currentServiceForm.name || ""} onChange={handleFormInputChange} className="col-span-3" required />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="description" className="text-right">
@@ -349,19 +283,14 @@ export function ServicesPage() {
                   Cancelar
                 </Button>
               </DialogClose>
-              <Button type="submit">
-                {dialogMode === "add" ? "Adicionar" : "Salvar Alterações"}
-              </Button>
+              <Button type="submit">{dialogMode === "add" ? "Adicionar" : "Salvar Alterações"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
 
       {/* AlertDialog para Confirmação de Deleção */}
-      <AlertDialog
-        open={!!serviceToDelete}
-        onOpenChange={(open) => !open && setServiceToDelete(null)}
-      >
+      <AlertDialog open={!!serviceToDelete} onOpenChange={(open) => !open && setServiceToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Deleção</AlertDialogTitle>
@@ -371,13 +300,8 @@ export function ServicesPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setServiceToDelete(null)}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteService}
-              className="bg-red-600 hover:bg-red-700"
-            >
+            <AlertDialogCancel onClick={() => setServiceToDelete(null)}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteService} className="bg-red-600 hover:bg-red-700">
               Deletar
             </AlertDialogAction>
           </AlertDialogFooter>

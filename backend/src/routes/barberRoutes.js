@@ -1,122 +1,206 @@
+// src/routes/barberRoutes.js
 import express from "express";
-import mongoose from "mongoose";
+import mongoose from "mongoose"; // Importar mongoose para ObjectId.isValid
 import Barber from "../models/Barber.js";
 import Booking from "../models/Booking.js";
-import { parseISO, startOfDay, endOfDay } from "date-fns";
-import { barberSchema as BarberValidationSchema } from "../validations/barberValidation.js"; // Renomeado
+import Service from "../models/Service.js";
+import { barberSchema as BarberValidationSchema } from "../validations/barberValidation.js";
+import { z } from "zod"; // Para tratamento de erro de validação do Zod
+import { parseISO, startOfDay, endOfDay, addMinutes, isEqual, isBefore, format as formatDateFns } from "date-fns";
+import { protectAdmin } from "../middleware/authAdminMiddleware.js";
+import { ptBR } from "date-fns/locale";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
 
+const BRAZIL_TIMEZONE = "America/Sao_Paulo";
+
 // Adicionar Barbeiro a uma Barbearia
-// Rota esperada: POST /barbershops/:barbershopId/barbers
+// Rota: POST /barbershops/:barbershopId/barbers
 router.post("/", async (req, res) => {
   try {
-    const data = BarberValidationSchema.parse(req.body);
+    // O schema Zod barberValidation não deve esperar 'barbershop' no req.body,
+    // pois ele é pego dos parâmetros da rota e adicionado antes de salvar.
+    const { barbershop, ...barberDataFromRequest } = req.body;
+    const data = BarberValidationSchema.parse(barberDataFromRequest);
+
     const created = await Barber.create({
       ...data,
       barbershop: req.params.barbershopId, // Pega o ID da barbearia da URL
     });
     res.status(201).json(created);
   } catch (e) {
-    res.status(400).json({ error: e.errors || e.message });
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: "Dados inválidos para o funcionário.", details: e.errors });
+    }
+    console.error("Erro ao criar funcionário:", e);
+    res.status(400).json({ error: e.message || "Erro ao criar funcionário." });
   }
 });
 
 // Listar Barbeiros de uma Barbearia
-// Rota esperada: GET /barbershops/:barbershopId/barbers
+// Rota: GET /barbershops/:barbershopId/barbers
 router.get("/", async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.barbershopId)) {
+      return res.status(400).json({ error: "ID da barbearia inválido." });
+    }
     const barbers = await Barber.find({ barbershop: req.params.barbershopId });
     res.json(barbers);
   } catch (e) {
-    res.status(500).json({ error: "Erro ao buscar barbeiros." });
+    console.error("Erro ao buscar funcionários:", e);
+    res.status(500).json({ error: "Erro ao buscar funcionários." });
   }
 });
 
+// Rota: GET /barbershops/:barbershopId/barbers/:barberId/free-slots
 router.get("/:barberId/free-slots", async (req, res) => {
   try {
     const { date } = req.query;
-    const { barberId, barbershopId } = req.params; // barbershopId vem do mergeParams
+    const serviceId = req.query.serviceId; // ✅ Agora esperamos apenas o serviceId
 
-    if (!date || !barberId || !barbershopId) {
-      return res.status(400).json({
-        error: "Data, ID do barbeiro e ID da barbearia são obrigatórios.",
-      });
-    }
-    if (
-      !mongoose.Types.ObjectId.isValid(barberId) ||
-      !mongoose.Types.ObjectId.isValid(barbershopId)
-    ) {
-      return res
-        .status(400)
-        .json({ error: "ID do barbeiro ou da barbearia inválido." });
-    }
+    const { barberId, barbershopId } = req.params;
 
-    const barber = await Barber.findById(barberId);
-    // Verifica se o barbeiro existe E se pertence à barbearia especificada na URL
+    // Validações básicas
+    // if (!date || !barberId || !barbershopId || !serviceId) {
+    //   return res.status(400).json({ error: "Parâmetros incompletos (data, IDs e serviceId são obrigatórios)." });
+    // }
+    // if (!mongoose.Types.ObjectId.isValid(barberId) || !mongoose.Types.ObjectId.isValid(barbershopId) || !mongoose.Types.ObjectId.isValid(serviceId)) {
+    //   return res.status(400).json({ error: "Um ou mais IDs fornecidos são inválidos." });
+    // }
+
+    // Buscar o serviço para obter a duração
+    const serviceDoc = await Service.findById(serviceId).lean();
+    if (!serviceDoc) return res.status(404).json({ error: "Serviço não encontrado." });
+    const serviceDuration = serviceDoc.duration;
+    if (isNaN(serviceDuration) || serviceDuration <= 0) return res.status(400).json({ error: "Duração do serviço inválida." });
+
+    const barber = await Barber.findById(barberId).lean();
     if (!barber || barber.barbershop.toString() !== barbershopId) {
-      return res.status(404).json({
-        error: "Barbeiro não encontrado ou não pertence a esta barbearia.",
-      });
+      /* ... erro ... */
     }
 
-    const selectedDate = parseISO(date);
-    const dayOfWeekName = [
-      "Domingo",
-      "Segunda-feira",
-      "Terça-feira",
-      "Quarta-feira",
-      "Quinta-feira",
-      "Sexta-feira",
-      "Sábado",
-    ][selectedDate.getUTCDay()];
-    const workHours = barber.availability.find((a) => a.day === dayOfWeekName);
+    // selectedDateInput é "YYYY-MM-DD"
+    // parseISO cria uma data UTC à meia-noite desse dia.
+    // Ex: "2025-06-10" -> 2025-06-10T00:00:00.000Z
+    const dateObjectFromQuery = parseISO(date);
 
-    if (!workHours) return res.json([]); // Sem horários de trabalho para este dia
+    // Para obter o dia da semana no Brasil, precisamos considerar o fuso.
+    // Uma forma de simular isso sem date-fns-tz é pegar os componentes da data UTC
+    // e construir uma nova data como se fosse local, mas isso pode ser complicado.
+    // A forma mais simples para o dia da semana, se date-fns-tz não funciona,
+    // é assumir que a string "YYYY-MM-DD" representa o dia local desejado.
+    const tempDateForDayName = new Date(`${date}T12:00:00`); // Meio-dia local para evitar problemas de transição de dia por fuso
+    const dayOfWeekName = formatDateFns(tempDateForDayName, "EEEE", { locale: ptBR });
+
+    const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
+    if (!workHours) return res.json([]);
 
     const allLocalSlots = [];
-    const [startHour, startMinute] = workHours.start.split(":").map(Number);
-    const [endHour, endMinute] = workHours.end.split(":").map(Number);
-    const slotInterval = 30;
+    const [startWorkHour, startWorkMinute] = workHours.start.split(":").map(Number); // Ex: 9, 0
+    const [endWorkHour, endWorkMinute] = workHours.end.split(":").map(Number); // Ex: 18, 0
+    const slotInterval = 15;
 
-    let currentHour = startHour;
-    let currentMinute = startMinute;
+    let currentHour = startWorkHour;
+    let currentMinute = startWorkMinute;
 
-    while (
-      currentHour < endHour ||
-      (currentHour === endHour && currentMinute < endMinute)
-    ) {
-      const timeString = `${String(currentHour).padStart(2, "0")}:${String(
-        currentMinute
-      ).padStart(2, "0")}`;
+    // Loop para gerar os horários LOCAIS baseados no workHours
+    while (true) {
+      const slotEndHour = currentHour + Math.floor((currentMinute + serviceDuration - 1) / 60); // Hora que o serviço terminaria
+      const slotEndMinute = ((currentMinute + serviceDuration - 1) % 60) + 1; // Minuto que o serviço terminaria
+
+      // Verifica se o fim do serviço ultrapassa o fim do expediente
+      if (slotEndHour > endWorkHour || (slotEndHour === endWorkHour && slotEndMinute > endWorkMinute)) {
+        break;
+      }
+
+      const timeString = `${String(currentHour).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`;
       allLocalSlots.push(timeString);
+
       currentMinute += slotInterval;
-      if (currentMinute >= 60) {
+      while (currentMinute >= 60) {
+        // Use while para caso o intervalo seja > 60
         currentHour++;
-        currentMinute = 0;
+        currentMinute -= 60;
+      }
+      // Para o loop se a próxima hora de início já ultrapassa o limite
+      if (currentHour > endWorkHour || (currentHour === endWorkHour && currentMinute >= endWorkMinute)) {
+        break;
       }
     }
 
-    const bookings = await Booking.find({
-      barber: barberId, // Filtra pelo ID do barbeiro
-      barbershop: barbershopId, // Segurança extra: garante que o agendamento é da mesma barbearia
-      time: { $gte: startOfDay(selectedDate), $lt: endOfDay(selectedDate) },
+    // Agendamentos existentes (armazenados em UTC)
+    const existingBookings = await Booking.find({
+      barber: barberId,
+      barbershop: barbershopId,
+      // Usamos dateObjectFromQuery que é meia-noite UTC para startOfDay e endOfDay
+      time: { $gte: startOfDay(dateObjectFromQuery), $lt: endOfDay(dateObjectFromQuery) },
+    })
+      .populate("service", "duration")
+      .lean();
+
+    // bookedIntervalsLocal: Array de objetos { start: string HH:mm, end: string HH:mm } no horário local
+    const bookedIntervalsLocal = existingBookings.map((booking) => {
+      // bookedTimeIsUTC é o objeto Date do banco (UTC)
+      const bookedTimeIsUTC = booking.time;
+      // Precisamos converter este UTC para a hora local do Brasil
+      // Usando toLocaleString para obter a hora local e depois extraindo
+      const localBookingStartTimeStr = new Date(bookedTimeIsUTC).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: BRAZIL_TIMEZONE,
+      });
+
+      const bookingDuration = booking.service?.duration || slotInterval;
+
+      const [bookedStartH, bookedStartM] = localBookingStartTimeStr.split(":").map(Number);
+
+      let bookedEndH = bookedStartH;
+      let bookedEndM = bookedStartM + bookingDuration;
+      while (bookedEndM >= 60) {
+        bookedEndH++;
+        bookedEndM -= 60;
+      }
+      // Garantir que a hora não passe de 23 (embora improvável para durações normais)
+      bookedEndH = bookedEndH % 24;
+
+      const localBookingEndTimeStr = `${String(bookedEndH).padStart(2, "0")}:${String(bookedEndM).padStart(2, "0")}`;
+
+      return { start: localBookingStartTimeStr, end: localBookingEndTimeStr };
     });
 
-    const bookedTimes = new Set(
-      bookings.map((booking) => {
-        return new Date(booking.time).toLocaleTimeString("pt-BR", {
-          hour: "2-digit",
-          minute: "2-digit",
-          timeZone: "America/Sao_Paulo",
-        });
-      })
-    );
+    const slotsWithStatus = [];
 
-    const slotsWithStatus = allLocalSlots.map((time) => ({
-      time: time,
-      isBooked: bookedTimes.has(time),
-    }));
+    for (const potentialStartSlot of allLocalSlots) {
+      // "09:00", "09:15", etc. (local)
+      const [startSlotH, startSlotM] = potentialStartSlot.split(":").map(Number);
+
+      let endSlotH = startSlotH;
+      let endSlotM = startSlotM + serviceDuration;
+      while (endSlotM >= 60) {
+        endSlotH++;
+        endSlotM -= 60;
+      }
+      endSlotH = endSlotH % 24;
+      const potentialEndSlot = `${String(endSlotH).padStart(2, "0")}:${String(endSlotM).padStart(2, "0")}`;
+
+      let hasConflict = false;
+      for (const booked of bookedIntervalsLocal) {
+        // Comparação de strings de horário "HH:mm"
+        // Conflito se: (InícioSlot < FimBooked) E (FimSlot > InícioBooked)
+        if (potentialStartSlot < booked.end && potentialEndSlot > booked.start) {
+          hasConflict = true;
+          break;
+        }
+      }
+
+      if (!hasConflict) {
+        slotsWithStatus.push({
+          time: potentialStartSlot,
+          isBooked: false,
+        });
+      }
+    }
+
     res.json(slotsWithStatus);
   } catch (error) {
     console.error("Erro ao buscar status dos horários:", error);
@@ -124,4 +208,69 @@ router.get("/:barberId/free-slots", async (req, res) => {
   }
 });
 
+// ✅ NOVA ROTA: Atualizar um Funcionário (Barbeiro)
+// Rota: PUT /barbershops/:barbershopId/barbers/:barberId
+router.put("/:barberId", protectAdmin, async (req, res) => {
+  try {
+    const { barbershopId, barberId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(barbershopId) || !mongoose.Types.ObjectId.isValid(barberId)) {
+      return res.status(400).json({ error: "ID da barbearia ou do funcionário inválido." });
+    }
+
+    // O schema Zod barberValidation não deve esperar 'barbershop' no req.body
+    const { barbershop, ...barberDataFromRequest } = req.body;
+    const dataToUpdate = BarberValidationSchema.parse(barberDataFromRequest);
+
+    const updatedBarber = await Barber.findOneAndUpdate(
+      { _id: barberId, barbershop: barbershopId }, // Condição: ID do funcionário E da barbearia
+      dataToUpdate, // Novos dados (nome, availability)
+      { new: true, runValidators: true } // Opções
+    );
+
+    if (!updatedBarber) {
+      return res.status(404).json({ error: "Funcionário não encontrado ou não pertence a esta barbearia." });
+    }
+
+    res.json(updatedBarber);
+  } catch (e) {
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: "Dados inválidos para atualização do funcionário.", details: e.errors });
+    }
+    console.error("Erro ao atualizar funcionário:", e);
+    res.status(500).json({ error: "Erro interno ao atualizar o funcionário." });
+  }
+});
+
+// ✅ NOVA ROTA: Deletar um Funcionário (Barbeiro)
+// Rota: DELETE /barbershops/:barbershopId/barbers/:barberId
+router.delete("/:barberId", protectAdmin, async (req, res) => {
+  try {
+    const { barbershopId, barberId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(barbershopId) || !mongoose.Types.ObjectId.isValid(barberId)) {
+      return res.status(400).json({ error: "ID da barbearia ou do funcionário inválido." });
+    }
+
+    const deletedBarber = await Barber.findOneAndDelete({
+      _id: barberId,
+      barbershop: barbershopId, // Condição: ID do funcionário E da barbearia
+    });
+
+    if (!deletedBarber) {
+      return res.status(404).json({ error: "Funcionário não encontrado ou não pertence a esta barbearia." });
+    }
+
+    // Consideração: O que fazer com os agendamentos futuros deste barbeiro?
+    // Por enquanto, estamos apenas deletando o barbeiro.
+    // Você pode querer adicionar lógica para cancelar/remanejar agendamentos.
+
+    res.json({ message: "Funcionário deletado com sucesso.", barberId: deletedBarber._id });
+  } catch (e) {
+    console.error("Erro ao deletar funcionário:", e);
+    res.status(500).json({ error: "Erro interno ao deletar o funcionário." });
+  }
+});
+
 export default router;
+``;

@@ -1,6 +1,5 @@
-import React, { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
-import axios from "axios";
 import { format, parseISO, isPast, differenceInMilliseconds } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -11,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Para o filtro
 import { Switch } from "@/components/ui/switch"; // Para o toggle
 import { Label } from "@/components/ui/label"; // Para os rótulos dos filtros
-import { CalendarClock, User, Phone, Filter } from "lucide-react";
+import { Filter } from "lucide-react";
+import apiClient from "@/services/api";
 
 // Contexto do AdminLayout
 interface AdminOutletContext {
@@ -66,8 +66,8 @@ export function AgendamentosPage() {
       setError(null);
       try {
         const [bookingsResponse, barbersResponse] = await Promise.all([
-          axios.get(`http://localhost:3001/barbershops/${barbershopId}/bookings`),
-          axios.get(`http://localhost:3001/barbershops/${barbershopId}/barbers`), //
+          apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/bookings`),
+          apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/barbers`), //
         ]);
         setBookings(bookingsResponse.data);
         setAllBarbers(barbersResponse.data);
@@ -123,7 +123,8 @@ export function AgendamentosPage() {
     }
   };
 
-  if (isLoading && bookings.length === 0 && allBarbers.length === 0) return <p className="text-center p-10">Carregando agendamentos e barbeiros...</p>;
+  if (isLoading && bookings.length === 0 && allBarbers.length === 0)
+    return <p className="text-center p-10">Carregando agendamentos e barbeiros...</p>;
   if (error && bookings.length === 0) return <p className="text-center p-10 text-red-500">{error}</p>;
 
   return (
@@ -159,8 +160,6 @@ export function AgendamentosPage() {
             </Select>
           </div>
           <div className="flex items-center space-x-2 pt-2 sm:pt-5 w-full sm:w-auto justify-end">
-            {" "}
-            {/* pt-5 para alinhar com o select no mobile */}
             <Switch id="showPastToggle" checked={showPastAppointments} onCheckedChange={setShowPastAppointments} />
             <Label htmlFor="showPastToggle" className="text-sm font-medium text-gray-600 cursor-pointer whitespace-nowrap">
               Exibir passados
@@ -169,7 +168,11 @@ export function AgendamentosPage() {
         </div>
 
         <Table>
-          <TableCaption>{displayedBookings.length === 0 ? "Nenhum agendamento encontrado para os filtros selecionados." : `Exibindo ${displayedBookings.length} agendamento(s).`}</TableCaption>
+          <TableCaption>
+            {displayedBookings.length === 0
+              ? "Nenhum agendamento encontrado para os filtros selecionados."
+              : `Exibindo ${displayedBookings.length} agendamento(s).`}
+          </TableCaption>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[300px]">Data e Hora</TableHead>
@@ -183,7 +186,6 @@ export function AgendamentosPage() {
           </TableHeader>
           <TableBody>
             {displayedBookings.map((booking) => {
-              // Usa displayedBookings aqui
               const { date, time, isPast: bookingIsPast } = formatBookingTime(booking.time);
               return (
                 <TableRow key={booking._id} className={bookingIsPast && showPastAppointments ? "opacity-70 bg-gray-50" : ""}>
@@ -205,7 +207,9 @@ export function AgendamentosPage() {
                     <div className="flex items-center">{booking.service.name}</div>
                   </TableCell>
                   <TableCell>{booking.barber.name}</TableCell>
-                  <TableCell className="text-right">{booking.service.price.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    {typeof booking.service?.price === "number" ? booking.service.price.toFixed(2) : "N/A"}
+                  </TableCell>
                   <TableCell className="text-center">
                     <Badge
                       variant={booking.status === "booked" ? "default" : booking.status === "completed" ? "secondary" : "outline"}
