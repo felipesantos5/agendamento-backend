@@ -6,7 +6,7 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/loja/:slug" element={<Loja />} />
+        <Route path="/:slug" element={<Loja />} />
         <Route path="/agendamento-sucesso" element={<BookingSuccessPage />} />
       </Routes>
     </BrowserRouter>

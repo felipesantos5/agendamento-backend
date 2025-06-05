@@ -78,10 +78,10 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
 
   return (
     <div className="space-y-6">
-      {/* <div>
+      <div>
         <h2 className="text-xl font-semibold text-gray-900">Escolha a Data e Hora</h2>
         <p className="mt-1 text-sm text-gray-500">Selecione quando você gostaria de nos visitar</p>
-      </div> */}
+      </div>
 
       <div className="lg:flex gap-8">
         <div className="space-y-4 lg:w-full">
@@ -123,8 +123,8 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
                         isDateInPast(day)
                           ? "!cursor-not-allowed text-gray-300"
                           : formData.date === `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
-                          ? "bg-rose-500 text-white"
-                          : "hover:bg-rose-100"
+                          ? "bg-[var(--loja-theme-color)] text-white"
+                          : "hover:bg-[var(--loja-theme-color)]/30"
                       }`}
                     >
                       {day}
@@ -141,7 +141,7 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
             <Clock className="mr-2 h-4 w-4" />
             Selecione o Horário
           </label>
-          {!selectedBarber && <p className="text-xs text-red-500">Por favor, selecione um barbeiro na etapa anterior.</p>}
+          {!selectedBarber && <p className="text-xs text-[var(--loja-theme-color)]">Por favor, selecione um barbeiro na etapa anterior.</p>}
           {!formData.date && selectedBarber && <p className="text-xs text-gray-500">Por favor, selecione uma data primeiro.</p>}
 
           {loadingTimes ? (
@@ -159,10 +159,10 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
                       // ✅ NOVO: Classes de estilo condicionais
                       className={`rounded-md border p-2 text-center text-sm transition-colors cursor-pointer ${
                         formData.time === slot.time && !slot.isBooked
-                          ? "border-rose-500 bg-rose-50 text-rose-700 font-semibold" // Estilo para horário selecionado
+                          ? "border-[var(--loja-theme-color)] bg-[var(--loja-theme-color)]/10 text-[var(--loja-theme-color)] font-semibold" // Estilo para horário selecionado
                           : slot.isBooked
                           ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 line-through" // Estilo para horário ocupado
-                          : "border-gray-200 hover:border-rose-300 hover:bg-rose-50/50" // Estilo para horário livre
+                          : "border-gray-200 hover:border-[var(--loja-theme-color)] hover:bg-[var(--loja-theme-color)]/20" // Estilo para horário livre
                       }`}
                     >
                       {slot.time}

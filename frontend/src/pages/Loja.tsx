@@ -17,6 +17,7 @@ type Barbershop = {
   _id: string;
   name: string;
   logoUrl: string;
+  themeColor: string;
 };
 
 type Service = {
@@ -66,6 +67,18 @@ export const Loja = () => {
         const currentBarbershop = barbershopResponse.data;
         setBarbershop(currentBarbershop);
         document.title = `Agendamento em ${currentBarbershop.name}`;
+
+        if (currentBarbershop?.themeColor) {
+          document.documentElement.style.setProperty("--loja-theme-color", currentBarbershop.themeColor);
+
+          // Opcional: Criar uma cor para o hover (ex: um pouco mais escura)
+          // Isso é mais complexo de fazer dinamicamente com JS para todas as cores.
+          // Uma abordagem mais simples para hover é usar opacidade ou uma classe Tailwind que escureça.
+          // Ex: document.documentElement.style.setProperty('--loja-theme-color-hover', calcularCorHover(currentBarbershop.themeColor));
+        } else {
+          // Fallback se não houver themeColor definida (usa a cor padrão do botão)
+          document.documentElement.style.removeProperty("--loja-theme-color");
+        }
 
         if (currentBarbershop?._id) {
           // ✅ BUSCAR SERVIÇOS E BARBEIROS AQUI
@@ -195,15 +208,15 @@ export const Loja = () => {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      <div className="mx-auto max-w-md py-8 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-12">
-        {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto" />}
+      <div className="mx-auto max-w-md py-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-8">
+        {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto mb-4" />}
 
-        <div className="mb-8 text-center">
+        {/* <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 md:text-3xl mt-6">Agende seu Horário</h1>
           <p className="mt-2 text-gray-600">
             Complete os passos abaixo para garantir seu horário em <span className="font-semibold">{barbershop.name}</span>
           </p>
-        </div>
+        </div> */}
 
         <div className="mb-8">
           <StepIndicator currentStep={currentStep} totalSteps={totalSteps} />
@@ -243,7 +256,7 @@ export const Loja = () => {
             )}
 
             <div className="mt-8 flex justify-between">
-              <Button type="button" variant="outline" onClick={handlePrevious} className={`${currentStep === 1 ? "invisible" : ""}`}>
+              <Button type="button" variant="outline" onClick={handlePrevious} className={`cursor-pointer ${currentStep === 1 ? "invisible" : ""}`}>
                 <ChevronLeft className="mr-1 h-4 w-4" />
                 Voltar
               </Button>
@@ -252,14 +265,18 @@ export const Loja = () => {
                 <Button
                   type="button"
                   onClick={handleNext}
-                  className="bg-rose-600 text-white hover:bg-rose-700 cursor-pointer"
+                  className="bg-[var(--loja-theme-color)] text-white cursor-pointer hover:brightness-90 hover:bg-[var(--loja-theme-color)]"
                   disabled={isNextButtonDisabled}
                 >
                   Próximo
                   <ChevronRight className="ml-1 h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" className="bg-rose-600 text-white hover:bg-rose-700" disabled={isSubmitting}>
+                <Button
+                  type="submit"
+                  className="bg-[var(--loja-theme-color)] text-white hover:brightness-90 hover:bg-[var(--loja-theme-color)] cursor-pointer"
+                  disabled={isSubmitting}
+                >
                   {isSubmitting ? "Agendando..." : "Confirmar Agendamento"}
                   <Check className="ml-1 h-4 w-4" />
                 </Button>

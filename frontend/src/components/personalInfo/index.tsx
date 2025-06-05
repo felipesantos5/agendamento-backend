@@ -85,7 +85,7 @@ export default function PersonalInfo({ formData, updateFormData, serviceNameDisp
       <div className="space-y-4">
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-            Nome Completo <span className="text-red-500">*</span>
+            Nome Completo <span className="text-[var(--loja-theme-color)]">*</span>
           </label>
           <input
             type="text"
@@ -93,7 +93,7 @@ export default function PersonalInfo({ formData, updateFormData, serviceNameDisp
             name="name"
             value={formData.name}
             onChange={(e) => updateFormData({ name: e.target.value })}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-rose-500 focus:outline-none focus:ring-rose-500 sm:text-sm"
+            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[var(--loja-theme-color)] focus:outline-none focus:ring-[var(--loja-theme-color)] sm:text-sm"
             placeholder="Seu nome completo"
             required
           />
@@ -101,7 +101,7 @@ export default function PersonalInfo({ formData, updateFormData, serviceNameDisp
 
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-            Email <span className="text-red-500">*</span>
+            Email <span className="text-[var(--loja-theme-color)]">*</span>
           </label>
           <input
             type="email"
@@ -109,7 +109,7 @@ export default function PersonalInfo({ formData, updateFormData, serviceNameDisp
             name="email"
             value={formData.email}
             onChange={(e) => updateFormData({ email: e.target.value })}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-rose-500 focus:outline-none focus:ring-rose-500 sm:text-sm"
+            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 shadow-sm focus:border-[var(--loja-theme-color)] focus:outline-none focus:ring-[var(--loja-theme-color)] sm:text-sm"
             placeholder="seu@email.com"
             required
           />
@@ -117,7 +117,7 @@ export default function PersonalInfo({ formData, updateFormData, serviceNameDisp
 
         <div>
           <label htmlFor="phone" className="block text-sm font-medium text-gray-700">
-            Celular (WhatsApp) <span className="text-red-500">*</span>
+            Celular (WhatsApp) <span className="text-[var(--loja-theme-color)]">*</span>
           </label>
           <input
             type="tel"
@@ -125,8 +125,10 @@ export default function PersonalInfo({ formData, updateFormData, serviceNameDisp
             name="phone"
             value={PhoneFormat(formData.phone)}
             onChange={handlePhoneChange}
-            className={`mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-rose-500 sm:text-sm ${
-              !isPhoneValid && formData.phone.length > 0 ? "border-red-500 focus:border-red-500" : "border-gray-300 focus:border-rose-500"
+            className={`mt-1 block w-full rounded-md border px-3 py-2 shadow-sm focus:outline-none focus:ring-[var(--loja-theme-color)] sm:text-sm ${
+              !isPhoneValid && formData.phone.length > 0
+                ? "border-[var(--loja-theme-color)] focus:border-[var(--loja-theme-color)]"
+                : "border-gray-300 focus:border-[var(--loja-theme-color)]"
             }`}
             placeholder="(XX) XXXXX-XXXX"
             required

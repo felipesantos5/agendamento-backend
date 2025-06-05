@@ -134,7 +134,7 @@ export function BookingSuccessPage() {
           </p> */}
         </CardContent>
         <CardFooter className="p-6 bg-slate-50 border-t">
-          <Link to={barbershopSlug ? `/loja/${barbershopSlug}` : "/"} className="w-full">
+          <Link to={barbershopSlug ? `/${barbershopSlug}` : "/"} className="w-full">
             <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer">Fazer Novo Agendamento</Button>
           </Link>
         </CardFooter>
