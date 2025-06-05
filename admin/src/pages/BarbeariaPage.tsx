@@ -271,16 +271,17 @@ export function BarbeariaConfigPage() {
                 required
               />
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="slug">Slug (URL)</Label>
-              <Input id="slug" name="slug" value={formData.slug || ""} onChange={handleInputChange} required />
-              <p className="text-xs text-gray-500">Ex: nome-da-barbearia (usado na URL da sua página)</p>
+              <Label htmlFor="slug">Instagram</Label>
+              <Input id="instagram" name="instagram" value={formData.instagram || ""} onChange={handleInputChange} />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="slug">Instagram</Label>
-            <Input id="instagram" name="instagram" value={formData.instagram || ""} onChange={handleInputChange} />
+            <Label htmlFor="slug">Slug (URL)</Label>
+            <Input id="slug" name="slug" value={formData.slug || ""} onChange={handleInputChange} required />
+            <p className="text-xs text-gray-500">Ex: nome-da-barbearia (usado na URL da sua página)</p>
           </div>
 
           <div className="space-y-2">
@@ -413,15 +414,16 @@ export function BarbeariaConfigPage() {
               </Button>
             </div>
           </fieldset>
-
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
         </CardContent>
         <CardFooter>
           <Button type="submit" disabled={isLoading || isUploading} className="cursor-pointer mt-4">
             {isLoading ? (isUploading ? "Enviando Imagem..." : "Salvando...") : "Salvar Configurações"}
           </Button>
         </CardFooter>
+        <div className="px-6 mt-4">
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
+        </div>
       </form>
     </Card>
   );

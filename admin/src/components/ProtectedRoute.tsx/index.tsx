@@ -22,14 +22,14 @@ export const ProtectedRoute = ({}: ProtectedRouteProps) => {
   if (barbershopSlug && auth.user?.barbershopSlug !== barbershopSlug) {
     // Redireciona para o slug correto ou para uma página de erro/seleção
     console.warn("Tentativa de acesso a slug de barbearia incorreto.");
-    return <Navigate to={`/${auth.user?.barbershopSlug}/dashboard`} replace />;
+    return <Navigate to={`/${auth.user?.barbershopSlug}/configuracoes`} replace />;
   }
 
   // Se o slug não estiver na URL, mas o usuário estiver autenticado,
   // redireciona para o slug da barbearia dele.
   // Isso acontece se ele tentar acessar /admin (ou uma rota sem slug) após o login.
   if (!barbershopSlug && auth.user?.barbershopSlug) {
-    return <Navigate to={`/${auth.user.barbershopSlug}/dashboard`} replace />;
+    return <Navigate to={`/${auth.user.barbershopSlug}/configuracoes`} replace />;
   }
 
   return <Outlet />; // Outlet renderizará o AdminLayout se o slug corresponder
