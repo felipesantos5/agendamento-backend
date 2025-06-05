@@ -411,7 +411,7 @@ export function BarbeariaConfigPage() {
           {successMessage && <p className="text-sm text-green-600">{successMessage}</p>}
         </CardContent>
         <CardFooter>
-          <Button type="submit" disabled={isLoading || isUploading} className="cursor-pointer">
+          <Button type="submit" disabled={isLoading || isUploading} className="cursor-pointer mt-4">
             {isLoading ? (isUploading ? "Enviando Imagem..." : "Salvando...") : "Salvar Configurações"}
           </Button>
         </CardFooter>

@@ -2,9 +2,10 @@
 
 import React, { useEffect, useState } from "react";
 import { Outlet, Link, useParams, useLocation } from "react-router-dom";
-import { LayoutDashboard, Settings, Users, Scissors, CalendarDays, ShieldAlert, LogOut } from "lucide-react"; // Ícones de exemplo
+import { LayoutDashboard, Settings, Users, Scissors, CalendarDays, ShieldAlert, LogOut, X, Menu } from "lucide-react"; // Ícones de exemplo
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/services/api";
+import { Button } from "@/components/ui/button";
 
 // Tipo para os dados básicos da barbearia que podem ser úteis no layout
 interface BarbershopContextData {
@@ -25,6 +26,7 @@ export function AdminLayout() {
   const [barbershop, setBarbershop] = useState<BarbershopContextData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!barbershopSlug) {
@@ -110,47 +112,100 @@ export function AdminLayout() {
     },
   ];
 
+  const SidebarContent = () => (
+    <>
+      <div className="p-5">
+        <h1 className="text-2xl font-bold text-white mb-1">Painel</h1>
+        <h2 className="text-sm font-medium text-rose-400 truncate" title={barbershop!.name}>
+          {barbershop!.name}
+        </h2>
+      </div>
+      <nav className="flex flex-col space-y-1 mt-4 flex-grow px-3">
+        {navItems.map((item) => {
+          const pathToCheck = `/${barbershopSlug}/${item.to}`;
+          const isActive = location.pathname === pathToCheck || (item.to === "dashboard" && location.pathname === `/${barbershopSlug}`);
+
+          return (
+            <Link
+              key={item.label}
+              to={item.to}
+              className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ease-in-out
+                ${
+                  isActive
+                    ? "bg-rose-600 text-white shadow-lg transform scale-105"
+                    : "text-gray-300 hover:bg-zinc-800 hover:text-white hover:shadow-md"
+                }`}
+              onClick={() => setIsMobileSidebarOpen(false)} // Fecha ao clicar no item em mobile
+            >
+              {item.icon}
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+      <div className="p-3 mt-auto">
+        <Button
+          variant="ghost"
+          onClick={logout}
+          className="w-full flex items-center justify-start px-3 py-2.5 text-sm font-medium rounded-md text-gray-400 hover:bg-red-700 hover:text-white"
+        >
+          <LogOut size={18} className="mr-3" />
+          Sair
+        </Button>
+      </div>
+    </>
+  );
+
   return (
     <BarbershopAdminContext.Provider value={barbershop}>
       <div className="flex min-h-screen bg-gray-100">
-        <aside className="w-64 bg-neutral-950 text-gray-200 p-5 space-y-4 flex flex-col">
-          <div>
-            <h1 className="text-2xl font-bold text-white mb-1">Painel</h1>
-            <h2 className="text-sm font-medium text-zinc-100 truncate" title={barbershop.name}>
-              {barbershop.name}
-            </h2>
-          </div>
-          <nav className="flex flex-col items-baseline space-y-1 mt-4 flex-grow">
-            {navItems.map((item) => {
-              const isActive =
-                location.pathname === `/admin/${barbershopSlug}/${item.to}` ||
-                (item.to === "dashboard" && location.pathname === `/admin/${barbershopSlug}`);
-              return (
-                <Link
-                  key={item.label}
-                  to={item.to} // Rotas relativas ao path do AdminLayout
-                  className={`flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors
-                    ${isActive ? "bg-rose-600 text-white" : "text-gray-300 hover:bg-gray-800 hover:text-white"}`}
-                >
-                  {item.icon}
-                  {item.label}
-                </Link>
-              );
-            })}
-            <button
-              onClick={logout}
-              className={`w-full cursor-pointer flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-colors text-gray-300 hover:bg-gray-800`}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Sair
-            </button>
-          </nav>
-
-          {/* Você pode adicionar um botão de logout aqui */}
+        {/* Sidebar para Desktop */}
+        <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-neutral-950 text-gray-200 fixed h-full">
+          <SidebarContent />
         </aside>
-        <main className="flex-1 p-6 overflow-auto">
-          {/* O Outlet renderizará DashboardPage, BarbeariaConfigPage, etc. */}
-          {/* Passando o ID da barbearia para as páginas filhas */}
+
+        {/* Sidebar para Mobile (Overlay) */}
+        {isMobileSidebarOpen && (
+          <div className="fixed inset-0 bg-black/50 z-30 lg:hidden" onClick={() => setIsMobileSidebarOpen(false)} aria-hidden="true" />
+        )}
+        <aside
+          className={`fixed inset-y-0 left-0 z-40 w-64 bg-neutral-950 text-gray-200 flex flex-col
+                   transform transition-transform duration-300 ease-in-out lg:hidden 
+                   ${isMobileSidebarOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"}`}
+        >
+          <div className="flex justify-end p-2">
+            <Button variant="ghost" size="icon" onClick={() => setIsMobileSidebarOpen(false)} className="text-gray-300">
+              <X size={24} />
+            </Button>
+          </div>
+          <SidebarContent />
+        </aside>
+
+        {/* Botão para Abrir Sidebar em Mobile */}
+        <div className="lg:hidden fixed top-4 left-4 z-50">
+          {!isMobileSidebarOpen && (
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="bg-white/80 backdrop-blur-sm shadow-md"
+              aria-label="Abrir menu"
+            >
+              <Menu size={24} className="text-gray-700" />
+            </Button>
+          )}
+        </div>
+
+        {/* Conteúdo Principal */}
+        <main className="flex-1 p-6 overflow-y-auto lg:ml-64">
+          {" "}
+          {/* ml-64 para compensar a sidebar desktop */}
+          {/* Adiciona um header simples para o nome da barbearia em mobile, se desejar */}
+          <div className="lg:hidden text-center mb-4 pt-10">
+            {" "}
+            {/* pt-10 para não ficar embaixo do botão Menu */}
+            <h1 className="text-xl font-bold text-gray-800">{barbershop!.name}</h1>
+          </div>
           <Outlet context={outletContextData} />
         </main>
       </div>
