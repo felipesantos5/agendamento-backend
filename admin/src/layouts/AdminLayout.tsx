@@ -21,7 +21,7 @@ export const BarbershopAdminContext = React.createContext<BarbershopContextData 
 
 export function AdminLayout() {
   const { barbershopSlug } = useParams<{ barbershopSlug: string }>();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation(); // Para destacar o link ativo
 
   const [barbershop, setBarbershop] = useState<BarbershopContextData | null>(null);
@@ -90,28 +90,35 @@ export function AdminLayout() {
       to: "configuracoes",
       label: "Minha Barbearia",
       icon: <Settings className="mr-2 h-4 w-4" />,
+      roles: ["admin"],
     },
     {
       to: "metricas",
       label: "Metricas",
       icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
+      roles: ["admin"],
     },
     {
       to: "funcionarios",
       label: "Funcionários",
       icon: <Users className="mr-2 h-4 w-4" />,
+      roles: ["admin"],
     },
     {
       to: "servicos",
       label: "Serviços",
       icon: <Scissors className="mr-2 h-4 w-4" />,
+      roles: ["admin"],
     },
     {
       to: "agendamentos",
       label: "Agendamentos",
       icon: <CalendarDays className="mr-2 h-4 w-4" />,
+      roles: ["admin", "barber"],
     },
   ];
+
+  const visibleNavItems = navItems.filter((item) => user?.role && item.roles.includes(user.role));
 
   const SidebarContent = () => (
     <>
@@ -122,7 +129,7 @@ export function AdminLayout() {
         </h2>
       </div>
       <nav className="flex flex-col space-y-1 mt-4 flex-grow px-3">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const pathToCheck = `/${barbershopSlug}/${item.to}`;
           const isActive = location.pathname === pathToCheck || (item.to === "dashboard" && location.pathname === `/${barbershopSlug}`);
 

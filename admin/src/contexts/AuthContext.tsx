@@ -5,6 +5,7 @@ interface AuthUser {
   barbershopId: string;
   barbershopSlug: string;
   barbershopName: string;
+  role: "admin" | "barber";
 }
 
 interface AuthContextType {
