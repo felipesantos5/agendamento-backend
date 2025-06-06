@@ -262,21 +262,23 @@ export function BarberPage() {
 
       {/* Dialog para Adicionar/Editar Funcionário */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg">
-          {" "}
-          {/* Aumentado um pouco o tamanho */}
-          <form onSubmit={handleSaveBarber}>
-            <DialogHeader>
-              <DialogTitle>{dialogMode === "add" ? "Adicionar Novo Funcionário" : "Editar Funcionário"}</DialogTitle>
-              <DialogDescription>Preencha os dados do profissional e seus horários de disponibilidade.</DialogDescription>
-            </DialogHeader>
+        {/* O DialogContent do ShadCN/UI é um bom lugar para adicionar classes de altura e overflow */}
+        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{dialogMode === "add" ? "Adicionar Novo Funcionário" : "Editar Funcionário"}</DialogTitle>
+            <DialogDescription>Preencha os dados do profissional e seus horários de disponibilidade.</DialogDescription>
+          </DialogHeader>
+
+          {/* Formulário com scroll interno se necessário */}
+          <form onSubmit={handleSaveBarber} className="flex-grow overflow-y-auto pr-6 -mr-6">
             <div className="grid gap-6 py-4">
               <div className="space-y-1.5">
                 <Label>Foto de Perfil</Label>
                 <ImageUploader
                   initialImageUrl={currentBarberForm.image || null}
                   onFileSelect={(file) => setProfileImageFile(file)}
-                  aspectRatio="square" // Fotos de perfil geralmente são quadradas
+                  aspectRatio="square"
+                  label=""
                 />
               </div>
 
@@ -287,65 +289,83 @@ export function BarberPage() {
 
               <div className="space-y-2">
                 <Label>Horários de Disponibilidade</Label>
-                {(currentBarberForm.availability || []).map((slot, index) => (
-                  <div key={index} className="flex items-center gap-2 p-2 border rounded-md">
-                    <div className="flex-1">
-                      <Label htmlFor={`day-${index}`} className="sr-only">
-                        Dia
-                      </Label>
-                      <Select value={slot.day} onValueChange={(value) => handleAvailabilityChange(index, "day", value)}>
-                        <SelectTrigger id={`day-${index}`}>
-                          <SelectValue placeholder="Dia" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {daysOfWeek.map((dayName) => (
-                            <SelectItem key={dayName} value={dayName}>
-                              {dayName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+
+                {/* Container para a lista de horários */}
+                <div className="space-y-3">
+                  {(currentBarberForm.availability || []).map((slot, index) => (
+                    <div
+                      key={index}
+                      // ✅ LÓGICA DE RESPONSIVIDADE AQUI
+                      className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] sm:items-end gap-2 p-3 border rounded-md"
+                    >
+                      {/* O Select do dia ocupará a primeira coluna */}
+                      <div className="sm:col-span-1">
+                        <Label htmlFor={`day-${index}`} className="text-xs text-muted-foreground">
+                          Dia
+                        </Label>
+                        <Select value={slot.day} onValueChange={(value) => handleAvailabilityChange(index, "day", value)}>
+                          <SelectTrigger id={`day-${index}`}>
+                            <SelectValue placeholder="Dia" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {daysOfWeek.map((dayName) => (
+                              <SelectItem key={dayName} value={dayName}>
+                                {dayName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Container para os inputs de hora e o botão de deletar */}
+                      <div className="col-span-1 sm:col-span-2 grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                        <div>
+                          <Label htmlFor={`start-${index}`} className="text-xs text-muted-foreground">
+                            Início
+                          </Label>
+                          <Input
+                            id={`start-${index}`}
+                            type="time"
+                            value={slot.start}
+                            onChange={(e) => handleAvailabilityChange(index, "start", e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`end-${index}`} className="text-xs text-muted-foreground">
+                            Fim
+                          </Label>
+                          <Input
+                            id={`end-${index}`}
+                            type="time"
+                            value={slot.end}
+                            onChange={(e) => handleAvailabilityChange(index, "end", e.target.value)}
+                          />
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeAvailabilitySlot(index)} aria-label="Remover horário">
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <Label htmlFor={`start-${index}`} className="sr-only">
-                        Início
-                      </Label>
-                      <Input
-                        id={`start-${index}`}
-                        type="time"
-                        value={slot.start}
-                        onChange={(e) => handleAvailabilityChange(index, "start", e.target.value)}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <Label htmlFor={`end-${index}`} className="sr-only">
-                        Fim
-                      </Label>
-                      <Input
-                        id={`end-${index}`}
-                        type="time"
-                        value={slot.end}
-                        onChange={(e) => handleAvailabilityChange(index, "end", e.target.value)}
-                      />
-                    </div>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeAvailabilitySlot(index)}>
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </div>
-                ))}
+                  ))}
+                </div>
+
                 <Button type="button" variant="outline" size="sm" onClick={addAvailabilitySlot} className="mt-2">
                   <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Horário
                 </Button>
               </div>
             </div>
-            {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
-            <DialogFooter>
+
+            {/* Footer do Dialog fica fora da área de scroll */}
+            <DialogFooter className="flex-shrink-0 pt-4 border-t">
+              {error && <p className="text-sm text-red-600 mr-auto">{error}</p>}
               <DialogClose asChild>
                 <Button type="button" variant="outline">
                   Cancelar
                 </Button>
               </DialogClose>
-              <Button type="submit">{dialogMode === "add" ? "Adicionar Funcionário" : "Salvar Alterações"}</Button>
+              <Button type="submit">
+                {/* {isSubmitting ? "Salvando..." : dialogMode === "add" ? "Adicionar Funcionário" : "Salvar Alterações"} */}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>
