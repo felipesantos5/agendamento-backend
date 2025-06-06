@@ -1,7 +1,8 @@
+import { API_BASE_URL } from "@/config/BackendUrl";
 import axios from "axios";
 
 const apiClient = axios.create({
-  baseURL: "http://localhost:3001", // Sua URL base da API do backend
+  baseURL: API_BASE_URL, // Sua URL base da API do backend
 });
 
 // Interceptor para adicionar o token JWT a todas as requisições

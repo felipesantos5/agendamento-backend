@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Users, Scissors, CalendarDays, DollarSign, TrendingUp } from "lucide-react"; // Adicionei TrendingUp
 import { Badge } from "@/components/ui/badge";
 import apiClient from "@/services/api";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Contexto e Tipos (como antes)
 interface AdminOutletContext {
@@ -68,15 +69,13 @@ export function DashboardPage() {
       setError(null);
       try {
         // ✅ CHAMADAS REAIS PARA OS ENDPOINTS DO BACKEND ✅
-        const overviewPromise = apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/analytics/overview`);
-        const monthlyBookingsPromise = apiClient.get(
-          `http://localhost:3001/barbershops/${barbershopId}/analytics/monthly-bookings?year=${selectedYear}`
-        );
+        const overviewPromise = apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/analytics/overview`);
+        const monthlyBookingsPromise = apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/analytics/monthly-bookings?year=${selectedYear}`);
         const bookingsByBarberPromise = apiClient.get(
-          `http://localhost:3001/barbershops/${barbershopId}/analytics/bookings-by-barber?period=${selectedPeriodBarber}`
+          `${API_BASE_URL}/barbershops/${barbershopId}/analytics/bookings-by-barber?period=${selectedPeriodBarber}`
         );
         const popularServicesPromise = apiClient.get(
-          `http://localhost:3001/barbershops/${barbershopId}/analytics/popular-services?period=${selectedPeriodService}&limit=5`
+          `${API_BASE_URL}/barbershops/${barbershopId}/analytics/popular-services?period=${selectedPeriodService}&limit=5`
         );
 
         const [overviewRes, monthlyRes, byBarberRes, popularServicesRes] = await Promise.all([

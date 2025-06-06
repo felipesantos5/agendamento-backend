@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch"; // Para o toggle
 import { Label } from "@/components/ui/label"; // Para os rótulos dos filtros
 import { Filter } from "lucide-react";
 import apiClient from "@/services/api";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Contexto do AdminLayout
 interface AdminOutletContext {
@@ -66,8 +67,8 @@ export function AgendamentosPage() {
       setError(null);
       try {
         const [bookingsResponse, barbersResponse] = await Promise.all([
-          apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/bookings`),
-          apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/barbers`), //
+          apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/bookings`),
+          apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`), //
         ]);
         setBookings(bookingsResponse.data);
         setAllBarbers(barbersResponse.data);

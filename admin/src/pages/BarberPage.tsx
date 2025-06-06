@@ -21,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { PlusCircle, Edit2, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import apiClient from "@/services/api";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Contexto do AdminLayout (para obter barbershopId)
 interface AdminOutletContext {
@@ -71,7 +72,7 @@ export function BarberPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/barbers`);
+      const response = await apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`);
       setBarbers(response.data);
     } catch (err) {
       console.error("Erro ao buscar funcionários:", err);
@@ -150,9 +151,9 @@ export function BarberPage() {
 
     try {
       if (dialogMode === "add") {
-        await apiClient.post(`http://localhost:3001/barbershops/${barbershopId}/barbers`, barberDataPayload);
+        await apiClient.post(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`, barberDataPayload);
       } else if (currentBarberForm._id) {
-        await apiClient.put(`http://localhost:3001/barbershops/${barbershopId}/barbers/${currentBarberForm._id}`, barberDataPayload);
+        await apiClient.put(`${API_BASE_URL}/barbershops/${barbershopId}/barbers/${currentBarberForm._id}`, barberDataPayload);
       }
       setIsDialogOpen(false);
       fetchBarbers();
@@ -166,7 +167,7 @@ export function BarberPage() {
     if (!barberToDelete || !barbershopId) return;
     setError(null);
     try {
-      await apiClient.delete(`http://localhost:3001/barbershops/${barbershopId}/barbers/${barberToDelete._id}`);
+      await apiClient.delete(`${API_BASE_URL}/barbershops/${barbershopId}/barbers/${barberToDelete._id}`);
       setBarberToDelete(null);
       fetchBarbers();
     } catch (err: any) {

@@ -30,6 +30,7 @@ import {
 import { PlusCircle, Edit2, Trash2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import apiClient from "@/services/api";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Contexto do AdminLayout (para obter barbershopId)
 interface AdminOutletContext {
@@ -73,7 +74,7 @@ export function ServicesPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await apiClient.get(`http://localhost:3001/barbershops/${barbershopId}/services`);
+      const response = await apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/services`);
       setServices(response.data);
     } catch (err) {
       console.error("Erro ao buscar serviços:", err);
@@ -126,10 +127,10 @@ export function ServicesPage() {
 
     try {
       if (dialogMode === "add") {
-        await apiClient.post(`http://localhost:3001/barbershops/${barbershopId}/services`, serviceDataPayload);
+        await apiClient.post(`${API_BASE_URL}/barbershops/${barbershopId}/services`, serviceDataPayload);
       } else if (currentServiceForm._id) {
         // Certifique-se que seu backend espera o payload sem o barbershopId aqui, pois ele já está na URL
-        await apiClient.put(`http://localhost:3001/barbershops/${barbershopId}/services/${currentServiceForm._id}`, serviceDataPayload);
+        await apiClient.put(`${API_BASE_URL}/barbershops/${barbershopId}/services/${currentServiceForm._id}`, serviceDataPayload);
       }
       setIsDialogOpen(false);
       fetchServices(); // Re-busca a lista de serviços para atualizar a tabela
@@ -143,7 +144,7 @@ export function ServicesPage() {
     if (!serviceToDelete || !barbershopId) return;
     setError(null);
     try {
-      await apiClient.delete(`http://localhost:3001/barbershops/${barbershopId}/services/${serviceToDelete._id}`);
+      await apiClient.delete(`${API_BASE_URL}/barbershops/${barbershopId}/services/${serviceToDelete._id}`);
       setServiceToDelete(null); // Fecha o AlertDialog de confirmação
       fetchServices(); // Re-busca a lista
     } catch (err: any) {

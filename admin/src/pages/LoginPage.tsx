@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import apiClient from "@/services/api";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -26,7 +27,7 @@ export function LoginPage() {
     setError("");
     setIsLoading(true);
     try {
-      const response = await apiClient.post("http://localhost:3001/api/auth/admin/login", { email, password });
+      const response = await apiClient.post(`${API_BASE_URL}/api/auth/admin/login`, { email, password });
       auth.login(response.data.token, response.data.user);
       // Redireciona para o dashboard da barbearia específica após o login
       navigate(`/${response.data.user.barbershopSlug}/dashboard`, { replace: true });

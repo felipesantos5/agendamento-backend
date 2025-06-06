@@ -14,6 +14,7 @@ import { CepFormat } from "@/helper/cepFormarter";
 import { ImageUploader } from "./ImageUploader";
 import apiClient from "@/services/api";
 import { ColorSelector } from "@/components/themeColorPicker";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Tipos para os dados da barbearia (espelhando seus schemas do backend)
 interface Address {
@@ -96,7 +97,7 @@ export function BarbeariaConfigPage() {
       setError(null);
       setSuccessMessage(null);
       try {
-        const response = await apiClient.get(`http://localhost:3001/barbershops/${barbershopId}`);
+        const response = await apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}`);
         setFormData(response.data);
       } catch (err) {
         console.error("Erro ao buscar dados da barbearia:", err);
@@ -196,7 +197,7 @@ export function BarbeariaConfigPage() {
 
       try {
         const uploadResponse = await apiClient.post(
-          `http://localhost:3001/api/upload/logo`, // Rota de upload no backend
+          `${API_BASE_URL}/api/upload/logo`, // Rota de upload no backend
           imageUploadData,
           { headers: { "Content-Type": "multipart/form-data" } }
         );
@@ -224,7 +225,7 @@ export function BarbeariaConfigPage() {
 
     try {
       // 3. Envie os dados atualizados da barbearia (incluindo a nova logoUrl se houver)
-      const updateResponse = await apiClient.put(`http://localhost:3001/barbershops/${barbershopId}`, payload);
+      const updateResponse = await apiClient.put(`${API_BASE_URL}/barbershops/${barbershopId}`, payload);
       setSuccessMessage("Dados da barbearia atualizados com sucesso!");
       setFormData(updateResponse.data); // Atualiza o formData com os dados retornados (incluindo a nova logoUrl)
     } catch (err: any) {

@@ -6,6 +6,7 @@ import { LayoutDashboard, Settings, Users, Scissors, CalendarDays, ShieldAlert, 
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/services/api";
 import { Button } from "@/components/ui/button";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Tipo para os dados básicos da barbearia que podem ser úteis no layout
 interface BarbershopContextData {
@@ -39,7 +40,7 @@ export function AdminLayout() {
       setIsLoading(true);
       try {
         // Esta rota já existe no seu backend para buscar por slug
-        const response = await apiClient.get(`http://localhost:3001/barbershops/slug/${barbershopSlug}`);
+        const response = await apiClient.get(`${API_BASE_URL}/barbershops/slug/${barbershopSlug}`);
         if (response.data) {
           setBarbershop({
             _id: response.data._id,
