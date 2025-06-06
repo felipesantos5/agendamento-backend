@@ -154,7 +154,7 @@ export function BarberPage() {
 
       try {
         // Assumindo que você criou uma rota /api/upload/barber-profile que salva em public/uploads/barbers
-        const uploadResponse = await apiClient.post(`http://localhost:3001/api/upload/barber-profile`, imageUploadData, {
+        const uploadResponse = await apiClient.post(`${API_BASE_URL}/api/upload/barber-profile`, imageUploadData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         finalImageUrl = uploadResponse.data.imageUrl; // O backend retorna a URL da imagem salva
