@@ -1,15 +1,18 @@
 // src/routes/barberRoutes.js
 import express from "express";
-import mongoose from "mongoose"; // Importar mongoose para ObjectId.isValid
+import mongoose from "mongoose";
 import Barber from "../models/Barber.js";
+import AdminUser from "../models/AdminUser.js";
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
 import { barberSchema as BarberValidationSchema } from "../validations/barberValidation.js";
-import { z } from "zod"; // Para tratamento de erro de validação do Zod
-import { parseISO, startOfDay, endOfDay, addMinutes, isEqual, isBefore, format as formatDateFns } from "date-fns";
+import { z } from "zod";
+import { parseISO, startOfDay, endOfDay, format as formatDateFns } from "date-fns";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
-// import { requireRole } from "../middleware/authAdminMiddleware.js";
+import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { ptBR } from "date-fns/locale";
+import crypto from "crypto";
+import "dotenv/config";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
 
@@ -17,24 +20,56 @@ const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 // Adicionar Barbeiro a uma Barbearia
 // Rota: POST /barbershops/:barbershopId/barbers
-router.post("/", protectAdmin, async (req, res) => {
+router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
-    // O schema Zod barberValidation não deve esperar 'barbershop' no req.body,
-    // pois ele é pego dos parâmetros da rota e adicionado antes de salvar.
-    const { barbershop, ...barberDataFromRequest } = req.body;
-    const data = BarberValidationSchema.parse(barberDataFromRequest);
+    // ... (sua validação de autorização) ...
+    const data = BarberValidationSchema.parse(req.body);
 
-    const created = await Barber.create({
-      ...data,
-      barbershop: req.params.barbershopId, // Pega o ID da barbearia da URL
+    const existingAdminUser = await AdminUser.findOne({ email: data.email });
+    if (existingAdminUser) {
+      return res.status(409).json({ error: "Este email já está em uso." });
+    }
+
+    const newBarber = await Barber.create({
+      name: data.name,
+      image: data.image,
+      availability: data.availability,
+      barbershop: req.params.barbershopId,
     });
-    res.status(201).json(created);
+
+    // ✅ GERAÇÃO DO TOKEN
+    const setupToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(setupToken).digest("hex");
+
+    // O token expira em, por exemplo, 24 horas
+    const tokenExpiration = Date.now() + 24 * 60 * 60 * 1000;
+
+    if (newBarber) {
+      await AdminUser.create({
+        email: data.email,
+        role: "barber",
+        barbershop: req.params.barbershopId,
+        barberProfile: newBarber._id,
+        status: "pending",
+        accountSetupToken: hashedToken,
+        accountSetupTokenExpires: tokenExpiration,
+      });
+    }
+
+    // ✅ Retorna o link de configuração para o admin frontend
+    // Em um app real, você enviaria este link por email para data.email
+    const setupLink = `${process.env.ADMIN_FRONTEND_URL}/configurar-senha/${setupToken}`;
+
+    res.status(201).json({
+      barber: newBarber,
+      setupLink: setupLink, // O admin pode copiar e enviar este link para o barbeiro
+    });
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos para o funcionário.", details: e.errors });
+      return res.status(400).json({ error: "Dados inválidos.", details: e.errors });
     }
     console.error("Erro ao criar funcionário:", e);
-    res.status(400).json({ error: e.message || "Erro ao criar funcionário." });
+    res.status(500).json({ error: e.message || "Erro ao criar funcionário." });
   }
 });
 
@@ -209,8 +244,29 @@ router.get("/:barberId/free-slots", async (req, res) => {
   }
 });
 
+router.get("/my-bookings", protectAdmin, async (req, res) => {
+  try {
+    // Pega o ID do perfil de barbeiro do token JWT
+    const barberProfileId = req.adminUser.barberProfileId;
+
+    if (!barberProfileId) {
+      return res.status(400).json({ error: "Este usuário não é um barbeiro com perfil associado." });
+    }
+
+    const bookings = await Booking.find({ barber: barberProfileId })
+      .populate("service", "name price duration")
+      .populate("customer", "name")
+      .sort({ time: 1 }); // Ordena do mais próximo para o mais distante
+
+    res.json(bookings);
+  } catch (e) {
+    console.error("Erro ao buscar meus agendamentos:", e);
+    res.status(500).json({ error: "Erro ao buscar seus agendamentos." });
+  }
+});
+
 // Rota: PUT /barbershops/:barbershopId/barbers/:barberId
-router.put("/:barberId", protectAdmin, async (req, res) => {
+router.put("/:barberId", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 
@@ -248,7 +304,7 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
 });
 
 // Rota: DELETE /barbershops/:barbershopId/barbers/:barberId
-router.delete("/:barberId", protectAdmin, async (req, res) => {
+router.delete("/:barberId", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 

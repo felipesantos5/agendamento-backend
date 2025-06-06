@@ -17,8 +17,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Edit2, Trash2, UserCircle } from "lucide-react";
+import { PlusCircle, Edit2, Trash2, UserCircle, Copy } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
@@ -43,15 +44,24 @@ interface Barber {
   name: string;
   image?: string;
   availability: Availability[];
+  email?: string;
 }
 
-type BarberFormData = Omit<Barber, "_id">;
+type BarberFormData = {
+  name: string;
+  image?: string;
+  availability: Availability[];
+  email: string;
+  password?: string;
+};
 
 const daysOfWeek = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 const initialBarberFormState: BarberFormData = {
   name: "",
   image: "",
+  email: "",
+  password: "",
   availability: [
     { day: "Segunda-feira", start: "09:00", end: "18:00" }, // Exemplo inicial
   ],
@@ -69,6 +79,7 @@ export function BarberPage() {
   const [currentBarberForm, setCurrentBarberForm] = useState<Partial<Barber>>(initialBarberFormState);
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [barberToDelete, setBarberToDelete] = useState<Barber | null>(null);
+  const [setupLink, setSetupLink] = useState("");
 
   const fetchBarbers = async () => {
     if (!barbershopId) return;
@@ -171,16 +182,18 @@ export function BarberPage() {
       name: currentBarberForm.name,
       image: finalImageUrl, // Usa a URL da imagem (nova ou existente)
       availability: validAvailability,
+      email: currentBarberForm.email,
     };
 
     // 3. Cria ou atualiza o barbeiro
     try {
       if (dialogMode === "add") {
-        await apiClient.post(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`, barberDataPayload);
+        const response = await apiClient.post(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`, barberDataPayload);
+        setSetupLink(response.data.setupLink);
       } else if (currentBarberForm._id) {
         await apiClient.put(`${API_BASE_URL}/barbershops/${barbershopId}/barbers/${currentBarberForm._id}`, barberDataPayload);
+        setIsDialogOpen(false);
       }
-      setIsDialogOpen(false);
       fetchBarbers();
     } catch (err: any) {
       console.error("Erro ao salvar funcionário:", err);
@@ -200,6 +213,18 @@ export function BarberPage() {
       setError(err.response?.data?.error || "Falha ao deletar o funcionário.");
       setBarberToDelete(null);
     }
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(setupLink);
+    toast("Link criado com sucesso", {
+      description: "Envie para seu barbeiro criar uma senha e acessar os seus horários agendados. valido até 24 horas.",
+    });
+  };
+
+  const closeDialogAndReset = () => {
+    setIsDialogOpen(false);
+    setSetupLink(""); // Limpa o link ao fechar
   };
 
   if (isLoading && barbers.length === 0) return <p className="text-center p-10">Carregando funcionários...</p>;
@@ -262,110 +287,145 @@ export function BarberPage() {
 
       {/* Dialog para Adicionar/Editar Funcionário */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        {/* O DialogContent do ShadCN/UI é um bom lugar para adicionar classes de altura e overflow */}
         <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>{dialogMode === "add" ? "Adicionar Novo Funcionário" : "Editar Funcionário"}</DialogTitle>
-            <DialogDescription>Preencha os dados do profissional e seus horários de disponibilidade.</DialogDescription>
-          </DialogHeader>
+          {!setupLink ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>{dialogMode === "add" ? "Adicionar Novo Funcionário" : "Editar Funcionário"}</DialogTitle>
+                <DialogDescription>Preencha os dados do profissional e seus horários de disponibilidade.</DialogDescription>
+              </DialogHeader>
 
-          {/* Formulário com scroll interno se necessário */}
-          <form onSubmit={handleSaveBarber} className="flex-grow overflow-y-auto pr-6 -mr-6">
-            <div className="grid gap-6 py-4">
-              <div className="space-y-1.5">
-                <Label>Foto de Perfil</Label>
-                <ImageUploader
-                  initialImageUrl={currentBarberForm.image || null}
-                  onFileSelect={(file) => setProfileImageFile(file)}
-                  aspectRatio="square"
-                  label=""
-                />
-              </div>
+              <form onSubmit={handleSaveBarber} className="flex-grow overflow-y-auto pr-6 -mr-6">
+                <div className="grid gap-6 py-4">
+                  <div className="space-y-1.5">
+                    <Label>Foto de Perfil</Label>
+                    <ImageUploader
+                      initialImageUrl={currentBarberForm.image || null}
+                      onFileSelect={(file) => setProfileImageFile(file)}
+                      aspectRatio="square"
+                      label=""
+                    />
+                  </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Nome do Funcionário</Label>
-                <Input id="name" name="name" value={currentBarberForm.name || ""} onChange={handleFormInputChange} required />
-              </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name">Nome do Funcionário</Label>
+                    <Input id="name" name="name" value={currentBarberForm.name || ""} onChange={handleFormInputChange} required />
+                  </div>
 
-              <div className="space-y-2">
-                <Label>Horários de Disponibilidade</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="email">Email de Login</Label>
+                    <Input id="email" name="email" type="email" value={currentBarberForm.email || ""} onChange={handleFormInputChange} required />
+                    <p className="text-xs text-muted-foreground">O convite para definir a senha será associado a este email.</p>
+                  </div>
 
-                {/* Container para a lista de horários */}
-                <div className="space-y-3">
-                  {(currentBarberForm.availability || []).map((slot, index) => (
-                    <div
-                      key={index}
-                      // ✅ LÓGICA DE RESPONSIVIDADE AQUI
-                      className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] sm:items-end gap-2 p-3 border rounded-md"
-                    >
-                      {/* O Select do dia ocupará a primeira coluna */}
-                      <div className="sm:col-span-1">
-                        <Label htmlFor={`day-${index}`} className="text-xs text-muted-foreground">
-                          Dia
-                        </Label>
-                        <Select value={slot.day} onValueChange={(value) => handleAvailabilityChange(index, "day", value)}>
-                          <SelectTrigger id={`day-${index}`}>
-                            <SelectValue placeholder="Dia" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {daysOfWeek.map((dayName) => (
-                              <SelectItem key={dayName} value={dayName}>
-                                {dayName}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                  <div className="space-y-2">
+                    <Label>Horários de Disponibilidade</Label>
 
-                      {/* Container para os inputs de hora e o botão de deletar */}
-                      <div className="col-span-1 sm:col-span-2 grid grid-cols-[1fr_1fr_auto] items-end gap-2">
-                        <div>
-                          <Label htmlFor={`start-${index}`} className="text-xs text-muted-foreground">
-                            Início
-                          </Label>
-                          <Input
-                            id={`start-${index}`}
-                            type="time"
-                            value={slot.start}
-                            onChange={(e) => handleAvailabilityChange(index, "start", e.target.value)}
-                          />
+                    {/* Container para a lista de horários */}
+                    <div className="space-y-3">
+                      {(currentBarberForm.availability || []).map((slot, index) => (
+                        <div
+                          key={index}
+                          // ✅ LÓGICA DE RESPONSIVIDADE AQUI
+                          className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] sm:items-end gap-2 p-3 border rounded-md"
+                        >
+                          {/* O Select do dia ocupará a primeira coluna */}
+                          <div className="sm:col-span-1">
+                            <Label htmlFor={`day-${index}`} className="text-xs text-muted-foreground">
+                              Dia
+                            </Label>
+                            <Select value={slot.day} onValueChange={(value) => handleAvailabilityChange(index, "day", value)}>
+                              <SelectTrigger id={`day-${index}`}>
+                                <SelectValue placeholder="Dia" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {daysOfWeek.map((dayName) => (
+                                  <SelectItem key={dayName} value={dayName}>
+                                    {dayName}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* Container para os inputs de hora e o botão de deletar */}
+                          <div className="col-span-1 sm:col-span-2 grid grid-cols-[1fr_1fr_auto] items-end gap-2">
+                            <div>
+                              <Label htmlFor={`start-${index}`} className="text-xs text-muted-foreground">
+                                Início
+                              </Label>
+                              <Input
+                                id={`start-${index}`}
+                                type="time"
+                                value={slot.start}
+                                onChange={(e) => handleAvailabilityChange(index, "start", e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor={`end-${index}`} className="text-xs text-muted-foreground">
+                                Fim
+                              </Label>
+                              <Input
+                                id={`end-${index}`}
+                                type="time"
+                                value={slot.end}
+                                onChange={(e) => handleAvailabilityChange(index, "end", e.target.value)}
+                              />
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => removeAvailabilitySlot(index)}
+                              aria-label="Remover horário"
+                            >
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
+                          </div>
                         </div>
-                        <div>
-                          <Label htmlFor={`end-${index}`} className="text-xs text-muted-foreground">
-                            Fim
-                          </Label>
-                          <Input
-                            id={`end-${index}`}
-                            type="time"
-                            value={slot.end}
-                            onChange={(e) => handleAvailabilityChange(index, "end", e.target.value)}
-                          />
-                        </div>
-                        <Button type="button" variant="ghost" size="icon" onClick={() => removeAvailabilitySlot(index)} aria-label="Remover horário">
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
+                      ))}
                     </div>
-                  ))}
+
+                    <Button type="button" variant="outline" size="sm" onClick={addAvailabilitySlot} className="mt-2">
+                      <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Horário
+                    </Button>
+                  </div>
                 </div>
 
-                <Button type="button" variant="outline" size="sm" onClick={addAvailabilitySlot} className="mt-2">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Horário
+                {/* Footer do Dialog fica fora da área de scroll */}
+                <DialogFooter className="flex-shrink-0 pt-4 border-t">
+                  {error && <p className="text-sm text-red-600 mr-auto">{error}</p>}
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">
+                      Cancelar
+                    </Button>
+                  </DialogClose>
+                  <Button type="submit">{dialogMode === "add" ? "Adicionar Funcionário" : "Salvar Alterações"}</Button>
+                </DialogFooter>
+              </form>
+            </>
+          ) : (
+            <div>
+              <DialogHeader>
+                <DialogTitle>Funcionário Criado com Sucesso!</DialogTitle>
+                <DialogDescription>
+                  Copie e envie este link para o funcionário. Ele poderá definir sua própria senha e acessar o sistema. Este link é de uso único e
+                  expira em 24 horas.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex items-center space-x-2 my-4">
+                <Input value={setupLink} readOnly />
+                <Button type="button" size="icon" onClick={copyToClipboard}>
+                  <Copy className="h-4 w-4" />
                 </Button>
               </div>
-            </div>
-
-            {/* Footer do Dialog fica fora da área de scroll */}
-            <DialogFooter className="flex-shrink-0 pt-4 border-t">
-              {error && <p className="text-sm text-red-600 mr-auto">{error}</p>}
-              <DialogClose asChild>
-                <Button type="button" variant="outline">
-                  Cancelar
+              <DialogFooter>
+                <Button type="button" onClick={closeDialogAndReset}>
+                  Concluído
                 </Button>
-              </DialogClose>
-              <Button type="submit">{dialogMode === "add" ? "Adicionar Funcionário" : "Salvar Alterações"}</Button>
-            </DialogFooter>
-          </form>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 

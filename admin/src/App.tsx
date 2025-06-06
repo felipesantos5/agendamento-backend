@@ -14,12 +14,14 @@ import { AgendamentosPage } from "./pages/AgendamentosPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
+import { SetPasswordPage } from "./pages/SetPasswordPage.tsx";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/configurar-senha/:token" element={<SetPasswordPage />} />
 
         <Route element={<ProtectedRoute />}>
           <Route path="/:barbershopSlug" element={<AdminLayout />}>

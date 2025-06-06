@@ -4,6 +4,7 @@ import { z } from "zod";
 export const barberSchema = z.object({
   name: z.string().min(2, "Nome do barbeiro é obrigatório"),
   image: z.string().url("URL da imagem inválida").optional().or(z.literal("")),
+  email: z.string().email({ message: "Formato de email inválido." }),
   availability: z
     .array(
       z.object({

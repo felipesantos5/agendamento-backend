@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import AdminUser from "../models/AdminUser.js"; // Ajuste o caminho se necessário
 import Barbershop from "../models/Barbershop.js"; // Para buscar o slug
 import "dotenv/config"; // Para JWT_SECRET
+import crypto from "crypto";
 
 const router = express.Router();
 
@@ -59,6 +60,44 @@ router.post("/login", async (req, res) => {
     });
   } catch (error) {
     console.error("Erro no login do admin:", error);
+    res.status(500).json({ error: "Erro interno do servidor." });
+  }
+});
+
+router.post("/set-password", async (req, res) => {
+  try {
+    const { token, password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({ error: "Token e senha são obrigatórios." });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ error: "A senha deve ter no mínimo 6 caracteres." });
+    }
+
+    // Hasheia o token recebido para comparar com o que está no banco
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // Encontra o usuário pelo token e verifica se não expirou
+    const user = await AdminUser.findOne({
+      accountSetupToken: hashedToken,
+      accountSetupTokenExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Token inválido ou expirado. Solicite um novo convite." });
+    }
+
+    // Define a nova senha, atualiza o status e limpa os campos do token
+    user.password = password; // O hook pre-save fará o hash
+    user.status = "active";
+    user.accountSetupToken = undefined;
+    user.accountSetupTokenExpires = undefined;
+    await user.save();
+
+    res.status(200).json({ message: "Senha definida com sucesso! Agora você pode fazer o login." });
+  } catch (error) {
+    console.error("Erro ao definir senha:", error);
     res.status(500).json({ error: "Erro interno do servidor." });
   }
 });

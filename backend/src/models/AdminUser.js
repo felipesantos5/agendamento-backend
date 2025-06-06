@@ -13,7 +13,6 @@ const AdminUserSchema = new Schema(
     },
     password: {
       type: String,
-      required: [true, "Senha é obrigatória"],
       minlength: [6, "Senha deve ter no mínimo 6 caracteres"],
     },
     barbershop: {
@@ -26,6 +25,21 @@ const AdminUserSchema = new Schema(
       enum: ["admin", "barber"],
       default: "barber",
       required: true,
+    },
+    barberProfile: {
+      type: Schema.Types.ObjectId,
+      ref: "Barber",
+      required: function () {
+        return this.role === "barber";
+      },
+    },
+
+    accountSetupToken: { type: String },
+    accountSetupTokenExpires: { type: Date },
+    status: {
+      type: String,
+      enum: ["pending", "active"], // pending = esperando definir a senha
+      default: "pending",
     },
   },
   { timestamps: true }
