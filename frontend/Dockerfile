@@ -1,21 +1,42 @@
-# Build stage
-FROM node:18-alpine as build
+# frontend/Dockerfile (e também admin-frontend/Dockerfile)
+
+# --- Estágio 1: Build da Aplicação React/Vite ---
+FROM node:18-alpine AS build
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm i --legacy-peer-deps
+# Copia package.json e yarn.lock
+COPY package.json yarn.lock ./
 
+# Instala todas as dependências (incluindo as de desenvolvimento para o build)
+RUN yarn install --frozen-lockfile
+
+# Copia o resto dos arquivos do projeto
 COPY . .
-RUN npm run build
 
-# Production stage
-FROM nginx:alpine
+# Opcional, mas recomendado: Passar a URL da API como variável de ambiente no build
+# Isso evita que a URL do backend fique "hardcoded" no seu código fonte
+# ARG VITE_API_URL
+# ENV VITE_API_URL=${VITE_API_URL}
 
+# Roda o comando de build para gerar os arquivos estáticos na pasta /dist
+RUN yarn build
+
+
+# --- Estágio 2: Servir os Arquivos Estáticos com Nginx ---
+# Use uma imagem Nginx super leve
+FROM nginx:stable-alpine
+
+# Copia os arquivos da pasta 'dist' do estágio de build para a pasta padrão do Nginx
 COPY --from=build /app/dist /usr/share/nginx/html
 
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Opcional: Para Single Page Applications (SPA), é bom ter um nginx.conf customizado
+# para redirecionar todas as rotas para o index.html.
+# Se precisar, crie um arquivo 'nginx.conf' e descomente a linha abaixo:
+# COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 8081
+# Expõe a porta 80, que é a porta padrão do Nginx
+EXPOSE 80
 
+# Comando para iniciar o Nginx
 CMD ["nginx", "-g", "daemon off;"]
