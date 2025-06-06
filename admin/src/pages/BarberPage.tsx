@@ -363,9 +363,7 @@ export function BarberPage() {
                   Cancelar
                 </Button>
               </DialogClose>
-              <Button type="submit">
-                {/* {isSubmitting ? "Salvando..." : dialogMode === "add" ? "Adicionar Funcionário" : "Salvar Alterações"} */}
-              </Button>
+              <Button type="submit">{dialogMode === "add" ? "Adicionar Funcionário" : "Salvar Alterações"}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
