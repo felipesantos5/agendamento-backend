@@ -54,7 +54,7 @@ export function DashboardPage() {
 
   const availableYears = useMemo(() => {
     const current = new Date().getFullYear();
-    return [current, current - 1, current - 2];
+    return [current];
   }, []);
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export function DashboardPage() {
             <CardTitle className="text-lg font-semibold">Agendamentos por Mês</CardTitle>
             <div className="w-36">
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger id="yearFilterMonthly">
+                <SelectTrigger id="yearFilterMonthly" className="w-full">
                   <SelectValue placeholder="Ano" />
                 </SelectTrigger>
                 <SelectContent>
