@@ -32,13 +32,32 @@ connectDB();
 
 const app = express();
 
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "https://barbeariagendamento.com.br",
+  "https://admin.barbeariagendamento.com.br",
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // A 'origin' é a URL que está fazendo a requisição para seu backend.
+
+    // Permite requisições sem 'origin' (ex: Postman, apps mobile) E
+    // verifica se a 'origin' da requisição está na sua lista de permitidas.
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true); // Permite a requisição
+    } else {
+      callback(new Error("Não permitido pela política de CORS")); // Bloqueia a requisição
+    }
+  },
+  credentials: true, // Importante para permitir o envio de cookies ou tokens de autorização
+};
+
+// 2. Use as novas opções no middleware cors
+app.use(cors(corsOptions));
+
 app.use(express.json());
-app.use(
-  cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:5173",
-    credentials: true,
-  })
-);
 
 // ✅ Servir arquivos estáticos da pasta 'public'
 // Se app.js está em src/ e public/ está na raiz do backend/
