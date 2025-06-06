@@ -13,6 +13,7 @@ import PersonalInfo from "@/components/personalInfo";
 import StepIndicator from "@/components/stepIndicator";
 import { SocialLinks } from "@/components/socialLinks";
 import { Service } from "@/types/barberShop";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Type Definitions
 type Barbershop = {
@@ -61,7 +62,7 @@ export const Loja = () => {
 
     const fetchInitialData = async () => {
       try {
-        const barbershopResponse = await axios.get(`http://localhost:3001/barbershops/slug/${slug}`);
+        const barbershopResponse = await axios.get(`${API_BASE_URL}/barbershops/slug/${slug}`);
         const currentBarbershop = barbershopResponse.data;
         setBarbershop(currentBarbershop);
         document.title = `${currentBarbershop.name}`;
@@ -72,10 +73,10 @@ export const Loja = () => {
 
         if (currentBarbershop?._id) {
           // ✅ BUSCAR SERVIÇOS E BARBEIROS AQUI
-          const servicesResponse = await axios.get(`http://localhost:3001/barbershops/${currentBarbershop._id}/services`);
+          const servicesResponse = await axios.get(`${API_BASE_URL}/barbershops/${currentBarbershop._id}/services`);
           setAllServices(servicesResponse.data);
 
-          const barbersResponse = await axios.get(`http://localhost:3001/barbershops/${currentBarbershop._id}/barbers`);
+          const barbersResponse = await axios.get(`${API_BASE_URL}/barbershops/${currentBarbershop._id}/barbers`);
           setAllBarbers(barbersResponse.data);
         }
       } catch (error) {
@@ -132,7 +133,7 @@ export const Loja = () => {
     };
 
     try {
-      const response = await axios.post(`http://localhost:3001/barbershops/${barbershop?._id}/bookings`, bookingPayload);
+      const response = await axios.post(`${API_BASE_URL}/barbershops/${barbershop?._id}/bookings`, bookingPayload);
 
       if (response.status === 201 && barbershop) {
         navigate("/agendamento-sucesso", {

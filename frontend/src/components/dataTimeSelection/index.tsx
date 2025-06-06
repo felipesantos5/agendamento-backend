@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import axios from "axios";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 interface TimeSlot {
   time: string;
@@ -31,7 +32,7 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
         setLoadingTimes(true);
         setTimeSlots([]);
         try {
-          const response = await axios.get(`http://localhost:3001/barbershops/${barbershopId}/barbers/${selectedBarber}/free-slots`, {
+          const response = await axios.get(`${API_BASE_URL}/barbershops/${barbershopId}/barbers/${selectedBarber}/free-slots`, {
             params: { date: formData.date, serviceId: selectedServiceId },
           });
           setTimeSlots(response.data);
