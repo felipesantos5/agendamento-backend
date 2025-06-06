@@ -1,7 +1,7 @@
 // src/components/admin/ImageUploader.tsx
 
 import { useState, useCallback, useEffect, DragEvent, ChangeEvent, useRef } from "react";
-import { UploadCloud, XCircle, Image as ImageIcon } from "lucide-react";
+import { UploadCloud, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button"; //
 import { Label } from "../ui/label";
 
@@ -122,7 +122,13 @@ export function ImageUploader({ onFileSelect, initialImageUrl, label = "Logo/Ima
       {previewUrl ? (
         <div className="relative group">
           <img src={previewUrl} alt="Preview" className={`w-full h-auto max-h-60 object-contain rounded-md border ${aspectRatioClass}`} />
-          <Button type="button" variant="destructive" size="icon" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={handleRemoveImage}>
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon"
+            className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
+            onClick={handleRemoveImage}
+          >
             <XCircle className="h-5 w-5" />
           </Button>
         </div>
@@ -144,7 +150,14 @@ export function ImageUploader({ onFileSelect, initialImageUrl, label = "Logo/Ima
           <p className={`text-xs ${isDragging ? "text-rose-500" : "text-gray-400"}`}>PNG, JPG, GIF, WebP (MAX. 2MB)</p>
         </div>
       )}
-      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" id={fileInputRef.current?.id || "image-upload-input"} />
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+        id={fileInputRef.current?.id || "image-upload-input"}
+      />
       {previewUrl && !selectedFile && initialImageUrl && (
         <Button type="button" variant="outline" size="sm" className="mt-2" onClick={triggerFileInput}>
           Alterar Imagem

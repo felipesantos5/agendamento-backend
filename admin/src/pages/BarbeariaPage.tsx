@@ -75,7 +75,7 @@ interface AdminOutletContext {
 }
 
 export function BarbeariaConfigPage() {
-  const { barbershopId, barbershopName } = useOutletContext<AdminOutletContext>();
+  const { barbershopId } = useOutletContext<AdminOutletContext>();
 
   const [formData, setFormData] = useState<Partial<BarbershopData>>(initialBarbershopState);
   const [isLoading, setIsLoading] = useState(true);

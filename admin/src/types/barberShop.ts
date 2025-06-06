@@ -1,8 +1,3 @@
-interface Customer {
-  name: string;
-  phone: string;
-}
-
 export interface Data {
   barbershop: Barbershop | null;
   barbers: Barber[];

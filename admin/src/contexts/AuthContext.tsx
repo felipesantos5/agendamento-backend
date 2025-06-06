@@ -1,5 +1,4 @@
 import { createContext, useState, useContext, useEffect, ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
 
 interface AuthUser {
   email: string;
@@ -23,8 +22,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [token, setToken] = useState<string | null>(localStorage.getItem("adminToken"));
   const [user, setUser] = useState<AuthUser | null>(JSON.parse(localStorage.getItem("adminUser") || "null"));
   const [isLoading, setIsLoading] = useState(true); // Para verificar o token inicial
-
-  // const navigate = useNavigate();
 
   useEffect(() => {
     // Poderia adicionar uma verificação de validade do token aqui se quisesse
