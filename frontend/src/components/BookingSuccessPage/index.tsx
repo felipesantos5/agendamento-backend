@@ -1,8 +1,8 @@
 // frontend/src/pages/BookingSuccessPage.tsx
 
 import { useEffect } from "react";
-import { Link, useLocation, Navigate } from "react-router-dom";
-import { CheckCircle2, CalendarDays, Clock, User, Scissors, ShieldAlert /* Ícone para fallback */ } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { CalendarDays, Clock, User, Scissors, ShieldAlert /* Ícone para fallback */ } from "lucide-react";
 import { Button } from "@/components/ui/button"; //
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"; //
 import { format, parseISO } from "date-fns";
