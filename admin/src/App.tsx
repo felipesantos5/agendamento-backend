@@ -1,6 +1,6 @@
 // admin-frontend/src/App.tsx
 
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "./layouts/AdminLayout";
 
 // Importe as páginas do seu admin aqui
@@ -15,29 +15,55 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { LoginPage } from "./pages/LoginPage";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { SetPasswordPage } from "./pages/SetPasswordPage.tsx";
+import { useAuth } from "./contexts/AuthContext.tsx";
 
-function App() {
+export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/configurar-senha/:token" element={<SetPasswordPage />} />
 
+        {/* Envolve todas as rotas do painel com uma verificação básica de login */}
         <Route element={<ProtectedRoute />}>
           <Route path="/:barbershopSlug" element={<AdminLayout />}>
-            <Route path="metricas" element={<DashboardPage />} />
-            <Route path="configuracoes" element={<BarbeariaConfigPage />} />
-            <Route path="servicos" element={<ServicesPage />} />
-            <Route path="funcionarios" element={<BarberPage />} />
+            {/* Rota padrão (index) para a área logada */}
+            <Route index element={<DefaultPageBasedOnRole />} />
+
+            {/* Rota que tanto 'admin' quanto 'barber' podem acessar */}
             <Route path="agendamentos" element={<AgendamentosPage />} />
+
+            {/* ✅ Grupo de rotas que APENAS 'admin' pode acessar */}
+            <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+              <Route path="metricas" element={<DashboardPage />} />
+              <Route path="configuracoes" element={<BarbeariaConfigPage />} />
+              <Route path="servicos" element={<ServicesPage />} />
+              <Route path="funcionarios" element={<BarberPage />} />
+            </Route>
+
+            {/* Rota para "não encontrado" dentro do painel admin */}
+            <Route path="*" element={<>nao encontrado</>} />
           </Route>
+
+          {/* Trata o acesso à raiz "/" para usuários logados */}
+          <Route path="/" element={null} />
         </Route>
 
-        <Route path="/" element={<div>Página inicial do Admin (ou redirecionar para login/seleção de barbearia)</div>} />
-        <Route path="*" element={<div>Erro 404 - Página Admin Não Encontrada</div>} />
+        <Route path="*" element={<div>Erro 404 - Página Não Encontrada</div>} />
       </Routes>
     </BrowserRouter>
   );
 }
 
-export default App;
+// Componente auxiliar para redirecionar com base na função do usuário
+function DefaultPageBasedOnRole() {
+  const { user } = useAuth();
+
+  if (user?.role === "admin") {
+    // Admins são redirecionados para o dashboard (métricas)
+    return <Navigate to="metricas" replace />;
+  }
+
+  // Barbeiros (e qualquer outra função) são redirecionados para os agendamentos
+  return <Navigate to="agendamentos" replace />;
+}

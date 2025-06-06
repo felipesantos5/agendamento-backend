@@ -63,7 +63,7 @@ export function SetPasswordPage() {
               </div>
               {error && <p className="text-sm text-red-500">{error}</p>}
             </CardContent>
-            <CardFooter>
+            <CardFooter className="mt-4">
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Salvando..." : "Definir Senha e Ativar Conta"}
               </Button>

@@ -206,12 +206,7 @@ export function AdminLayout() {
 
         {/* Conteúdo Principal */}
         <main className="flex-1 p-6 overflow-y-auto lg:ml-64">
-          {" "}
-          {/* ml-64 para compensar a sidebar desktop */}
-          {/* Adiciona um header simples para o nome da barbearia em mobile, se desejar */}
           <div className="lg:hidden text-center mb-4 pt-10">
-            {" "}
-            {/* pt-10 para não ficar embaixo do botão Menu */}
             <h1 className="text-xl font-bold text-gray-800">{barbershop!.name}</h1>
           </div>
           <Outlet context={outletContextData} />

@@ -1,12 +1,13 @@
-import { Navigate, Outlet, useParams } from "react-router-dom";
+import { Navigate, Outlet, useParams, useOutletContext } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 
 interface ProtectedRouteProps {
-  // Você pode adicionar props se precisar de verificações de role específicas no futuro
+  allowedRoles?: ("admin" | "barber")[];
 }
 
-export const ProtectedRoute = ({}: ProtectedRouteProps) => {
+export const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
   const auth = useAuth();
+  const parentContext = useOutletContext();
   const { barbershopSlug } = useParams<{ barbershopSlug?: string }>();
 
   if (auth.isLoading) {
@@ -25,6 +26,17 @@ export const ProtectedRoute = ({}: ProtectedRouteProps) => {
     return <Navigate to={`/${auth.user?.barbershopSlug}/configuracoes`} replace />;
   }
 
+  if (auth.user) {
+    // ✅ 3. NOVA VERIFICAÇÃO: O usuário tem a função (role) permitida para esta rota?
+    if (allowedRoles && !allowedRoles.includes(auth.user.role)) {
+      console.warn(`Acesso negado. Usuário com função '${auth.user.role}' tentou acessar uma rota para '${allowedRoles.join(", ")}'.`);
+
+      // Redireciona para uma página padrão que todos os usuários logados podem ver.
+      // Para um barbeiro, essa página seria a de agendamentos.
+      return <Navigate to={`/${auth.user.barbershopSlug}/agendamentos`} replace />;
+    }
+  }
+
   // Se o slug não estiver na URL, mas o usuário estiver autenticado,
   // redireciona para o slug da barbearia dele.
   // Isso acontece se ele tentar acessar /admin (ou uma rota sem slug) após o login.
@@ -32,5 +44,5 @@ export const ProtectedRoute = ({}: ProtectedRouteProps) => {
     return <Navigate to={`/${auth.user.barbershopSlug}/configuracoes`} replace />;
   }
 
-  return <Outlet />; // Outlet renderizará o AdminLayout se o slug corresponder
+  return <Outlet context={parentContext} />; // Outlet renderizará o AdminLayout se o slug corresponder
 };

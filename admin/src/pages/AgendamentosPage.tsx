@@ -14,6 +14,7 @@ import { Filter } from "lucide-react";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
 import { PhoneFormat } from "@/helper/phoneFormater";
+import { useAuth } from "@/contexts/AuthContext";
 
 // Contexto do AdminLayout
 interface AdminOutletContext {
@@ -51,6 +52,8 @@ interface Barber {
 export function AgendamentosPage() {
   const { barbershopId, barbershopName } = useOutletContext<AdminOutletContext>();
 
+  const { user } = useAuth();
+
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [allBarbers, setAllBarbers] = useState<Barber[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,22 +63,38 @@ export function AgendamentosPage() {
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>("all");
   const [showPastAppointments, setShowPastAppointments] = useState<boolean>(false);
 
+  const isUserAdmin = user?.role === "admin";
+
   useEffect(() => {
     if (!barbershopId) return;
 
     const fetchPageData = async () => {
       setIsLoading(true);
       setError(null);
+
       try {
-        const [bookingsResponse, barbersResponse] = await Promise.all([
-          apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/bookings`),
-          apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`), //
-        ]);
+        let bookingsResponse;
+
+        // ✅ Lógica condicional para buscar os dados
+        if (isUserAdmin) {
+          // Se for admin, busca todos os agendamentos da barbearia E a lista de barbeiros para o filtro
+          const [resBookings, resBarbers] = await Promise.all([
+            apiClient.get(`/barbershops/${barbershopId}/bookings`),
+            apiClient.get(`/barbershops/${barbershopId}/barbers`),
+          ]);
+          bookingsResponse = resBookings;
+          setAllBarbers(resBarbers.data);
+        } else {
+          // Se for barbeiro, busca apenas os SEUS agendamentos pela nova rota
+          bookingsResponse = await apiClient.get(`/barbershops/${barbershopId}/barbers/bookings/barber`);
+          console.log("bookingsResponse", bookingsResponse);
+          // Não precisa buscar todos os barbeiros, pois o filtro não será mostrado
+        }
+
         setBookings(bookingsResponse.data);
-        setAllBarbers(barbersResponse.data);
-      } catch (err) {
-        console.error("Erro ao buscar dados da página de agendamentos:", err);
-        setError("Não foi possível carregar os dados necessários.");
+      } catch (err: any) {
+        console.error("Erro ao buscar dados de agendamentos:", err);
+        setError(err.response?.data?.error || "Não foi possível carregar os dados.");
       } finally {
         setIsLoading(false);
       }
@@ -138,37 +157,37 @@ export function AgendamentosPage() {
       <CardContent>
         {error && !isLoading && <p className="mb-4 text-sm text-red-600 bg-red-100 p-3 rounded-md">{error}</p>}
 
-        {/* ✅ SEÇÃO DE FILTROS ✅ */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
-          <div className="flex items-center text-sm font-medium text-gray-700 mr-2 whitespace-nowrap">
-            <Filter className="mr-2 h-5 w-5" /> Filtros:
+        {isUserAdmin && (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+            <div className="flex items-center text-sm font-medium text-gray-700 mr-2 whitespace-nowrap">
+              <Filter className="mr-2 h-5 w-5" /> Filtros:
+            </div>
+            <div className="flex-grow min-w-[200px] w-full sm:w-auto">
+              <Label htmlFor="barberFilter" className="text-xs font-medium text-gray-600">
+                Profissional:
+              </Label>
+              <Select value={selectedBarberFilter} onValueChange={setSelectedBarberFilter}>
+                <SelectTrigger id="barberFilter" className="w-full mt-1">
+                  <SelectValue placeholder="Todos os Profissionais" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os Profissionais</SelectItem>
+                  {allBarbers.map((barber) => (
+                    <SelectItem key={barber._id} value={barber._id}>
+                      {barber.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center space-x-2 pt-2 sm:pt-5 w-full sm:w-auto justify-end">
+              <Switch id="showPastToggle" checked={showPastAppointments} onCheckedChange={setShowPastAppointments} />
+              <Label htmlFor="showPastToggle" className="text-sm font-medium text-gray-600 cursor-pointer whitespace-nowrap">
+                Exibir passados
+              </Label>
+            </div>
           </div>
-          <div className="flex-grow min-w-[200px] w-full sm:w-auto">
-            <Label htmlFor="barberFilter" className="text-xs font-medium text-gray-600">
-              Profissional:
-            </Label>
-            <Select value={selectedBarberFilter} onValueChange={setSelectedBarberFilter}>
-              <SelectTrigger id="barberFilter" className="w-full mt-1">
-                <SelectValue placeholder="Todos os Profissionais" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os Profissionais</SelectItem>
-                {allBarbers.map((barber) => (
-                  <SelectItem key={barber._id} value={barber._id}>
-                    {barber.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex items-center space-x-2 pt-2 sm:pt-5 w-full sm:w-auto justify-end">
-            <Switch id="showPastToggle" checked={showPastAppointments} onCheckedChange={setShowPastAppointments} />
-            <Label htmlFor="showPastToggle" className="text-sm font-medium text-gray-600 cursor-pointer whitespace-nowrap">
-              Exibir passados
-            </Label>
-          </div>
-        </div>
-
+        )}
         <Table>
           <TableCaption>
             {displayedBookings.length === 0
@@ -179,9 +198,9 @@ export function AgendamentosPage() {
             <TableRow>
               <TableHead className="w-[300px]">Data e Hora</TableHead>
               <TableHead>Cliente</TableHead>
-              <TableHead> Telefone</TableHead>
+              <TableHead>Telefone</TableHead>
               <TableHead>Serviço</TableHead>
-              <TableHead>Profissional</TableHead>
+              {isUserAdmin && <TableHead>Profissional</TableHead>}
               <TableHead className="text-right">Preço (R$)</TableHead>
               <TableHead className="text-center">Status</TableHead>
             </TableRow>
@@ -208,7 +227,7 @@ export function AgendamentosPage() {
                   <TableCell>
                     <div className="flex items-center">{booking.service.name}</div>
                   </TableCell>
-                  <TableCell>{booking.barber.name}</TableCell>
+                  {isUserAdmin && <TableCell>{booking.barber.name}</TableCell>}
                   <TableCell className="text-right">
                     {typeof booking.service?.price === "number" ? booking.service.price.toFixed(2) : "N/A"}
                   </TableCell>

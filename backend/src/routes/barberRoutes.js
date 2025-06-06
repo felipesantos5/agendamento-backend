@@ -52,7 +52,7 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
         barberProfile: newBarber._id,
         status: "pending",
         accountSetupToken: hashedToken,
-        accountSetupTokenExpires: tokenExpiration,
+        accountSetupTokenExpires: new Date(tokenExpiration),
       });
     }
 
@@ -244,24 +244,31 @@ router.get("/:barberId/free-slots", async (req, res) => {
   }
 });
 
-router.get("/my-bookings", protectAdmin, async (req, res) => {
+router.get("/bookings/barber", protectAdmin, async (req, res) => {
   try {
-    // Pega o ID do perfil de barbeiro do token JWT
-    const barberProfileId = req.adminUser.barberProfileId;
+    const { role, barberProfileId, barbershopId } = req.adminUser; // Dados do token JWT
 
-    if (!barberProfileId) {
-      return res.status(400).json({ error: "Este usuário não é um barbeiro com perfil associado." });
+    let query = { barbershop: new mongoose.Types.ObjectId(barbershopId) };
+
+    // Se a função for 'barber', adiciona o filtro para pegar apenas os agendamentos dele
+    if (role === "barber") {
+      if (!barberProfileId || !mongoose.Types.ObjectId.isValid(barberProfileId)) {
+        return res.status(400).json({ error: "Perfil de barbeiro inválido ou não associado a este usuário." });
+      }
+      query.barber = new mongoose.Types.ObjectId(barberProfileId);
     }
+    // Se a função for 'admin', o query buscará todos os agendamentos da barbearia
 
-    const bookings = await Booking.find({ barber: barberProfileId })
-      .populate("service", "name price duration")
-      .populate("customer", "name")
+    const bookings = await Booking.find(query)
+      .populate("barber", "name")
+      .populate("service", "name price")
+      .populate("customer", "name phone whatsapp") // Incluindo 'whatsapp' se existir
       .sort({ time: 1 }); // Ordena do mais próximo para o mais distante
 
     res.json(bookings);
-  } catch (e) {
-    console.error("Erro ao buscar meus agendamentos:", e);
-    res.status(500).json({ error: "Erro ao buscar seus agendamentos." });
+  } catch (error) {
+    console.error("Erro ao buscar agendamentos do usuário:", error);
+    res.status(500).json({ error: "Erro interno ao buscar agendamentos." });
   }
 });
 
