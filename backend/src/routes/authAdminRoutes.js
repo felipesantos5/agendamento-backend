@@ -39,7 +39,8 @@ router.post("/login", async (req, res) => {
       barbershopId: user.barbershop._id,
       barbershopSlug: user.barbershop.slug, // Inclui o slug para facilitar o redirect no frontend
       barbershopName: user.barbershop.name,
-      // você pode adicionar outras infos como 'role' se tiver
+      role: user.role,
+      barberProfileId: user.barberProfile,
     };
 
     const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" }); // Token expira em 24 horas
@@ -53,6 +54,7 @@ router.post("/login", async (req, res) => {
         barbershopId: user.barbershop._id,
         barbershopSlug: user.barbershop.slug,
         barbershopName: user.barbershop.name,
+        role: user.role,
       },
     });
   } catch (error) {

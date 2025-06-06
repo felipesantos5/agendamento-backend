@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label"; // Para os rótulos dos filtros
 import { Filter } from "lucide-react";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
+import { PhoneFormat } from "@/helper/phoneFormater";
 
 // Contexto do AdminLayout
 interface AdminOutletContext {
@@ -202,7 +203,7 @@ export function AgendamentosPage() {
                     <div className="flex items-center">{booking.customer.name}</div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center">{booking.customer.phone || "Não informado"}</div>
+                    <div className="flex items-center">{PhoneFormat(booking.customer.phone) || "Não informado"}</div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center">{booking.service.name}</div>

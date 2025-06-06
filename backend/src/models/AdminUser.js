@@ -17,12 +17,16 @@ const AdminUserSchema = new Schema(
       minlength: [6, "Senha deve ter no mínimo 6 caracteres"],
     },
     barbershop: {
-      // A barbearia que este usuário admin gerencia
       type: Schema.Types.ObjectId,
       ref: "Barbershop",
       required: true,
     },
-    // Você pode adicionar outros campos como nome, role, etc.
+    role: {
+      type: String,
+      enum: ["admin", "barber"],
+      default: "barber",
+      required: true,
+    },
   },
   { timestamps: true }
 );

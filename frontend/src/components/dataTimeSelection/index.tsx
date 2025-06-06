@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/BackendUrl";
@@ -47,6 +47,29 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
     };
     fetchTimeSlots();
   }, [formData.date, selectedBarber, barbershopId]);
+
+  const filteredAndVisibleSlots = useMemo(() => {
+    // Se a data selecionada não for hoje, não precisa filtrar por hora
+    const today = new Date();
+    const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+
+    if (formData.date !== todayString) {
+      return timeSlots; // Retorna todos os slots para datas futuras
+    }
+
+    // Se for hoje, filtra os horários que já passaram
+    const currentHour = today.getHours();
+    const currentMinute = today.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+
+    return timeSlots.filter((slot) => {
+      const [slotHour, slotMinute] = slot.time.split(":").map(Number);
+      const slotTimeInMinutes = slotHour * 60 + slotMinute;
+
+      // Mostra o slot apenas se o horário dele for maior que o horário atual
+      return slotTimeInMinutes > currentTimeInMinutes;
+    });
+  }, [timeSlots, formData.date]);
 
   // --- Lógica do Calendário ---
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -147,8 +170,8 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
             <p className="text-sm text-gray-500">Carregando horários...</p>
           ) : (
             <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {timeSlots.length !== 0
-                ? timeSlots.map((slot) => (
+              {filteredAndVisibleSlots.length !== 0
+                ? filteredAndVisibleSlots.map((slot) => (
                     <button
                       key={slot.time}
                       type="button"

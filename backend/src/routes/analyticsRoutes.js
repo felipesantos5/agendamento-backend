@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
+import { requireRole } from "../middleware/authAdminMiddleware.js";
 
 const router = express.Router({ mergeParams: true }); // Para acessar :barbershopId
 
@@ -29,7 +30,7 @@ const getPeriodDates = (period) => {
 };
 
 // ROTA: GET /barbershops/:barbershopId/analytics/overview
-router.get("/overview", async (req, res) => {
+router.get("/overview", requireRole, async (req, res) => {
   try {
     const { barbershopId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(barbershopId)) {
@@ -60,7 +61,7 @@ router.get("/overview", async (req, res) => {
 });
 
 // ROTA: GET /barbershops/:barbershopId/analytics/monthly-bookings?year=YYYY
-router.get("/monthly-bookings", async (req, res) => {
+router.get("/monthly-bookings", requireRole, async (req, res) => {
   try {
     const { barbershopId } = req.params;
     const year = parseInt(req.query.year) || new Date().getFullYear();
@@ -108,7 +109,7 @@ router.get("/monthly-bookings", async (req, res) => {
 });
 
 // ROTA: GET /barbershops/:barbershopId/analytics/bookings-by-barber?period=currentMonth
-router.get("/bookings-by-barber", async (req, res) => {
+router.get("/bookings-by-barber", requireRole, async (req, res) => {
   try {
     const { barbershopId } = req.params;
     const period = req.query.period || "currentMonth";
@@ -154,7 +155,7 @@ router.get("/bookings-by-barber", async (req, res) => {
 });
 
 // ROTA: GET /barbershops/:barbershopId/analytics/popular-services?period=currentMonth&limit=5
-router.get("/popular-services", async (req, res) => {
+router.get("/popular-services", requireRole, async (req, res) => {
   try {
     const { barbershopId } = req.params;
     const period = req.query.period || "currentMonth";

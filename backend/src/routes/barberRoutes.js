@@ -8,6 +8,7 @@ import { barberSchema as BarberValidationSchema } from "../validations/barberVal
 import { z } from "zod"; // Para tratamento de erro de validação do Zod
 import { parseISO, startOfDay, endOfDay, addMinutes, isEqual, isBefore, format as formatDateFns } from "date-fns";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
+import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { ptBR } from "date-fns/locale";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
@@ -16,7 +17,7 @@ const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 // Adicionar Barbeiro a uma Barbearia
 // Rota: POST /barbershops/:barbershopId/barbers
-router.post("/", protectAdmin, async (req, res) => {
+router.post("/", protectAdmin, requireRole, async (req, res) => {
   try {
     // O schema Zod barberValidation não deve esperar 'barbershop' no req.body,
     // pois ele é pego dos parâmetros da rota e adicionado antes de salvar.
@@ -209,7 +210,7 @@ router.get("/:barberId/free-slots", async (req, res) => {
 });
 
 // Rota: PUT /barbershops/:barbershopId/barbers/:barberId
-router.put("/:barberId", protectAdmin, async (req, res) => {
+router.put("/:barberId", protectAdmin, requireRole, async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 
@@ -247,7 +248,7 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
 });
 
 // Rota: DELETE /barbershops/:barbershopId/barbers/:barberId
-router.delete("/:barberId", protectAdmin, async (req, res) => {
+router.delete("/:barberId", protectAdmin, requireRole, async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 

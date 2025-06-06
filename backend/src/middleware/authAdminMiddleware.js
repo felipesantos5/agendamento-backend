@@ -3,6 +3,16 @@ import "dotenv/config";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
+export const requireRole = (requiredRole) => {
+  return (req, res, next) => {
+    if (req.adminUser && req.adminUser.role === requiredRole) {
+      next(); // Permite o acesso se a função for a correta
+    } else {
+      res.status(403).json({ error: "Acesso proibido: permissões insuficientes." });
+    }
+  };
+};
+
 export const protectAdmin = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
