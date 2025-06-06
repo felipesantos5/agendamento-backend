@@ -1,5 +1,3 @@
-import { Instagram, MessageCircle } from "lucide-react"; // MessageCircle pode representar o WhatsApp
-
 interface AppFooterProps {
   instagramUrl?: string | null;
   whatsappNumber?: string | null; // Ex: "48991234567" ou "(48) 99123-4567"

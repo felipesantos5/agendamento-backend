@@ -21,8 +21,6 @@ interface DateTimeSelectionProps {
 
 export default function DateTimeSelection({ formData, updateFormData, barbershopId, selectedBarber, selectedServiceId }: DateTimeSelectionProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [availableTimes, setAvailableTimes] = useState<string[]>([]);
-  // ✅ NOVO: O estado agora armazena a lista de objetos TimeSlot
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
 

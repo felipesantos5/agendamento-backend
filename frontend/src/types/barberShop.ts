@@ -1,62 +1,61 @@
-interface Customer {
-  name: string;
-  phone: string;
+// frontend/src/types/index.ts
+
+export interface Address {
+  cep: string;
+  estado: string;
+  cidade: string;
+  bairro: string;
+  rua: string;
+  numero: string;
+  complemento?: string;
 }
 
-export interface Data {
-  barbershop: Barbershop | null;
-  barbers: Barber[];
-  services: Service[];
-  id: string;
-  // customer: Customer;
-  date: string;
-  hour: string;
-  message: string;
-  submitting: boolean;
+export interface WorkingHour {
+  day: string;
+  start: string;
+  end: string;
 }
 
-// Você precisará definir as interfaces Barbershop, Barber e Service
-// com base nos seus schemas do Mongoose.
-
-interface Barbershop {
+export interface Barbershop {
   _id: string;
   name: string;
-  description: string;
-  address: {
-    cep: string;
-    estado: string;
-    cidade: string;
-    bairro: string;
-    rua: string;
-    numero: string;
-    complemento?: string;
-  };
+  themeColor?: string;
   logoUrl?: string;
-  contact: string;
-  slug: string;
-  workingHours: {
-    day: string;
-    start: string;
-    end: string;
-  }[];
+  instagramUrl?: string;
+  whatsappNumber?: string;
+  contact?: string; // Mantendo o contact se ainda for usado
+  address: Address;
+  workingHours: WorkingHour[];
 }
 
-interface Barber {
-  _id: string;
-  name: string;
-  barbershop: string;
-  availability: {
-    day: string;
-    start: string;
-    end: string;
-  }[];
-}
-
-interface Service {
+export interface Service {
   _id: string;
   name: string;
   description: string;
   price: number;
-  duration: number;
-  barbershop: string;
+  duration: number; // em minutos
+}
+
+export interface Barber {
+  _id: string;
+  name: string;
+  availability: Availability[]; // Supondo que Availability é parecido com WorkingHour
+}
+
+// Interface para a disponibilidade do barbeiro (se for diferente de WorkingHour)
+export interface Availability {
+  day: string;
+  start: string;
+  end: string;
+}
+
+// Você pode também definir os tipos para o formulário aqui
+export interface BookingFormData {
+  service: string;
+  barber: string;
+  date: string;
+  time: string;
+  name: string;
+  email: string;
+  phone: string;
 }

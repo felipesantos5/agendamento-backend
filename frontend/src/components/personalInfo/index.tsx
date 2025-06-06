@@ -1,6 +1,6 @@
 // frontend/src/components/personalInfo/index.tsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 // Supondo que você tenha o PhoneFormat em um local como "@/lib/phoneUtils"
 // Se não, você pode defini-lo aqui ou importá-lo de onde estiver.

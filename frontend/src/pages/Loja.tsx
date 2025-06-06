@@ -12,6 +12,7 @@ import DateTimeSelection from "@/components/dataTimeSelection";
 import PersonalInfo from "@/components/personalInfo";
 import StepIndicator from "@/components/stepIndicator";
 import { SocialLinks } from "@/components/socialLinks";
+import { Service } from "@/types/barberShop";
 
 // Type Definitions
 type Barbershop = {
@@ -21,12 +22,6 @@ type Barbershop = {
   themeColor: string;
   instagram: string;
   contact: string;
-};
-
-type Service = {
-  _id: string;
-  name: string;
-  // outros campos do serviço que você possa precisar
 };
 
 type Barber = {
