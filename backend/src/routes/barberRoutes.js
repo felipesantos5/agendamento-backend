@@ -41,8 +41,8 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
     const setupToken = crypto.randomBytes(32).toString("hex");
     const hashedToken = crypto.createHash("sha256").update(setupToken).digest("hex");
 
-    // O token expira em, por exemplo, 24 horas
-    const tokenExpiration = Date.now() + 24 * 60 * 60 * 1000;
+    // O token expira em, por exemplo, 72 horas
+    const tokenExpiration = Date.now() + 72 * 60 * 60 * 1000;
 
     if (newBarber) {
       await AdminUser.create({

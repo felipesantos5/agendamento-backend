@@ -218,7 +218,7 @@ export function BarberPage() {
   const copyToClipboard = () => {
     navigator.clipboard.writeText(setupLink);
     toast("Link criado com sucesso", {
-      description: "Envie para seu barbeiro criar uma senha e acessar os seus horários agendados. valido até 24 horas.",
+      description: "Envie para seu barbeiro criar uma senha e acessar os seus horários agendados. valido até 72 horas.",
     });
   };
 
@@ -410,7 +410,7 @@ export function BarberPage() {
                 <DialogTitle>Funcionário Criado com Sucesso!</DialogTitle>
                 <DialogDescription>
                   Copie e envie este link para o funcionário. Ele poderá definir sua própria senha e acessar o sistema. Este link é de uso único e
-                  expira em 24 horas.
+                  expira em 72 horas.
                 </DialogDescription>
               </DialogHeader>
               <div className="flex items-center space-x-2 my-4">
