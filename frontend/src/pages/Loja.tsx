@@ -28,6 +28,7 @@ type Barbershop = {
 type Barber = {
   _id: string;
   name: string;
+  image?: string;
   // outros campos do barbeiro
 };
 

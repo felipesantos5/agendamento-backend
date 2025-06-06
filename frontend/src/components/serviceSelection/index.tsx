@@ -1,5 +1,6 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Label } from "../ui/label";
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 
 interface Service {
   _id: string;
@@ -11,6 +12,7 @@ interface Service {
 interface Barber {
   _id: string;
   name: string;
+  image?: string;
 }
 
 interface ServiceSelectionProps {
@@ -60,7 +62,11 @@ export default function ServiceSelection({
           </SelectTrigger>
           <SelectContent>
             {barbers.map((barber) => (
-              <SelectItem key={barber._id} value={barber._id} className="cursor-pointer">
+              <SelectItem key={barber._id} value={barber._id} className="cursor-pointer flex gap-3">
+                <Avatar>
+                  <AvatarImage src={barber.image} />
+                  <AvatarFallback className="uppercase">{barber.name.slice(0, 1)}</AvatarFallback>
+                </Avatar>
                 {barber.name}
               </SelectItem>
             ))}

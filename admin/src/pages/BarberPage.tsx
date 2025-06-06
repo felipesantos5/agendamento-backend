@@ -18,10 +18,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { PlusCircle, Edit2, Trash2 } from "lucide-react";
+import { PlusCircle, Edit2, Trash2, UserCircle } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
+import { ImageUploader } from "./ImageUploader";
 
 // Contexto do AdminLayout (para obter barbershopId)
 interface AdminOutletContext {
@@ -40,8 +41,8 @@ interface Availability {
 interface Barber {
   _id: string;
   name: string;
+  image?: string;
   availability: Availability[];
-  // barbershop ID é implícito pela rota
 }
 
 type BarberFormData = Omit<Barber, "_id">;
@@ -50,6 +51,7 @@ const daysOfWeek = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", 
 
 const initialBarberFormState: BarberFormData = {
   name: "",
+  image: "",
   availability: [
     { day: "Segunda-feira", start: "09:00", end: "18:00" }, // Exemplo inicial
   ],
@@ -65,6 +67,7 @@ export function BarberPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"add" | "edit">("add");
   const [currentBarberForm, setCurrentBarberForm] = useState<Partial<Barber>>(initialBarberFormState);
+  const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [barberToDelete, setBarberToDelete] = useState<Barber | null>(null);
 
   const fetchBarbers = async () => {
@@ -135,20 +138,42 @@ export function BarberPage() {
 
   const handleSaveBarber = async (e: FormEvent) => {
     e.preventDefault();
+    setError(null);
+
     if (!barbershopId || !currentBarberForm.name) {
       setError("Nome do funcionário é obrigatório.");
       return;
     }
-    setError(null);
 
-    // Filtrar horários de disponibilidade vazios ou incompletos antes de enviar
+    let finalImageUrl = currentBarberForm.image || "";
+
+    // 1. Se um novo arquivo de imagem foi selecionado, faz o upload primeiro
+    if (profileImageFile) {
+      const imageUploadData = new FormData();
+      imageUploadData.append("profileImage", profileImageFile); // O nome do campo esperado pelo backend
+
+      try {
+        // Assumindo que você criou uma rota /api/upload/barber-profile que salva em public/uploads/barbers
+        const uploadResponse = await apiClient.post(`http://localhost:3001/api/upload/barber-profile`, imageUploadData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        finalImageUrl = uploadResponse.data.imageUrl; // O backend retorna a URL da imagem salva
+      } catch (uploadError: any) {
+        console.error("Erro no upload da imagem:", uploadError);
+        setError(uploadError.response?.data?.error || "Falha ao fazer upload da imagem.");
+        return;
+      }
+    }
+
+    // 2. Prepara o payload com os dados do barbeiro
     const validAvailability = (currentBarberForm.availability || []).filter((slot) => slot.day && slot.start && slot.end);
-
     const barberDataPayload = {
       name: currentBarberForm.name,
+      image: finalImageUrl, // Usa a URL da imagem (nova ou existente)
       availability: validAvailability,
     };
 
+    // 3. Cria ou atualiza o barbeiro
     try {
       if (dialogMode === "add") {
         await apiClient.post(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`, barberDataPayload);
@@ -204,7 +229,15 @@ export function BarberPage() {
           <TableBody>
             {barbers.map((barber) => (
               <TableRow key={barber._id}>
-                <TableCell className="font-medium">{barber.name}</TableCell>
+                <TableCell className="font-medium flex items-center">
+                  {" "}
+                  {barber.image ? (
+                    <img src={barber.image} alt={barber.name} className="h-10 w-10 rounded-full object-cover mr-4" />
+                  ) : (
+                    <UserCircle className="h-10 w-10 text-gray-300 mr-4" />
+                  )}
+                  {barber.name}
+                </TableCell>
                 <TableCell className="text-xs">
                   {barber.availability && barber.availability.length > 0 ? (
                     barber.availability.map((a, index) => <div key={index}>{`${a.day}: ${a.start} - ${a.end}`}</div>)
@@ -237,7 +270,16 @@ export function BarberPage() {
               <DialogTitle>{dialogMode === "add" ? "Adicionar Novo Funcionário" : "Editar Funcionário"}</DialogTitle>
               <DialogDescription>Preencha os dados do profissional e seus horários de disponibilidade.</DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
+            <div className="grid gap-6 py-4">
+              <div className="space-y-1.5">
+                <Label>Foto de Perfil</Label>
+                <ImageUploader
+                  initialImageUrl={currentBarberForm.image || null}
+                  onFileSelect={(file) => setProfileImageFile(file)}
+                  aspectRatio="square" // Fotos de perfil geralmente são quadradas
+                />
+              </div>
+
               <div className="space-y-1.5">
                 <Label htmlFor="name">Nome do Funcionário</Label>
                 <Input id="name" name="name" value={currentBarberForm.name || ""} onChange={handleFormInputChange} required />

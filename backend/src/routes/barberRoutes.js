@@ -16,7 +16,7 @@ const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 // Adicionar Barbeiro a uma Barbearia
 // Rota: POST /barbershops/:barbershopId/barbers
-router.post("/", async (req, res) => {
+router.post("/", protectAdmin, async (req, res) => {
   try {
     // O schema Zod barberValidation não deve esperar 'barbershop' no req.body,
     // pois ele é pego dos parâmetros da rota e adicionado antes de salvar.
@@ -208,28 +208,32 @@ router.get("/:barberId/free-slots", async (req, res) => {
   }
 });
 
-// ✅ NOVA ROTA: Atualizar um Funcionário (Barbeiro)
 // Rota: PUT /barbershops/:barbershopId/barbers/:barberId
 router.put("/:barberId", protectAdmin, async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(barbershopId) || !mongoose.Types.ObjectId.isValid(barberId)) {
-      return res.status(400).json({ error: "ID da barbearia ou do funcionário inválido." });
+    // 1. Validação de Autorização: O admin está tentando editar um funcionário da sua própria barbearia?
+    if (req.adminUser.barbershopId !== barbershopId) {
+      return res.status(403).json({ error: "Não autorizado a modificar funcionários desta barbearia." });
     }
 
-    // O schema Zod barberValidation não deve esperar 'barbershop' no req.body
-    const { barbershop, ...barberDataFromRequest } = req.body;
-    const dataToUpdate = BarberValidationSchema.parse(barberDataFromRequest);
+    if (!mongoose.Types.ObjectId.isValid(barberId)) {
+      return res.status(400).json({ error: "ID do funcionário inválido." });
+    }
 
+    // 2. Validação dos Dados Recebidos
+    const dataToUpdate = BarberValidationSchema.parse(req.body);
+
+    // 3. Atualização Segura no Banco
     const updatedBarber = await Barber.findOneAndUpdate(
-      { _id: barberId, barbershop: barbershopId }, // Condição: ID do funcionário E da barbearia
-      dataToUpdate, // Novos dados (nome, availability)
-      { new: true, runValidators: true } // Opções
+      { _id: barberId, barbershop: barbershopId }, // Condição garante que o barbeiro pertence à barbearia correta
+      dataToUpdate, // Novos dados (nome, availability, image)
+      { new: true, runValidators: true }
     );
 
     if (!updatedBarber) {
-      return res.status(404).json({ error: "Funcionário não encontrado ou não pertence a esta barbearia." });
+      return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
     }
 
     res.json(updatedBarber);
@@ -242,28 +246,39 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
   }
 });
 
-// ✅ NOVA ROTA: Deletar um Funcionário (Barbeiro)
 // Rota: DELETE /barbershops/:barbershopId/barbers/:barberId
 router.delete("/:barberId", protectAdmin, async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(barbershopId) || !mongoose.Types.ObjectId.isValid(barberId)) {
-      return res.status(400).json({ error: "ID da barbearia ou do funcionário inválido." });
+    // 1. Validação de Autorização
+    if (req.adminUser.barbershopId !== barbershopId) {
+      return res.status(403).json({ error: "Não autorizado a deletar funcionários desta barbearia." });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(barberId)) {
+      return res.status(400).json({ error: "ID do funcionário inválido." });
+    }
+
+    // Opcional: Verificar se o barbeiro tem agendamentos futuros antes de deletar
+    const futureBookings = await Booking.findOne({
+      barber: barberId,
+      time: { $gte: new Date() },
+    });
+
+    if (futureBookings) {
+      return res.status(400).json({ error: "Não é possível deletar. Este funcionário possui agendamentos futuros." });
+    }
+
+    // 2. Deleção Segura no Banco
     const deletedBarber = await Barber.findOneAndDelete({
       _id: barberId,
-      barbershop: barbershopId, // Condição: ID do funcionário E da barbearia
+      barbershop: barbershopId, // Garante que só deleta o funcionário da barbearia correta
     });
 
     if (!deletedBarber) {
-      return res.status(404).json({ error: "Funcionário não encontrado ou não pertence a esta barbearia." });
+      return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
     }
-
-    // Consideração: O que fazer com os agendamentos futuros deste barbeiro?
-    // Por enquanto, estamos apenas deletando o barbeiro.
-    // Você pode querer adicionar lógica para cancelar/remanejar agendamentos.
 
     res.json({ message: "Funcionário deletado com sucesso.", barberId: deletedBarber._id });
   } catch (e) {
@@ -273,4 +288,3 @@ router.delete("/:barberId", protectAdmin, async (req, res) => {
 });
 
 export default router;
-``;

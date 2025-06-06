@@ -51,7 +51,7 @@ export function SocialLinks({
             rel="noopener noreferrer"
             className="hover:underline text-var(--loja-theme-color) dark:var(--loja-theme-color)/80 font-medium"
           >
-            SuaPlataforma
+            BarbeariaAgendamento
           </a>
         </p>
 
