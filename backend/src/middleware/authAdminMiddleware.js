@@ -24,9 +24,9 @@ export const protectAdmin = (req, res, next) => {
       req.adminUser = decoded; // Adiciona os dados do token (userId, barbershopId, barbershopSlug) ao req
 
       // Opcional: Verificar se o barbershopId do token corresponde ao barbershopId da rota (se aplicável)
-      // if (req.params.barbershopId && req.adminUser.barbershopId !== req.params.barbershopId) {
-      //   return res.status(403).json({ error: "Acesso não autorizado para esta barbearia." });
-      // }
+      if (req.params.barbershopId && req.adminUser.barbershopId !== req.params.barbershopId) {
+        return res.status(403).json({ error: "Acesso não autorizado para esta barbearia." });
+      }
 
       next();
     } catch (error) {
