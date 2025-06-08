@@ -42,7 +42,6 @@ interface AdminOutletContext {
 interface Service {
   _id: string;
   name: string;
-  description: string;
   price: number;
   duration: number; // em minutos
 }
@@ -52,7 +51,6 @@ type ServiceFormData = Omit<Service, "_id">;
 
 const initialServiceFormState: ServiceFormData = {
   name: "",
-  description: "",
   price: 0,
   duration: 30, // Duração padrão de 30 minutos
 };
@@ -120,7 +118,6 @@ export function ServicesPage() {
 
     const serviceDataPayload = {
       name: currentServiceForm.name,
-      description: currentServiceForm.description,
       price: Number(currentServiceForm.price),
       duration: Number(currentServiceForm.duration),
     };
@@ -174,7 +171,6 @@ export function ServicesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Nome</TableHead>
-              <TableHead>Descrição</TableHead>
               <TableHead className="text-right">Preço (R$)</TableHead>
               <TableHead className="text-right">Duração (min)</TableHead>
               <TableHead className="text-right">Ações</TableHead>
@@ -184,7 +180,6 @@ export function ServicesPage() {
             {services.map((service) => (
               <TableRow key={service._id}>
                 <TableCell className="font-medium">{service.name}</TableCell>
-                <TableCell className="text-sm text-muted-foreground max-w-xs truncate">{service.description}</TableCell>
                 <TableCell className="text-right">{service.price.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{service.duration}</TableCell>
                 <TableCell className="text-right space-x-2">
@@ -233,18 +228,6 @@ export function ServicesPage() {
                   Nome
                 </Label>
                 <Input id="name" name="name" value={currentServiceForm.name || ""} onChange={handleFormInputChange} className="col-span-3" required />
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="description" className="text-right">
-                  Descrição
-                </Label>
-                <Textarea
-                  id="description"
-                  name="description"
-                  value={currentServiceForm.description || ""}
-                  onChange={handleFormInputChange}
-                  className="col-span-3"
-                />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="price" className="text-right">
