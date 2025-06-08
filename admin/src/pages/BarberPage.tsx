@@ -178,12 +178,19 @@ export function BarberPage() {
 
     // 2. Prepara o payload com os dados do barbeiro
     const validAvailability = (currentBarberForm.availability || []).filter((slot) => slot.day && slot.start && slot.end);
-    const barberDataPayload = {
+    const barberDataPayload: Partial<BarberFormData> = {
       name: currentBarberForm.name,
       image: finalImageUrl, // Usa a URL da imagem (nova ou existente)
       availability: validAvailability,
-      email: currentBarberForm.email,
     };
+
+    if (dialogMode === "add") {
+      if (!currentBarberForm.email) {
+        setError("O email de login é obrigatório para novos funcionários.");
+        return;
+      }
+      barberDataPayload.email = currentBarberForm.email;
+    }
 
     // 3. Cria ou atualiza o barbeiro
     try {
@@ -245,7 +252,8 @@ export function BarberPage() {
           <TableCaption>{barbers.length === 0 && !isLoading ? "Nenhum funcionário cadastrado." : "Lista dos seus funcionários."}</TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead>Nome</TableHead>
+              <TableHead className="w-[300px]">Nome</TableHead>
+              <TableHead>Email de Login</TableHead>
               <TableHead>Disponibilidade</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -254,7 +262,6 @@ export function BarberPage() {
             {barbers.map((barber) => (
               <TableRow key={barber._id}>
                 <TableCell className="font-medium flex items-center">
-                  {" "}
                   {barber.image ? (
                     <img src={barber.image} alt={barber.name} className="h-10 w-10 rounded-full object-cover mr-4" />
                   ) : (
@@ -262,6 +269,7 @@ export function BarberPage() {
                   )}
                   {barber.name}
                 </TableCell>
+                <TableCell className="text-sm text-muted-foreground">{barber.email || "Não definido"}</TableCell>
                 <TableCell className="text-xs">
                   {barber.availability && barber.availability.length > 0 ? (
                     barber.availability.map((a, index) => <div key={index}>{`${a.day}: ${a.start} - ${a.end}`}</div>)
@@ -286,15 +294,20 @@ export function BarberPage() {
 
       {/* Dialog para Adicionar/Editar Funcionário */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="sm:max-w-lg max-h-[90vh] flex flex-col">
+        <DialogContent className=" max-h-[90vh] flex flex-col">
           {!setupLink ? (
             <>
               <DialogHeader>
                 <DialogTitle>{dialogMode === "add" ? "Adicionar Novo Funcionário" : "Editar Funcionário"}</DialogTitle>
-                <DialogDescription>Preencha os dados do profissional e seus horários de disponibilidade.</DialogDescription>
+                <DialogDescription>
+                  {" "}
+                  {dialogMode === "add"
+                    ? "Preencha os dados e crie as credenciais de login para o profissional."
+                    : "Edite os dados de perfil e disponibilidade do profissional."}
+                </DialogDescription>
               </DialogHeader>
 
-              <form onSubmit={handleSaveBarber} className="flex-grow overflow-y-auto pr-6 -mr-6">
+              <form onSubmit={handleSaveBarber} className="flex-grow overflow-y-auto pr-6 -mr-4 md:-mr-6">
                 <div className="grid gap-6 py-4">
                   <div className="space-y-1.5">
                     <Label>Foto de Perfil</Label>
@@ -311,11 +324,13 @@ export function BarberPage() {
                     <Input id="name" name="name" value={currentBarberForm.name || ""} onChange={handleFormInputChange} required />
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="email">Email de Login</Label>
-                    <Input id="email" name="email" type="email" value={currentBarberForm.email || ""} onChange={handleFormInputChange} required />
-                    <p className="text-xs text-muted-foreground">O convite para definir a senha será associado a este email.</p>
-                  </div>
+                  {dialogMode === "add" && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="email">Email de Login</Label>
+                      <Input id="email" name="email" type="email" value={currentBarberForm.email || ""} onChange={handleFormInputChange} required />
+                      <p className="text-xs text-muted-foreground">O convite para definir a senha será associado a este email.</p>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Horários de Disponibilidade</Label>

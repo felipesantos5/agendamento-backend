@@ -77,10 +77,41 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
 // Rota: GET /barbershops/:barbershopId/barbers
 router.get("/", async (req, res) => {
   try {
-    if (!mongoose.Types.ObjectId.isValid(req.params.barbershopId)) {
-      return res.status(400).json({ error: "ID da barbearia inválido." });
-    }
-    const barbers = await Barber.find({ barbershop: req.params.barbershopId });
+    const barbershopId = new mongoose.Types.ObjectId(req.params.barbershopId);
+
+    const barbers = await Barber.aggregate([
+      // 1. Encontra todos os barbeiros que pertencem a esta barbearia
+      {
+        $match: { barbershop: barbershopId },
+      },
+      // 2. Faz o "JOIN" com a coleção 'adminusers'
+      {
+        $lookup: {
+          from: "adminusers", // O nome da coleção no MongoDB (geralmente plural e minúsculo)
+          localField: "_id", // O campo no modelo 'Barber'
+          foreignField: "barberProfile", // O campo correspondente no modelo 'AdminUser'
+          as: "loginInfo", // O nome do novo array que será adicionado com os dados do usuário
+        },
+      },
+      // 3. O $lookup retorna um array. $unwind descontrói esse array para podermos acessar os campos.
+      {
+        $unwind: {
+          path: "$loginInfo",
+          preserveNullAndEmptyArrays: true, // Mantém barbeiros na lista mesmo que não tenham um login (importante!)
+        },
+      },
+      // 4. Projeta (seleciona) os campos que queremos retornar para o frontend
+      {
+        $project: {
+          _id: 1, // 1 significa incluir o campo
+          name: 1,
+          image: 1,
+          availability: 1,
+          email: "$loginInfo.email", // Pega o email de dentro do objeto 'loginInfo' que foi juntado
+        },
+      },
+    ]);
+
     res.json(barbers);
   } catch (e) {
     console.error("Erro ao buscar funcionários:", e);
