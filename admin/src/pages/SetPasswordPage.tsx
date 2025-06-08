@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 export function SetPasswordPage() {
   const { token } = useParams<{ token: string }>();
@@ -32,7 +33,7 @@ export function SetPasswordPage() {
 
     setIsLoading(true);
     try {
-      const response = await axios.post("http://localhost:3001/api/auth/admin/set-password", { token, password });
+      const response = await axios.post(`${API_BASE_URL}/auth/admin/set-password`, { token, password });
       setSuccess(response.data.message);
       // Redireciona para o login após 3 segundos
       setTimeout(() => navigate("/login"), 3000);
