@@ -23,7 +23,11 @@ export const BarbershopSchema = z.object({
   name: z.string().min(2, "Nome obrigatório"),
   description: z.string().max(300, "Descrição muito longa"),
   address: AddressSchema,
-  logoUrl: z.string().url("URL inválida").optional(),
+  logoUrl: z
+    .string()
+    .url("URL inválida") // Deve ser uma URL...
+    .or(z.literal("")) // ...OU pode ser uma string vazia
+    .optional(),
   contact: z.string().min(8, "Contato obrigatório"),
   instagram: z.string().optional(),
   slug: z.string().max(50, "Descrição muito longa"),
