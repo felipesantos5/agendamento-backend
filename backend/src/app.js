@@ -59,6 +59,8 @@ app.use(cors(corsOptions));
 
 app.use(express.json());
 
+app.use(express.static("public"));
+
 // ✅ Servir arquivos estáticos da pasta 'public'
 // Se app.js está em src/ e public/ está na raiz do backend/
 app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
