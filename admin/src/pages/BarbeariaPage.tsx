@@ -198,8 +198,7 @@ export function BarbeariaConfigPage() {
       try {
         const uploadResponse = await apiClient.post(
           `${API_BASE_URL}/api/upload/logo`, // Rota de upload no backend
-          imageUploadData,
-          { headers: { "Content-Type": "multipart/form-data" } }
+          imageUploadData
         );
         finalLogoUrl = uploadResponse.data.logoUrl; // Pega a URL retornada pelo backend
         setLogoFile(null); // Limpa o arquivo do estado após o upload
