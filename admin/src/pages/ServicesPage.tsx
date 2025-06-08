@@ -158,13 +158,13 @@ export function ServicesPage() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Gerenciar Serviços - {barbershopName}</CardTitle>
-          <p className="text-sm text-muted-foreground">Adicione, edite ou remova os serviços oferecidos.</p>
+      <CardHeader className="flex flex-col items-start md:items-center md:flex-row justify-between">
+        <div className="mb-4">
+          <CardTitle>Gerenciar Serviços</CardTitle>
+          {/* <p className="text-sm text-muted-foreground">Adicione, edite ou remova os serviços oferecidos.</p> */}
         </div>
         <Button onClick={openAddDialog}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Serviço
+          <PlusCircle className="mr-2 h-4 w-4" /> Adicionar
         </Button>
       </CardHeader>
       <CardContent>

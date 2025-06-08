@@ -2,13 +2,14 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Users, Scissors, CalendarDays, DollarSign, TrendingUp } from "lucide-react"; // Adicionei TrendingUp
 import { Badge } from "@/components/ui/badge";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
+import useMediaQuery from "@/hooks/useMediaQuery";
 
 // Contexto e Tipos (como antes)
 interface AdminOutletContext {
@@ -51,6 +52,8 @@ export function DashboardPage() {
   const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
   const [selectedPeriodBarber, setSelectedPeriodBarber] = useState<string>("currentMonth");
   const [selectedPeriodService, setSelectedPeriodService] = useState<string>("currentMonth");
+
+  const isMobile = useMediaQuery("(max-width: 768px)");
 
   const availableYears = useMemo(() => {
     const current = new Date().getFullYear();
@@ -181,11 +184,11 @@ export function DashboardPage() {
       {/* Gráficos */}
       <div className="grid gap-6 md:grid-cols-1">
         <Card className="lg:col-span-1">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
             <CardTitle className="text-lg font-semibold">Agendamentos por Mês</CardTitle>
             <div className="w-36">
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger id="yearFilterMonthly" className="w-full">
+                <SelectTrigger id="yearFilterMonthly" aria-label="Selecionar ano" className="w-full">
                   <SelectValue placeholder="Ano" />
                 </SelectTrigger>
                 <SelectContent>
@@ -198,23 +201,66 @@ export function DashboardPage() {
               </Select>
             </div>
           </CardHeader>
-          <CardContent className="h-[350px] w-full pl-2">
+          <CardContent className="h-[350px] w-full pl-0 pr-3 sm:pl-2 sm:pr-4">
             {dashboardData.monthlyBookings && dashboardData.monthlyBookings.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={dashboardData.monthlyBookings}>
-                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                  <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "white", borderRadius: "0.5rem", boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}
-                    labelStyle={{ fontWeight: "bold", color: "#333" }}
-                  />
-                  <Bar dataKey="totalBookings" fill="var(--theme-primary, #ef4444)" name="Agendamentos" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <>
+                {isMobile ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dashboardData.monthlyBookings}
+                      layout="vertical" // 1. Layout definido como "vertical" para ter barras horizontais
+                      margin={{ top: 5, right: 30, left: 10, bottom: 5 }} // Margens ajustadas para o novo layout
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
+                      {/* 2. Eixo X agora é numérico */}
+                      <XAxis
+                        type="number"
+                        fontSize={12}
+                        tickLine={false}
+                        axisLine={{ stroke: "hsl(var(--border))" }}
+                        stroke="hsl(var(--muted-foreground))"
+                        allowDecimals={false} // Não permite números quebrados na contagem
+                      />
+                      {/* 3. Eixo Y agora é de categoria e mostra os meses */}
+                      <YAxis
+                        dataKey="month"
+                        type="category"
+                        fontSize={12}
+                        width={40} // Largura para os nomes dos meses
+                        tickLine={false}
+                        axisLine={false}
+                        stroke="hsl(var(--muted-foreground))"
+                      />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "white", borderRadius: "0.5rem", boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}
+                        labelStyle={{ fontWeight: "bold", color: "#333" }}
+                      />
+                      <Bar
+                        dataKey="totalBookings"
+                        fill="var(--theme-primary, #ef4444)" // Usando a cor primária do seu tema
+                        name="Agendamentos"
+                        radius={[0, 4, 4, 0]} // Cantos arredondados na ponta da barra
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={dashboardData.monthlyBookings}>
+                      <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                      <XAxis dataKey="month" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis fontSize={12} tickLine={false} axisLine={false} tickFormatter={(value) => `${value}`} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: "white", borderRadius: "0.5rem", boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}
+                        labelStyle={{ fontWeight: "bold", color: "#333" }}
+                      />
+                      <Bar dataKey="totalBookings" fill="var(--theme-primary, #ef4444)" name="Agendamentos" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
+              </>
             ) : (
               <p className="text-center text-muted-foreground h-full flex items-center justify-center">
-                Sem dados de agendamentos para o ano selecionado.
+                Sem dados de atendimentos para o período selecionado.
               </p>
             )}
           </CardContent>

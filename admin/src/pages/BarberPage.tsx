@@ -231,13 +231,12 @@ export function BarberPage() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle>Gerenciar Funcionários (Barbeiros) - {barbershopName}</CardTitle>
-          <CardDescription>Adicione, edite ou remova os profissionais da sua equipe.</CardDescription>
+      <CardHeader className="flex flex-col items-start md:items-center justify-between md:flex-row">
+        <div className="mb-4">
+          <CardTitle>Gerenciar Funcionários (Barbeiros)</CardTitle>
         </div>
         <Button onClick={openAddDialog}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Funcionário
+          <PlusCircle className="mr-2 h-4 w-4" /> Adicionar
         </Button>
       </CardHeader>
       <CardContent>

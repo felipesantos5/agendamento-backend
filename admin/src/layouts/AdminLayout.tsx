@@ -168,7 +168,7 @@ export function AdminLayout() {
     <BarbershopAdminContext.Provider value={barbershop}>
       <div className="flex min-h-screen bg-gray-100">
         {/* Sidebar para Desktop */}
-        <aside className="hidden lg:flex lg:flex-col lg:w-64 bg-neutral-950 text-gray-200 fixed h-full">
+        <aside className="hidden lg:flex lg:flex-col lg:w-52 bg-neutral-950 text-gray-200 fixed h-full">
           <SidebarContent />
         </aside>
 
@@ -205,10 +205,10 @@ export function AdminLayout() {
         </div>
 
         {/* Conteúdo Principal */}
-        <main className="flex-1 p-6 overflow-y-auto lg:ml-64">
-          <div className="lg:hidden text-center mb-4 pt-10">
+        <main className="flex-1 p-6 overflow-y-auto lg:ml-64 pt-20">
+          {/* <div className="lg:hidden text-center mb-4 pt-10">
             <h1 className="text-xl font-bold text-gray-800">{barbershop!.name}</h1>
-          </div>
+          </div> */}
           <Outlet context={outletContextData} />
         </main>
       </div>
