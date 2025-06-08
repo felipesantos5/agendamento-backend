@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
+import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 
 // Helper para __dirname em ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -44,7 +45,7 @@ const uploadLogoMiddleware = multer({
   limits: { fileSize: FIVE_MEGABYTES },
 });
 
-router.post("/logo", requireRole("admin"), uploadLogoMiddleware.single("logoFile"), (req, res) => {
+router.post("/logo", protectAdmin, requireRole("admin"), uploadLogoMiddleware.single("logoFile"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Nenhum arquivo de logo foi enviado." });
   }
@@ -77,6 +78,7 @@ const uploadBarberProfileMiddleware = multer({
 // O endpoint final será POST /api/upload/barber-profile
 router.post(
   "/barber-profile",
+  protectAdmin,
   requireRole("admin"),
   uploadBarberProfileMiddleware.single("profileImage"),
   // 'profileImage' é o nome do campo que o frontend enviará

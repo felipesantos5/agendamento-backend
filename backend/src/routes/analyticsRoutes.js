@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import { startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths } from "date-fns";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
+import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 
 const router = express.Router({ mergeParams: true }); // Para acessar :barbershopId
 
@@ -30,7 +31,7 @@ const getPeriodDates = (period) => {
 };
 
 // ROTA: GET /barbershops/:barbershopId/analytics/overview
-router.get("/overview", requireRole("admin"), async (req, res) => {
+router.get("/overview", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(barbershopId)) {

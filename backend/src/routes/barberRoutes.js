@@ -273,7 +273,7 @@ router.get("/bookings/barber", protectAdmin, async (req, res) => {
 });
 
 // Rota: PUT /barbershops/:barbershopId/barbers/:barberId
-router.put("/:barberId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.put("/:barberId", protectAdmin, async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 

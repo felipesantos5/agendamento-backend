@@ -2,6 +2,7 @@ import express from "express";
 import Barbershop from "../models/Barbershop.js";
 import { BarbershopSchema as BarbershopValidationSchema, BarbershopUpdateSchema } from "../validations/barbershopValidation.js"; // Renomeado para evitar conflito com o modelo Mongoose
 import { requireRole } from "../middleware/authAdminMiddleware.js";
+import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 
 const router = express.Router();
 
@@ -48,7 +49,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // EDITAR (PUT)
-router.put("/:id", requireRole("admin"), async (req, res) => {
+router.put("/:id", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const data = BarbershopUpdateSchema.parse(req.body);
     const updated = await Barbershop.findByIdAndUpdate(req.params.id, { $set: data }, { new: true, runValidators: true });
@@ -62,7 +63,7 @@ router.put("/:id", requireRole("admin"), async (req, res) => {
 });
 
 // DELETAR POR ID
-router.delete("/:id", requireRole("admin"), async (req, res) => {
+router.delete("/:id", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const deleted = await Barbershop.findByIdAndDelete(req.params.id);
     if (!deleted) {

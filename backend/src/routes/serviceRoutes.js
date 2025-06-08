@@ -10,7 +10,7 @@ const router = express.Router({ mergeParams: true });
 
 // Adicionar Serviço a uma Barbearia
 // Rota: POST /barbershops/:barbershopId/services
-router.post("/", requireRole("admin"), async (req, res) => {
+router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     // O schema de validação não deve incluir 'barbershop', pois será pego dos params.
     const serviceData = req.body;
@@ -49,7 +49,7 @@ router.get("/", async (req, res) => {
 
 // ✅ NOVA ROTA: Atualizar um Serviço existente
 // Rota: PUT /barbershops/:barbershopId/services/:serviceId
-router.put("/:serviceId", requireRole("admin"), protectAdmin, async (req, res) => {
+router.put("/:serviceId", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, serviceId } = req.params;
 
@@ -81,7 +81,7 @@ router.put("/:serviceId", requireRole("admin"), protectAdmin, async (req, res) =
 });
 
 // Rota: DELETE /barbershops/:barbershopId/services/:serviceId
-router.delete("/:serviceId", requireRole("admin"), protectAdmin, async (req, res) => {
+router.delete("/:serviceId", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, serviceId } = req.params;
 
