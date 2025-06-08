@@ -5,7 +5,7 @@ import Barber from "../models/Barber.js";
 import AdminUser from "../models/AdminUser.js";
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
-import { barberSchema as BarberValidationSchema } from "../validations/barberValidation.js";
+import { barberCreationSchema, barberUpdateSchema } from "../validations/barberValidation.js";
 import { z } from "zod";
 import { parseISO, startOfDay, endOfDay, format as formatDateFns } from "date-fns";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
@@ -23,7 +23,7 @@ const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     // ... (sua validação de autorização) ...
-    const data = BarberValidationSchema.parse(req.body);
+    const data = barberCreationSchema.parse(req.body);
 
     const existingAdminUser = await AdminUser.findOne({ email: data.email });
     if (existingAdminUser) {
@@ -318,7 +318,7 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
     }
 
     // 2. Validação dos Dados Recebidos
-    const dataToUpdate = BarberValidationSchema.parse(req.body);
+    const dataToUpdate = barberUpdateSchema.parse(req.body);
 
     // 3. Atualização Segura no Banco
     const updatedBarber = await Barber.findOneAndUpdate(
