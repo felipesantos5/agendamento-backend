@@ -33,7 +33,7 @@ export function SetPasswordPage() {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/admin/set-password`, { token, password });
+      const response = await axios.post(`${API_BASE_URL}/api/auth/admin/set-password`, { token, password });
       setSuccess(response.data.message);
       // Redireciona para o login após 3 segundos
       setTimeout(() => navigate("/login"), 3000);
