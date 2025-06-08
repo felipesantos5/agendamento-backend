@@ -12,7 +12,6 @@ import { Switch } from "@/components/ui/switch"; // Para o toggle
 import { Label } from "@/components/ui/label"; // Para os rótulos dos filtros
 import { Filter } from "lucide-react";
 import apiClient from "@/services/api";
-import { API_BASE_URL } from "@/config/BackendUrl";
 import { PhoneFormat } from "@/helper/phoneFormater";
 import { useAuth } from "@/contexts/AuthContext";
 

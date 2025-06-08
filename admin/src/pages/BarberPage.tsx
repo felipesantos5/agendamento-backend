@@ -20,7 +20,7 @@ import {
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { PlusCircle, Edit2, Trash2, UserCircle, Copy } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
 import { ImageUploader } from "./ImageUploader";
@@ -68,7 +68,7 @@ const initialBarberFormState: BarberFormData = {
 };
 
 export function BarberPage() {
-  const { barbershopId, barbershopName } = useOutletContext<AdminOutletContext>();
+  const { barbershopId } = useOutletContext<AdminOutletContext>();
 
   const [barbers, setBarbers] = useState<Barber[]>([]);
   const [isLoading, setIsLoading] = useState(true);

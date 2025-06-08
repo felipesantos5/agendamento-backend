@@ -58,7 +58,7 @@ const initialServiceFormState: ServiceFormData = {
 };
 
 export function ServicesPage() {
-  const { barbershopId, barbershopName } = useOutletContext<AdminOutletContext>();
+  const { barbershopId } = useOutletContext<AdminOutletContext>();
 
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
