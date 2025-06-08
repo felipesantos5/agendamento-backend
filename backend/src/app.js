@@ -57,7 +57,7 @@ const corsOptions = {
 // 2. Use as novas opções no middleware cors
 app.use(cors(corsOptions));
 
-app.use(express.static("public"));
+app.use(express.json());
 
 // ✅ Servir arquivos estáticos da pasta 'public'
 // Se app.js está em src/ e public/ está na raiz do backend/
