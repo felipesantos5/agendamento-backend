@@ -48,6 +48,16 @@ interface Barber {
   name: string;
 }
 
+const daysOfWeekForFilter = [
+  { value: "1", label: "Segunda-feira" },
+  { value: "2", label: "Terça-feira" },
+  { value: "3", label: "Quarta-feira" },
+  { value: "4", label: "Quinta-feira" },
+  { value: "5", label: "Sexta-feira" },
+  { value: "6", label: "Sábado" },
+  { value: "0", label: "Domingo" },
+];
+
 export function AgendamentosPage() {
   const { barbershopId, barbershopName } = useOutletContext<AdminOutletContext>();
 
@@ -57,8 +67,7 @@ export function AgendamentosPage() {
   const [allBarbers, setAllBarbers] = useState<Barber[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  // ✅ Estados para os filtros
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string>("all");
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>("all");
   const [showPastAppointments, setShowPastAppointments] = useState<boolean>(false);
 
@@ -74,7 +83,6 @@ export function AgendamentosPage() {
       try {
         let bookingsResponse;
 
-        // ✅ Lógica condicional para buscar os dados
         if (isUserAdmin) {
           // Se for admin, busca todos os agendamentos da barbearia E a lista de barbeiros para o filtro
           const [resBookings, resBarbers] = await Promise.all([
@@ -102,13 +110,23 @@ export function AgendamentosPage() {
     fetchPageData();
   }, [barbershopId]);
 
-  // ✅ Aplica filtros e depois ordena
   const displayedBookings = useMemo(() => {
     let filtered = [...bookings];
 
     // 1. Filtrar por barbeiro selecionado
-    if (selectedBarberFilter !== "all") {
+    if (isUserAdmin && selectedBarberFilter !== "all") {
       filtered = filtered.filter((booking) => booking.barber?._id === selectedBarberFilter);
+    }
+
+    if (selectedDayFilter !== "all") {
+      filtered = filtered.filter((booking) => {
+        // É importante considerar o fuso horário para pegar o dia da semana correto
+        // da data UTC que vem do banco. Uma forma simples é criar a data como se
+        // fosse local para o dia da semana não mudar por causa de UTC-3.
+        const dateInLocalTZ = new Date(booking.time.replace("Z", ""));
+        const dayOfWeek = dateInLocalTZ.getDay(); // Retorna 0 (Domingo) a 6 (Sábado)
+        return String(dayOfWeek) === selectedDayFilter;
+      });
     }
 
     // 2. Filtrar agendamentos passados (se a opção estiver desmarcada)
@@ -117,18 +135,24 @@ export function AgendamentosPage() {
     }
 
     // 3. Ordenar a lista filtrada
+    // return filtered.sort((a, b) => {
+    //   const dateA = parseISO(a.time);
+    //   const dateB = parseISO(b.time);
+    //   const aIsPast = isPast(dateA);
+    //   const bIsPast = isPast(dateB);
+
+    //   if (aIsPast && bIsPast) return differenceInMilliseconds(dateB, dateA);
+    //   if (aIsPast && !bIsPast) return -1;
+    //   if (!aIsPast && bIsPast) return 1;
+    //   return differenceInMilliseconds(dateA, dateB);
+    // });
+
     return filtered.sort((a, b) => {
       const dateA = parseISO(a.time);
       const dateB = parseISO(b.time);
-      const aIsPast = isPast(dateA);
-      const bIsPast = isPast(dateB);
-
-      if (aIsPast && bIsPast) return differenceInMilliseconds(dateB, dateA);
-      if (aIsPast && !bIsPast) return -1;
-      if (!aIsPast && bIsPast) return 1;
       return differenceInMilliseconds(dateA, dateB);
     });
-  }, [bookings, selectedBarberFilter, showPastAppointments]);
+  }, [bookings, selectedBarberFilter, showPastAppointments, selectedDayFilter, isUserAdmin]);
 
   const formatBookingTime = (isoTime: string) => {
     try {
@@ -151,16 +175,19 @@ export function AgendamentosPage() {
     <Card>
       <CardHeader>
         <CardTitle>Agendamentos - {barbershopName}</CardTitle>
-        <CardDescription>Visualize e filtre os agendamentos da sua barbearia.</CardDescription>
+        <CardDescription>
+          {isUserAdmin ? "Visualize e filtre os agendamentos da sua barbearia." : "Visualize e filtre os seus agendamentos."}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {error && !isLoading && <p className="mb-4 text-sm text-red-600 bg-red-100 p-3 rounded-md">{error}</p>}
 
-        {isUserAdmin && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
-            <div className="flex items-center text-sm font-medium text-gray-700 mr-2 whitespace-nowrap">
-              <Filter className="mr-2 h-5 w-5" /> Filtros:
-            </div>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 mb-6 p-4 bg-gray-50 rounded-lg border">
+          <div className="flex items-center text-sm font-medium text-gray-700 mr-2 whitespace-nowrap">
+            <Filter className="mr-2 h-5 w-5" /> Filtros:
+          </div>
+
+          {isUserAdmin && (
             <div className="flex-grow min-w-[200px] w-full sm:w-auto">
               <Label htmlFor="barberFilter" className="text-xs font-medium text-gray-600">
                 Profissional:
@@ -179,14 +206,36 @@ export function AgendamentosPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="flex items-center space-x-2 pt-2 sm:pt-5 w-full sm:w-auto justify-end">
-              <Switch id="showPastToggle" checked={showPastAppointments} onCheckedChange={setShowPastAppointments} />
-              <Label htmlFor="showPastToggle" className="text-sm font-medium text-gray-600 cursor-pointer whitespace-nowrap">
-                Exibir passados
-              </Label>
-            </div>
+          )}
+
+          <div className="flex-grow min-w-[200px] w-full sm:w-auto">
+            <Label htmlFor="dayFilter" className="text-xs font-medium text-gray-600">
+              Dia da Semana:
+            </Label>
+            <Select value={selectedDayFilter} onValueChange={setSelectedDayFilter}>
+              <SelectTrigger id="dayFilter" className="w-full mt-1">
+                <SelectValue placeholder="Todos os Dias" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Dias</SelectItem>
+                {daysOfWeekForFilter.map((day) => (
+                  <SelectItem key={day.value} value={day.value}>
+                    {day.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-        )}
+
+          {/* Toggle para exibir passados (comum para ambos os papéis) */}
+          <div className="flex items-center space-x-2 pt-2 sm:pt-5 w-full sm:w-auto justify-baseline md:justify-end">
+            <Switch id="showPastToggle" checked={showPastAppointments} onCheckedChange={setShowPastAppointments} />
+            <Label htmlFor="showPastToggle" className="text-sm font-medium text-gray-600 cursor-pointer whitespace-nowrap">
+              Exibir passados
+            </Label>
+          </div>
+        </div>
+
         <Table>
           <TableCaption>
             {displayedBookings.length === 0
@@ -195,7 +244,7 @@ export function AgendamentosPage() {
           </TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[300px]">Data e Hora</TableHead>
+              <TableHead className="w-[200px]">Data e Hora</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Telefone</TableHead>
               <TableHead>Serviço</TableHead>
@@ -209,7 +258,7 @@ export function AgendamentosPage() {
               const { date, time, isPast: bookingIsPast } = formatBookingTime(booking.time);
               return (
                 <TableRow key={booking._id} className={bookingIsPast && showPastAppointments ? "opacity-70 bg-gray-50" : ""}>
-                  <TableCell className="W-[300px]">
+                  <TableCell className="W-[200px]">
                     <div className="flex items-center">
                       <div>
                         <div>{date}</div>
