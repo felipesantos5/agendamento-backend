@@ -31,9 +31,9 @@ router.post("/", async (req, res) => {
       time: bookingTime,
     });
 
-    if (createdBooking) {
-      sendWhatsAppConfirmation(createdBooking.customer.name, createdBooking.customer.phone, createdBooking.time);
-    }
+    // if (createdBooking) {
+    //   sendWhatsAppConfirmation(createdBooking.customer.name, createdBooking.customer.phone, createdBooking.time);
+    // }
 
     res.status(201).json(createdBooking);
   } catch (e) {
