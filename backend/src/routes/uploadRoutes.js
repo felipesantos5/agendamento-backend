@@ -14,24 +14,34 @@ const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// --- Configuração Geral para Filtro de Imagem e Limites ---
+// Função para garantir que o diretório de upload exista
+const ensureUploadsDir = (dirPath) => {
+  // O caminho é relativo à raiz do projeto DENTRO do contêiner
+  const fullPath = path.resolve(dirPath);
+  if (!fs.existsSync(fullPath)) {
+    fs.mkdirSync(fullPath, { recursive: true });
+  }
+  return dirPath;
+};
+
+// --- Configuração Geral ---
 const imageFileFilter = (req, file, cb) => {
-  // Aceita apenas arquivos de imagem
   if (file.mimetype.startsWith("image/")) {
     cb(null, true);
   } else {
-    cb(new Error("Apenas arquivos de imagem são permitidos! (PNG, JPG, GIF, WebP)"), false);
+    cb(new Error("Apenas arquivos de imagem são permitidos!"), false);
   }
 };
-
 const FIVE_MEGABYTES = 5 * 1024 * 1024;
+const multerLimits = { fileSize: FIVE_MEGABYTES };
 
-// --- Configuração e Rota para LOGO DA BARBEARIA ---
+// --- Configuração para LOGO DA BARBEARIA ---
 const logoStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, "../../public/uploads/logos");
-    fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
+    // ✅ SALVA NO CAMINHO CORRETO DENTRO DO CONTÊINER
+    // Este é o caminho que o Coolify está mapeando com o volume.
+    const destinationPath = "public/uploads/logos";
+    cb(null, ensureUploadsDir(destinationPath));
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -39,28 +49,23 @@ const logoStorage = multer.diskStorage({
   },
 });
 
-const uploadLogoMiddleware = multer({
-  storage: logoStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: FIVE_MEGABYTES },
-});
+const uploadLogoMiddleware = multer({ storage: logoStorage, fileFilter: imageFileFilter, limits: multerLimits });
 
+// Rota para Logo
 router.post("/logo", protectAdmin, requireRole("admin"), uploadLogoMiddleware.single("logoFile"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "Nenhum arquivo de logo foi enviado." });
   }
-  const fileUrl = `${req.protocol}://${req.get("host")}/uploads/logos/${req.file.filename}`;
+  const fileUrl = `${process.env.API_URL}/uploads/logos/${req.file.filename}`; // Usa variável de ambiente para a URL base
   res.status(200).json({ message: "Logo enviada com sucesso!", logoUrl: fileUrl });
 });
 
-// --- ✅ NOVA CONFIGURAÇÃO E ROTA PARA PERFIL DO BARBEIRO ---
-
-// 1. Configuração do Multer para salvar na pasta 'barbers'
+// --- Configuração para PERFIL DO BARBEIRO ---
 const barberProfileStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, "../../public/uploads/barbers");
-    fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
+    // ✅ SALVA NO CAMINHO CORRETO DENTRO DO CONTÊINER
+    const destinationPath = "public/uploads/barbers";
+    cb(null, ensureUploadsDir(destinationPath));
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -68,34 +73,21 @@ const barberProfileStorage = multer.diskStorage({
   },
 });
 
-const uploadBarberProfileMiddleware = multer({
-  storage: barberProfileStorage,
-  fileFilter: imageFileFilter,
-  limits: { fileSize: FIVE_MEGABYTES },
+const uploadBarberProfileMiddleware = multer({ storage: barberProfileStorage, fileFilter: imageFileFilter, limits: multerLimits });
+
+// Rota para Perfil do Barbeiro
+router.post("/barber-profile", protectAdmin, requireRole("admin"), uploadBarberProfileMiddleware.single("profileImage"), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: "Nenhum arquivo de perfil foi enviado." });
+  }
+  const imageUrl = `${process.env.API_URL}/uploads/barbers/${req.file.filename}`; // Usa variável de ambiente
+  res.status(200).json({ message: "Imagem de perfil enviada com sucesso!", imageUrl: imageUrl });
 });
 
-// 2. Nova rota para upload de perfil do barbeiro
-// O endpoint final será POST /api/upload/barber-profile
-router.post(
-  "/barber-profile",
-  protectAdmin,
-  requireRole("admin"),
-  uploadBarberProfileMiddleware.single("profileImage"),
-  // 'profileImage' é o nome do campo que o frontend enviará
-  (req, res) => {
-    if (!req.file) {
-      return res.status(400).json({ error: "Nenhum arquivo de perfil foi enviado." });
-    }
-    // Constrói a URL pública do arquivo salvo na pasta 'barbers'
-    const imageUrl = `${req.protocol}://${req.get("host")}/uploads/barbers/${req.file.filename}`;
-    res.status(200).json({ message: "Imagem de perfil enviada com sucesso!", imageUrl: imageUrl });
-  }
-);
-
-// Middleware de tratamento de erro para todas as rotas de upload neste arquivo
+// Tratamento de erro genérico do Multer
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {
-    return res.status(400).json({ error: `Erro de upload (Multer): ${error.message}` });
+    return res.status(400).json({ error: `Erro de upload: ${error.message}` });
   } else if (error) {
     return res.status(400).json({ error: error.message });
   }
