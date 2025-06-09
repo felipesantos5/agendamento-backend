@@ -65,6 +65,22 @@ services:
       - .env
     volumes:
       - evolution_instances:/evolution/instances
+    environment:
+      - DATABASE_ENABLED=true
+      - DATABASE_CONNECTION_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}cluster0.xuung4n.mongodb.net/appName=Cluster0/?authSource=admin&readPreference=primary&ssl=false&directConnection=true
+      - DATABASE_CONNECTION_DB_PREFIX_NAME=evo
+      - DATABASE_SAVE_DATA_INSTANCE=false
+
+      - DATABASE_CONNECTION_DB_PREFIX_NAME=error
+
+      - DATABASE_SAVE_DATA_INSTANCE=true
+
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=false
+      - DATABASE_SAVE_MESSAGE_UPDATE=false
+      - DATABASE_SAVE_DATA_CONTACTS=false
+      - DATABASE_SAVE_DATA_CHATS=false
+      - SERVER_URL=https://api.barbeariagendamento.com.br
+      - LOG_LEVEL=ERROR,WARN,DEBUG,INFO,LOG,VERBOSE,DARK,WEBHOOKS
 
 volumes:
   mongodb_data:
