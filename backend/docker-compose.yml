@@ -16,11 +16,31 @@ services:
 
   mongodb:
     image: mongo:latest
+    container_name: barbershop-mongodb
     volumes:
       - mongodb_data:/data/db
     ports:
       - "27017:27017"
     restart: unless-stopped
 
+  evolution_api:
+    image: atendeai/evolution:latest # Imagem oficial da Evolution API
+    container_name: barbershop-evolution-api
+    restart: unless-stopped
+    volumes:
+      # Volume persistente para os dados da instância (sessão, QR Code, etc.)
+      - evolution_data:/evolution/instances
+    ports:
+      # Expõe a porta da API da Evolution para você acessar e configurar
+      - "8080:8080"
+    environment:
+      # Configurações da Evolution API
+      - "API_KEY=${EVOLUTION_API_KEY}"
+      - "DATABASE_ENABLED=true"
+      - "DATABASE_CONNECTION_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin"
+    depends_on:
+      - mongodb
+
 volumes:
   mongodb_data:
+  evolution_data:
