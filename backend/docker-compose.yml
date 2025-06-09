@@ -28,12 +28,13 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
 
   evolution_api:
-    image: atendeai/evolution:latest # Imagem oficial da Evolution API
+    image: atendai/evolution-api # Imagem oficial da Evolution API
     container_name: barbershop-evolution-api
     restart: unless-stopped
     volumes:
       # Volume persistente para os dados da instância (sessão, QR Code, etc.)
-      - evolution_data:/evolution/instances
+      - evolution_store:/evolution/store
+      - evolution_instances:/evolution/instances
     ports:
       # Expõe a porta da API da Evolution para você acessar e configurar
       - "8080:8080"
