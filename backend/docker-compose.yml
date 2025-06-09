@@ -56,4 +56,5 @@ evolution_api:
 
 volumes:
   mongodb_data:
-  evolution_data:
+  evolution_store:
+  evolution_instances:
