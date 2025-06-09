@@ -42,7 +42,7 @@ services:
       # Configurações da Evolution API
       - "API_KEY=${EVOLUTION_API_KEY}"
       - "DATABASE_ENABLED=true"
-      - "DATABASE_CONNECTION_URI={MONGODB_URI}"
+      - "DATABASE_CONNECTION_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin"
     depends_on:
       - mongodb
 
