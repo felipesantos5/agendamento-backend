@@ -12,16 +12,20 @@ services:
       - MONGODB_URI=${MONGODB_URI}
     depends_on:
       - mongodb
+      - evolution_api
     restart: unless-stopped
 
   mongodb:
-    image: mongo:latest
+    image: mongo:6.0
     container_name: barbershop-mongodb
+    restart: unless-stopped
     volumes:
       - mongodb_data:/data/db
     ports:
       - "27017:27017"
-    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
 
   evolution_api:
     image: atendeai/evolution:latest # Imagem oficial da Evolution API
