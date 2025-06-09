@@ -369,12 +369,19 @@ export function BarbeariaConfigPage() {
           <fieldset className="border p-4 rounded-md">
             <legend className="text-lg font-semibold px-1">Horários de Funcionamento</legend>
             <div className="space-y-4 mt-2">
-              {formData.workingHours?.map((wh, index) => (
-                <div key={wh._id || index} className="flex items-end gap-2 p-2 border rounded-md">
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor={`wh-day-${index}`}>Dia</Label>
+              {(formData.workingHours || []).map((wh, index) => (
+                <div
+                  key={wh._id || index}
+                  // ✅ LÓGICA DE RESPONSIVIDADE AQUI
+                  className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto_auto] items-end gap-3 p-3 border rounded-lg bg-gray-50/50"
+                >
+                  {/* Seletor do Dia */}
+                  <div className="md:col-span-1">
+                    <Label htmlFor={`wh-day-${index}`} className="text-xs font-medium text-gray-600">
+                      Dia da Semana
+                    </Label>
                     <Select value={wh.day} onValueChange={(value) => handleWorkingHourChange(index, "day", value)}>
-                      <SelectTrigger id={`wh-day-${index}`}>
+                      <SelectTrigger id={`wh-day-${index}`} className="mt-1 w-full md:w-40">
                         <SelectValue placeholder="Selecione o dia" />
                       </SelectTrigger>
                       <SelectContent>
@@ -386,30 +393,53 @@ export function BarbeariaConfigPage() {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor={`wh-start-${index}`}>Início</Label>
-                    <Input
-                      id={`wh-start-${index}`}
-                      type="time"
-                      value={wh.start}
-                      onChange={(e) => handleWorkingHourChange(index, "start", e.target.value)}
-                    />
+
+                  {/* Container para horários e botão de remover */}
+                  <div className="grid grid-cols-[1fr_1fr_auto] items-end gap-2 md:col-span-3">
+                    {/* Input de Início */}
+                    <div className="w-full">
+                      <Label htmlFor={`wh-start-${index}`} className="text-xs font-medium text-gray-600">
+                        Início
+                      </Label>
+                      <Input
+                        id={`wh-start-${index}`}
+                        type="time"
+                        className="mt-1"
+                        value={wh.start}
+                        onChange={(e) => handleWorkingHourChange(index, "start", e.target.value)}
+                      />
+                    </div>
+
+                    {/* Input de Fim */}
+                    <div className="w-full">
+                      <Label htmlFor={`wh-end-${index}`} className="text-xs font-medium text-gray-600">
+                        Fim
+                      </Label>
+                      <Input
+                        id={`wh-end-${index}`}
+                        type="time"
+                        className="mt-1"
+                        value={wh.end}
+                        onChange={(e) => handleWorkingHourChange(index, "end", e.target.value)}
+                      />
+                    </div>
+
+                    {/* Botão de Remover */}
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:bg-destructive/10"
+                      onClick={() => removeWorkingHour(index)}
+                      aria-label="Remover este horário"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
                   </div>
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor={`wh-end-${index}`}>Fim</Label>
-                    <Input
-                      id={`wh-end-${index}`}
-                      type="time"
-                      value={wh.end}
-                      onChange={(e) => handleWorkingHourChange(index, "end", e.target.value)}
-                    />
-                  </div>
-                  <Button type="button" variant="destructive" size="icon" onClick={() => removeWorkingHour(index)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" onClick={addWorkingHour} className="mt-2">
+
+              <Button type="button" variant="outline" size="sm" onClick={addWorkingHour} className="mt-2">
                 <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Horário
               </Button>
             </div>

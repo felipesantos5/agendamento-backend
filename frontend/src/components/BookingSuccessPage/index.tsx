@@ -43,7 +43,7 @@ export function BookingSuccessPage() {
     // Se não houver detalhes do agendamento (ex: acesso direto à URL),
     // mostra uma mensagem e um link para voltar.
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-6 text-center">
+      <div className="flex flex-col md:items-center justify-center min-h-screen bg-gray-100 p-6 text-center">
         <Card className="w-full max-w-md shadow-lg">
           <CardHeader>
             <ShieldAlert className="h-16 w-16 text-destructive mx-auto mb-4" />

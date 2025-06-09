@@ -205,7 +205,7 @@ export function AdminLayout() {
         </div>
 
         {/* Conteúdo Principal */}
-        <main className="flex-1 p-2 md:p-6 overflow-y-auto lg:ml-64 pt-20">
+        <main className="flex-1 p-2 lg:p-6  overflow-y-auto lg:ml-52 pt-20">
           {/* <div className="lg:hidden text-center mb-4 pt-10">
             <h1 className="text-xl font-bold text-gray-800">{barbershop!.name}</h1>
           </div> */}

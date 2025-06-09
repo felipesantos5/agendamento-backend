@@ -158,7 +158,7 @@ export function AgendamentosPage() {
     try {
       const dateObj = parseISO(isoTime);
       return {
-        date: format(dateObj, "dd/MM/yyyy (EEEE)", { locale: ptBR }),
+        date: format(dateObj, "dd/MM/yyyy", { locale: ptBR }),
         time: format(dateObj, "HH:mm"),
         isPast: isPast(dateObj),
       };
@@ -175,9 +175,9 @@ export function AgendamentosPage() {
     <Card>
       <CardHeader>
         <CardTitle>Agendamentos - {barbershopName}</CardTitle>
-        <CardDescription>
+        {/* <CardDescription>
           {isUserAdmin ? "Visualize e filtre os agendamentos da sua barbearia." : "Visualize e filtre os seus agendamentos."}
-        </CardDescription>
+        </CardDescription> */}
       </CardHeader>
       <CardContent>
         {error && !isLoading && <p className="mb-4 text-sm text-red-600 bg-red-100 p-3 rounded-md">{error}</p>}
@@ -244,7 +244,7 @@ export function AgendamentosPage() {
           </TableCaption>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[200px]">Data e Hora</TableHead>
+              <TableHead className="w-[100px]">Data e Hora</TableHead>
               <TableHead>Cliente</TableHead>
               <TableHead>Telefone</TableHead>
               <TableHead>Serviço</TableHead>
