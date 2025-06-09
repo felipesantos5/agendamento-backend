@@ -27,26 +27,32 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
 
-  evolution_api:
-    image: atendai/evolution-api # Imagem oficial da Evolution API
-    container_name: barbershop-evolution-api
-    restart: unless-stopped
-    volumes:
-      # Volume persistente para os dados da instância (sessão, QR Code, etc.)
-      - evolution_store:/evolution/store
-      - evolution_instances:/evolution/instances
-    ports:
-      # Expõe a porta da API da Evolution para você acessar e configurar
-      - "8088:80"
-    environment:
-      - "API_KEY=${EVOLUTION_API_KEY}"
-      - "DATABASE_ENABLED=true"
-      - "DATABASE_CLIENT=mongodb"
-      - "DATABASE_CONNECTION_URI=mongodb://user:password@database_URL/?authSource=admin&readPreference=primary&ssl=false&directConnection=true"
-      - "DATABASE_CONNECTION_DB_PREFIX_NAME=appName=Cluster0"
-      - "DATABASE_SAVE_DATA_INSTANCE=true"
-    depends_on:
-      - mongodb
+evolution_api:
+  image: atendai/evolution-api # Imagem oficial da Evolution API
+  container_name: barbershop-evolution-api
+  restart: unless-stopped
+  volumes:
+    # Volume persistente para os dados da instância (sessão, QR Code, etc.)
+    - evolution_store:/evolution/store
+    - evolution_instances:/evolution/instances
+  ports:
+    # Expõe a porta da API da Evolution para você acessar e configurar
+    # Internal port for atendai/evolution-api is 8080 [2]
+    - "8088:8080"
+  environment:
+    - "API_KEY=${EVOLUTION_API_KEY}" # Ensure this is defined in your.env file
+    - "DATABASE_ENABLED=true"
+    - "DATABASE_CLIENT=mongodb"
+    # Corrected DATABASE_CONNECTION_URI for MongoDB Atlas
+    # Replace 'yourActualDbName' with the specific database name you intend to use.
+    # If this database does not exist, MongoDB will create it upon first write,
+    # provided the user 'barber' has the necessary permissions.
+    - "DATABASE_CONNECTION_URI=mongodb+srv://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@cluster0.xuung4n.mongodb.net/appName=Cluster0?retryWrites=true&w=majority&appName=Cluster0"
+    # Corrected DATABASE_CONNECTION_DB_PREFIX_NAME
+    - "DATABASE_CONNECTION_DB_PREFIX_NAME=evolution_" # Or another suitable prefix, e.g., 'barbershop_evo_'
+    - "DATABASE_SAVE_DATA_INSTANCE=true"
+  depends_on:
+    - mongodb
 
 volumes:
   mongodb_data:
