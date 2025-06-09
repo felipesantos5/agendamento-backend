@@ -37,7 +37,7 @@ services:
       - evolution_instances:/evolution/instances
     ports:
       # Expõe a porta da API da Evolution para você acessar e configurar
-      - "8080:8080"
+      - "8088:8080"
     environment:
       # Configurações da Evolution API
       - "API_KEY=${EVOLUTION_API_KEY}"
