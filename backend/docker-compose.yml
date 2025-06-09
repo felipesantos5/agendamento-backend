@@ -61,6 +61,6 @@ volumes:
   evolution_instances_data: # NOVO: Volume para os dados das instâncias da Evolution API
   postgres_evo_data: # NOVO: Volume para os dados do PostgreSQL da Evolution API
 
-networks: # Recomendado definir uma rede customizada para os serviços da aplicação
-  app_network:
-    driver: bridge
+# networks:
+#   app_network:
+#     driver: bridge
