@@ -42,7 +42,9 @@ services:
       - "API_KEY=${EVOLUTION_API_KEY}"
       - "DATABASE_ENABLED=true"
       - "DATABASE_CLIENT=mongodb"
-      - "DATABASE_CONNECTION_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin"
+      - "DATABASE_CONNECTION_URI=mongodb://user:password@database_URL/?authSource=admin&readPreference=primary&ssl=false&directConnection=true"
+      - "DATABASE_CONNECTION_DB_PREFIX_NAME=appName=Cluster0"
+      - "DATABASE_SAVE_DATA_INSTANCE=true"
     depends_on:
       - mongodb
 
