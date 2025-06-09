@@ -38,7 +38,7 @@ evolution_api:
   ports:
     # Expõe a porta da API da Evolution para você acessar e configurar
     # Internal port for atendai/evolution-api is 8080 [2]
-    - "8088:8080"
+    - "8088:80"
   environment:
     - "API_KEY=${EVOLUTION_API_KEY}" # Ensure this is defined in your.env file
     - "DATABASE_ENABLED=true"
@@ -51,6 +51,7 @@ evolution_api:
     # Corrected DATABASE_CONNECTION_DB_PREFIX_NAME
     - "DATABASE_CONNECTION_DB_PREFIX_NAME=evolution_" # Or another suitable prefix, e.g., 'barbershop_evo_'
     - "DATABASE_SAVE_DATA_INSTANCE=true"
+    - "SERVER_URL=http://31.97.30.228:8088/"
   depends_on:
     - mongodb
 

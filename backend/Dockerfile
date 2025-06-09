@@ -9,6 +9,8 @@ COPY package*.json ./
 # Instale as dependências do projeto
 RUN npm ci
 
+FROM nginx:alpine
+
 # Copie os arquivos do projeto para o diretório de trabalho
 COPY . .
 
