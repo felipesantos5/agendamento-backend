@@ -32,7 +32,7 @@ services:
     container_name: evolution_api
     restart: always
     ports:
-      - "8080:8080" # Porta do host:porta do contêiner. Ajuste a porta do host (primeiro número) se 8080 estiver em uso.
+      - "8088:8080" # Porta do host:porta do contêiner. Ajuste a porta do host (primeiro número) se 8080 estiver em uso.
     env_file: -.env # Carrega variáveis de ambiente específicas da Evolution API
     volumes:
       - evolution_instances_data:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
