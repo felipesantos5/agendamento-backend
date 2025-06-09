@@ -12,7 +12,7 @@ services:
       - MONGODB_URI=${MONGODB_URI}
     depends_on:
       - mongodb
-      - evolution_api
+      # - evolution_api
     restart: unless-stopped
 
   mongodb:
