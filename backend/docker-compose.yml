@@ -27,61 +27,40 @@ services:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
 
-  # evolution_api:
-  #   image: atendai/evolution-api # Imagem oficial da Evolution API
-  #   container_name: barbershop-evolution-api
-  #   restart: unless-stopped
-  #   volumes:
-  #     # Volume persistente para os dados da instância (sessão, QR Code, etc.)
-  #     - evolution_store:/evolution/store
-  #     - evolution_instances:/evolution/instances
-  #   ports:
-  #     # Expõe a porta da API da Evolution para você acessar e configurar
-  #     # Internal port for atendai/evolution-api is 8080 [2]
-  #     - "8088:8080"
-  #   environment:
-  #     - "API_KEY=${EVOLUTION_API_KEY}" # Ensure this is defined in your.env file
-  #     - "DATABASE_ENABLED=true"
-  #     - "DATABASE_CLIENT=mongodb"
-  #     # Corrected DATABASE_CONNECTION_URI for MongoDB Atlas
-  #     # Replace 'yourActualDbName' with the specific database name you intend to use.
-  #     # If this database does not exist, MongoDB will create it upon first write,
-  #     # provided the user 'barber' has the necessary permissions.
-  #     - "DATABASE_CONNECTION_URI=mongodb+srv://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}@cluster0.xuung4n.mongodb.net/appName=Cluster0?retryWrites=true&w=majority&appName=Cluster0"
-  #     # Corrected DATABASE_CONNECTION_DB_PREFIX_NAME
-  #     - "DATABASE_CONNECTION_DB_PREFIX_NAME=evolution_" # Or another suitable prefix, e.g., 'barbershop_evo_'
-  #     - "DATABASE_SAVE_DATA_INSTANCE=true"
-  #     - "SERVER_URL=http://31.97.30.228:8088/"
-  #   depends_on:
-  #     - mongodb
-
   evolution-api:
+    image: atendai/evolution-api:v2.1.1 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
     container_name: evolution_api
-    image: atendai/evolution-api:v2.1.1
     restart: always
     ports:
-      - "8088:80"
-    env_file:
-      - .env
+      - "8080:8080" # Porta do host:porta do contêiner. Ajuste a porta do host (primeiro número) se 8080 estiver em uso.
+    env_file: -.env # Carrega variáveis de ambiente específicas da Evolution API
     volumes:
-      - evolution_instances:/evolution/instances
+      - evolution_instances_data:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
+    depends_on:
+      - postgresql-evo # Garante que o PostgreSQL da Evolution API inicie antes
+    networks:
+      - app_network
+
+  postgresql-evo:
+    image: postgres:14-alpine # Exemplo com versão específica e alpine para PostgreSQL
+    container_name: evolution_postgres
+    restart: unless-stopped
     environment:
-      - DATABASE_ENABLED=true
-      - DATABASE_CONNECTION_URI=mongodb://${MONGO_ROOT_USER}:${MONGO_ROOT_PASSWORD}cluster0.xuung4n.mongodb.net/appName=Cluster0/?authSource=admin&readPreference=primary&ssl=false&directConnection=true
-      - DATABASE_CONNECTION_DB_PREFIX_NAME=evo
-      - DATABASE_SAVE_DATA_INSTANCE=false
-
-      - DATABASE_CONNECTION_DB_PREFIX_NAME=error
-
-      - DATABASE_SAVE_DATA_INSTANCE=true
-
-      - DATABASE_SAVE_DATA_NEW_MESSAGE=false
-      - DATABASE_SAVE_MESSAGE_UPDATE=false
-      - DATABASE_SAVE_DATA_CONTACTS=false
-      - DATABASE_SAVE_DATA_CHATS=false
-      - SERVER_URL=https://api.barbeariagendamento.com.br
-      - LOG_LEVEL=ERROR,WARN,DEBUG,INFO,LOG,VERBOSE,DARK,WEBHOOKS
+      POSTGRES_USER: ${POSTGRES_USER_EVO} # Carregado do.env
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_EVO} # Carregado do.env
+      POSTGRES_DB: ${POSTGRES_DB_EVO} # Carregado do.env
+    volumes:
+      - postgres_evo_data:/var/lib/postgresql/data # Volume nomeado para persistência dos dados do PostgreSQL
+    # ports: # Descomente apenas se precisar de acesso direto do host ao PostgreSQL da Evolution API
+    # - "5433:5432" # Exporia a porta 5432 do contêiner na porta 5433 do host
+    networks:
+      - app_network
 
 volumes:
-  mongodb_data:
-  evolution_instances:
+  mongodb_data: # Volume existente para os dados do MongoDB
+  evolution_instances_data: # NOVO: Volume para os dados das instâncias da Evolution API
+  postgres_evo_data: # NOVO: Volume para os dados do PostgreSQL da Evolution API
+
+networks: # Recomendado definir uma rede customizada para os serviços da aplicação
+  app_network:
+    driver: bridge
