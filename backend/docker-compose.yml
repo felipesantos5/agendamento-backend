@@ -14,6 +14,8 @@ services:
       - mongodb
       - evolution-api
     restart: unless-stopped
+    networks:
+      - app_network
 
   mongodb:
     image: mongo:6.0
@@ -26,6 +28,8 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+    networks:
+      - app_network
 
   evolution-api:
     image: atendai/evolution-api:v2.1.1 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
@@ -33,11 +37,13 @@ services:
     restart: always
     ports:
       - "8088:8080" # Porta do host:porta do contêiner. Ajuste a porta do host (primeiro número) se 8080 estiver em uso.
-    env_file: -.env # Carrega variáveis de ambiente específicas da Evolution API
+    env_file:
+      - .env # Carrega variáveis de ambiente específicas da Evolution API
     volumes:
       - evolution_instances_data:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
     depends_on:
-      - postgresql-evo # Garante que o PostgreSQL da Evolution API inicie antes
+      - postgresql-evo
+        - redis-evo
     networks:
       - app_network
 
@@ -67,7 +73,8 @@ services:
 volumes:
   mongodb_data: # Volume existente para os dados do MongoDB
   evolution_instances_data: # NOVO: Volume para os dados das instâncias da Evolution API
-  postgres_evo_data: # NOVO: Volume para os dados do PostgreSQL da Evolution API
+  postgres_evo_data:
+  redis_data:
 
 networks:
   app_network:
