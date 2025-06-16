@@ -56,6 +56,14 @@ services:
     networks:
       - app_network
 
+  redis-evo: # <-- ESTE É O NOME DO SERVIÇO
+    image: redis:7.2-alpine
+    container_name: redis_evo
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+
 volumes:
   mongodb_data: # Volume existente para os dados do MongoDB
   evolution_instances_data: # NOVO: Volume para os dados das instâncias da Evolution API
