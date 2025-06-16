@@ -38,8 +38,8 @@ services:
       - evolution_instances_data:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
     depends_on:
       - postgresql-evo # Garante que o PostgreSQL da Evolution API inicie antes
-    # networks:
-    #   - app_network
+    networks:
+      - app_network
 
   postgresql-evo:
     image: postgres:14-alpine # Exemplo com versão específica e alpine para PostgreSQL
@@ -53,14 +53,14 @@ services:
       - postgres_evo_data:/var/lib/postgresql/data # Volume nomeado para persistência dos dados do PostgreSQL
     # ports: # Descomente apenas se precisar de acesso direto do host ao PostgreSQL da Evolution API
     # - "5433:5432" # Exporia a porta 5432 do contêiner na porta 5433 do host
-    # networks:
-    #   - app_network
+    networks:
+      - app_network
 
 volumes:
   mongodb_data: # Volume existente para os dados do MongoDB
   evolution_instances_data: # NOVO: Volume para os dados das instâncias da Evolution API
   postgres_evo_data: # NOVO: Volume para os dados do PostgreSQL da Evolution API
 
-# networks:
-#   app_network:
-#     driver: bridge
+networks:
+  app_network:
+    driver: bridge
