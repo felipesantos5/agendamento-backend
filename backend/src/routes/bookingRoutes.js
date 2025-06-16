@@ -3,7 +3,7 @@ import Booking from "../models/Booking.js";
 import Barber from "../models/Barber.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
-import { sendWhatsAppConfirmation } from "../services/twilioService.js";
+import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
 
 const router = express.Router({ mergeParams: true });
 
@@ -31,9 +31,9 @@ router.post("/", async (req, res) => {
       time: bookingTime,
     });
 
-    // if (createdBooking) {
-    //   sendWhatsAppConfirmation(createdBooking.customer.name, createdBooking.customer.phone, createdBooking.time);
-    // }
+    if (createdBooking) {
+      sendWhatsAppConfirmation(createdBooking.customer.name, createdBooking.customer.phone, createdBooking.time);
+    }
 
     res.status(201).json(createdBooking);
   } catch (e) {
