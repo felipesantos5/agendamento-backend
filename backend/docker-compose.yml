@@ -43,7 +43,7 @@ services:
       - evolution_instances_data:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
     depends_on:
       - postgresql-evo
-        - redis-evo
+      - redis-evo
     networks:
       - app_network
 
