@@ -1,4 +1,5 @@
 import "dotenv/config";
+import axios from "axios";
 
 export async function sendWhatsAppConfirmation(customerName, customerPhone, bookingTime) {
   // ---- CONFIGURAÇÃO ----
