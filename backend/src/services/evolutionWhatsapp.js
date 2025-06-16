@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 export async function sendWhatsAppConfirmation(customerName, customerPhone, bookingTime) {
   // ---- CONFIGURAÇÃO ----
   // É ALTAMENTE RECOMENDADO usar variáveis de ambiente para não expor suas chaves!
