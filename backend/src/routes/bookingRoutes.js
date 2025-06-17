@@ -32,7 +32,11 @@ router.post("/", async (req, res) => {
     });
 
     if (createdBooking) {
-      sendWhatsAppConfirmation(createdBooking.customer.name, createdBooking.customer.phone, createdBooking.time);
+      const formattedTime = formatBookingTime(new Date(bookingTime));
+
+      const message = `Olá, ${customerName}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;
+
+      sendWhatsAppConfirmation(createdBooking.customer.phone, message);
     }
 
     res.status(201).json(createdBooking);

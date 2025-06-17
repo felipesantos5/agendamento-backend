@@ -16,6 +16,8 @@ import authAdminRoutes from "./routes/authAdminRoutes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
+import './services/schedulerService.js'
+
 import "./models/Barbershop.js";
 import "./models/Barber.js";
 import "./models/Service.js";

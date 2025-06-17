@@ -2,7 +2,7 @@ import "dotenv/config";
 import axios from "axios";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
 
-export async function sendWhatsAppConfirmation(customerName, customerPhone, bookingTime) {
+export async function sendWhatsAppConfirmation(customerPhone, message) {
   // ---- CONFIGURAÇÃO ----
   // É ALTAMENTE RECOMENDADO usar variáveis de ambiente para não expor suas chaves!
   const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL // Ex: 'http://localhost:8080'
@@ -17,8 +17,8 @@ export async function sendWhatsAppConfirmation(customerName, customerPhone, book
   }
 
   // Formata a data e cria a mensagem personalizada
-  const formattedTime = formatBookingTime(new Date(bookingTime));
-  const message = `Olá, ${customerName}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;
+  // const formattedTime = formatBookingTime(new Date(bookingTime));
+  // const message = `Olá, ${customerName}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;
 
   const url = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
 
