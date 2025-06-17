@@ -23,10 +23,7 @@ export async function sendWhatsAppConfirmation(customerName, customerPhone, book
   const url = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
 
   const payload = {
-    number: "55",
-    customerPhone,
-    delay: 1200, // Um pequeno atraso para parecer mais humano
-    presence: "composing",
+    number: `55${customerPhone}`,
     linkPreview: true,
     text: message,
   };
@@ -35,6 +32,9 @@ export async function sendWhatsAppConfirmation(customerName, customerPhone, book
     "Content-Type": "application/json",
     apikey: EVOLUTION_API_KEY,
   };
+
+  console.log(`EVOLUTION_API_URL`, EVOLUTION_API_URL);
+  console.log(`EVOLUTION_API_URL`, EVOLUTION_API_URL);
 
   try {
     console.log(`Enviando confirmação via WhatsApp para o número: ${customerPhone}`);
