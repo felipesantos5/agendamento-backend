@@ -1,10 +1,12 @@
 import express from "express";
 import Booking from "../models/Booking.js";
 import Barber from "../models/Barber.js";
+import Barbershop from "../models/Barbershop.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
+import {formatPhoneNumber} from '../utils/phoneFormater.js'
 
 const router = express.Router({ mergeParams: true });
 
@@ -33,9 +35,11 @@ router.post("/", async (req, res) => {
     });
 
     if (createdBooking) {
+      const barbershop = await Barbershop.findById(req.params.barbershopId);
       const formattedTime = formatBookingTime(new Date(bookingTime));
+      const barberShopContact = formatPhoneNumber(barbershop.contact);
 
-      const message = `Olá, ${data.customer.name}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;
+      const message = `Olá, ${data.customer.name}!\n\nSeu agendamento na ${barbershop.name} foi confirmado com sucesso para o dia ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia: ${barberShopContact} \nEndereço: ${barbershop.address.rua}, ${barbershop.address.numero} - ${barbershop.address.bairro}\n\nNosso time te aguarda! 💈`;
 
       sendWhatsAppConfirmation(createdBooking.customer.phone, message);
     }

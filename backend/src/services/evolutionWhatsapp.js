@@ -33,9 +33,6 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
     apikey: EVOLUTION_API_KEY,
   };
 
-  console.log(`EVOLUTION_API_URL`, EVOLUTION_API_URL);
-  console.log(`EVOLUTION_API_URL`, EVOLUTION_API_URL);
-
   try {
     console.log(`Enviando confirmação via WhatsApp para o número: ${customerPhone}`);
     const response = await axios.post(url, payload, { headers });
