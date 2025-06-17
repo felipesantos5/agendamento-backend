@@ -46,6 +46,9 @@ services:
       - app_network
     environment:
       - CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143
+      - REDIS_HOST=redis-evo
+      - REDIS_PORT=6379
+      - CACHE_REDIS_ENABLED=true
 
   postgresql-evo:
     image: postgres:14-alpine # Exemplo com versão específica e alpine para PostgreSQL
@@ -64,7 +67,7 @@ services:
 
   redis-evo: # <-- ESTE É O NOME DO SERVIÇO
     image: redis:7.2-alpine
-    container_name: redis_evo
+    container_name: redis-evo
     restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
     volumes:
