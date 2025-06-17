@@ -46,7 +46,7 @@ const sendDailyReminders = async () => {
 };
 
 // Agenda a tarefa para ser executada todos os dias às 8h da manhã
-cron.schedule('0 12 * * *', () => {
+cron.schedule('0 13 * * *', () => {
   console.log('Executando tarefa agendada: Envio de lembretes de agendamento.');
   sendDailyReminders();
 }, {
