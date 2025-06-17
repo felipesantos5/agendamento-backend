@@ -140,3 +140,7 @@
 .animate-drawCheck {
   animation: drawCheck 0.6s ease-out 0.3s forwards;
 }
+
+span[data-slot="select-value"],div[role="option"] > span:last-child {
+  flex: 1;
+}

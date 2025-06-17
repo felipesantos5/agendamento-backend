@@ -47,7 +47,10 @@ export default function ServiceSelection({
           <SelectContent>
             {services.map((service) => (
               <SelectItem key={service._id} value={service._id} className="cursor-pointer">
-                {service.name}
+                <div className="flex justify-between items-center w-full gap-4">
+                  <span className="text-left">{service.name}</span>
+                  <span className="text-right min-w-[70px] text-zinc-800">R$ {service.price.toFixed(2)}</span>
+                </div>
               </SelectItem>
             ))}
           </SelectContent>
