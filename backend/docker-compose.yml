@@ -28,8 +28,8 @@ services:
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-    networks:
-      - app_network
+    # networks:
+    #   - app_network
 
   evolution-api:
     image: atendai/evolution-api:v2.1.1 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
