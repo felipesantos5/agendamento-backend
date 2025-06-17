@@ -75,7 +75,7 @@ services:
     networks:
       - app_network
     deploy:
-      resourser:
+      resourses:
         limits:
           cpus: "0.5"
           memory: 1024M
