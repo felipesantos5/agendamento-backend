@@ -1,5 +1,6 @@
 import "dotenv/config";
 import axios from "axios";
+import { formatBookingTime } from "../utils/formatBookingTime.js";
 
 export async function sendWhatsAppConfirmation(customerName, customerPhone, bookingTime) {
   // ---- CONFIGURAÇÃO ----
