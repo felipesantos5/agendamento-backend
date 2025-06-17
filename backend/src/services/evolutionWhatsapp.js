@@ -16,8 +16,6 @@ export async function sendWhatsAppConfirmation(customerName, customerPhone, book
     return; // Interrompe a execução se a API não estiver configurada
   }
 
-  console.log(`EVOLUTION_API_KEY`, EVOLUTION_API_KEY);
-
   // Formata a data e cria a mensagem personalizada
   const formattedTime = formatBookingTime(new Date(bookingTime));
   const message = `Olá, ${customerName}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;

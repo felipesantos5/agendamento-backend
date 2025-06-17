@@ -74,7 +74,9 @@ services:
 
 volumes:
   mongodb_data:
-  evolution_instances_data:
+  evolution_instancesv2:
+    external: true
+    name: evolution_instancesv2
   postgres_evo_data:
   redis_data:
 
