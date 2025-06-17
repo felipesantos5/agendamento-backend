@@ -23,11 +23,11 @@ export async function sendWhatsAppConfirmation(customerName, customerPhone, book
   const url = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
 
   const payload = {
-    number: customerPhone,
-    options: {
-      delay: 1200, // Um pequeno atraso para parecer mais humano
-      presence: "composing",
-    },
+    number: "55",
+    customerPhone,
+    delay: 1200, // Um pequeno atraso para parecer mais humano
+    presence: "composing",
+    linkPreview: true,
     text: message,
   };
 
@@ -45,7 +45,7 @@ export async function sendWhatsAppConfirmation(customerName, customerPhone, book
     console.error("FALHA AO ENVIAR MENSAGEM WHATSAPP:");
     if (error.response) {
       // O erro veio da API (ex: número inválido, API Key errada)
-      console.error("Detalhes do Erro:", error.response.data);
+      console.error("Detalhes do Erro:", error.response.data, error.response.message);
     } else {
       // O erro foi na conexão (ex: API offline, URL errada)
       console.error("Erro de Conexão:", error.message);
