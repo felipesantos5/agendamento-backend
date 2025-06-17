@@ -30,7 +30,7 @@ services:
       - app_network
 
   evolution-api:
-    image: atendai/evolution-api:v2.1.1 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
+    image: atendai/evolution-api:v2.2.3 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
     container_name: evolution_api
     restart: unless-stopped
     ports:
@@ -38,12 +38,14 @@ services:
     env_file:
       - .env # Carrega variáveis de ambiente específicas da Evolution API
     volumes:
-      - evolution_instances_data:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
+      - evolution_instancesv2:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
     depends_on:
       - postgresql-evo
       - redis-evo
     networks:
       - app_network
+    environment:
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143
 
   postgresql-evo:
     image: postgres:14-alpine # Exemplo com versão específica e alpine para PostgreSQL
