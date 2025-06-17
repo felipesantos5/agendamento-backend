@@ -41,12 +41,12 @@ services:
       - evolution_instancesv2:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
     depends_on:
       - postgresql-evo
-      - redis-evo
+      - redis
     networks:
       - app_network
     environment:
       - CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143
-      - REDIS_HOST=redis-evo
+      - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_REDIS_ENABLED=true
 
@@ -65,23 +65,30 @@ services:
     networks:
       - app_network
 
-  redis-evo: # <-- ESTE É O NOME DO SERVIÇO
-    image: redis:7.2-alpine
-    container_name: redis-evo
+  redis:
+    image: redis:latest
+    container_name: redis
     restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
+    command: ["redis-server", "--apendonly", "yes", "--port", "6379"]
     volumes:
       - redis_data:/data
     networks:
       - app_network
+    deploy:
+      resourser:
+        limits:
+          cpus: "0.5"
+          memory: 1024M
 
 volumes:
   mongodb_data:
   evolution_instancesv2:
     external: true
     name: evolution_instancesv2
-  postgres_evo_data:
   redis_data:
+    external: true
+    name: redis_data
+  postgres_evo_data:
 
 networks:
   app_network:
