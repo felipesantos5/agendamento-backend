@@ -10,10 +10,22 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Para o filtro
 import { Switch } from "@/components/ui/switch"; // Para o toggle
 import { Label } from "@/components/ui/label"; // Para os rótulos dos filtros
-import { Filter } from "lucide-react";
+import { Filter, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import apiClient from "@/services/api";
 import { PhoneFormat } from "@/helper/phoneFormater";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
 // Contexto do AdminLayout
 interface AdminOutletContext {
@@ -70,6 +82,8 @@ export function AgendamentosPage() {
   const [selectedDayFilter, setSelectedDayFilter] = useState<string>("all");
   const [selectedBarberFilter, setSelectedBarberFilter] = useState<string>("all");
   const [showPastAppointments, setShowPastAppointments] = useState<boolean>(false);
+  const [bookingToDelete, setBookingToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const isUserAdmin = user?.role === "admin";
 
@@ -167,6 +181,21 @@ export function AgendamentosPage() {
     }
   };
 
+  const handleDeleteBooking = async (bookingId: string) => {
+    try {
+      setIsDeleting(true);
+      await apiClient.delete(`/barbershops/${barbershopId}/bookings/${bookingId}`);
+      setBookings(bookings.filter(booking => booking._id !== bookingId));
+      toast.success("Agendamento excluído com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao excluir agendamento:", error);
+      toast.error(error.response?.data?.error || "Erro ao excluir agendamento");
+    } finally {
+      setIsDeleting(false);
+      setBookingToDelete(null);
+    }
+  };
+
   if (isLoading && bookings.length === 0 && allBarbers.length === 0)
     return <p className="text-center p-10">Carregando agendamentos e barbeiros...</p>;
   if (error && bookings.length === 0) return <p className="text-center p-10 text-red-500">{error}</p>;
@@ -251,6 +280,7 @@ export function AgendamentosPage() {
               {isUserAdmin && <TableHead>Profissional</TableHead>}
               <TableHead className="text-right">Preço (R$)</TableHead>
               <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-center">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -305,11 +335,43 @@ export function AgendamentosPage() {
                         : booking.status}
                     </Badge>
                   </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
+                      onClick={() => setBookingToDelete(booking._id)}
+                      disabled={isDeleting}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               );
             })}
           </TableBody>
         </Table>
+
+        <AlertDialog open={!!bookingToDelete} onOpenChange={() => setBookingToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => bookingToDelete && handleDeleteBooking(bookingToDelete)}
+                disabled={isDeleting}
+                className="bg-red-500 hover:bg-red-600"
+              >
+                {isDeleting ? "Excluindo..." : "Excluir"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </CardContent>
     </Card>
   );

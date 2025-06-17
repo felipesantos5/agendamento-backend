@@ -77,4 +77,30 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Excluir um Agendamento
+// Rota esperada: DELETE /barbershops/:barbershopId/bookings/:bookingId
+router.delete("/:bookingId", async (req, res) => {
+  try {
+    const { bookingId, barbershopId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+      return res.status(400).json({ error: "ID do agendamento inválido." });
+    }
+
+    const booking = await Booking.findOneAndDelete({
+      _id: bookingId,
+      barbershop: barbershopId
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: "Agendamento não encontrado." });
+    }
+
+    res.status(200).json({ message: "Agendamento excluído com sucesso." });
+  } catch (error) {
+    console.error("Erro ao excluir agendamento:", error);
+    res.status(500).json({ error: "Falha ao excluir agendamento." });
+  }
+});
+
 export default router;
