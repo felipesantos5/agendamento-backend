@@ -1,6 +1,7 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Label } from "../ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
+import { PriceFormater } from "@/helper/priceFormater";
 
 interface Service {
   _id: string;
@@ -49,7 +50,7 @@ export default function ServiceSelection({
               <SelectItem key={service._id} value={service._id} className="cursor-pointer">
                 <div className="flex justify-between items-center w-full gap-4">
                   <span className="text-left">{service.name}</span>
-                  <span className="text-right min-w-[70px] text-zinc-800">R$ {service.price.toFixed(2)}</span>
+                  <span className="text-right min-w-[70px] text-zinc-800">{PriceFormater(service.price)}</span>
                 </div>
               </SelectItem>
             ))}
