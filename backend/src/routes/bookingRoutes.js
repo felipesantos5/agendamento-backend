@@ -4,6 +4,7 @@ import Barber from "../models/Barber.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
+import { formatBookingTime } from "../utils/formatBookingTime.js";
 
 const router = express.Router({ mergeParams: true });
 
@@ -34,7 +35,7 @@ router.post("/", async (req, res) => {
     if (createdBooking) {
       const formattedTime = formatBookingTime(new Date(bookingTime));
 
-      const message = `Olá, ${customerName}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;
+      const message = `Olá, ${data.customer.name}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;
 
       sendWhatsAppConfirmation(createdBooking.customer.phone, message);
     }
