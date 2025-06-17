@@ -16,7 +16,7 @@ services:
       - app_network
 
   mongodb:
-    image: mongo:6.0
+    image: mongo:latest
     container_name: barbershop-mongodb
     restart: unless-stopped
     volumes:
