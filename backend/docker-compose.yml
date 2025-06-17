@@ -7,9 +7,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3001:3001"
-    environment:
-      - NODE_ENV=production
-      - MONGODB_URI=${MONGODB_URI}
+    env_file: .env
     depends_on:
       - mongodb
       - evolution-api
@@ -23,18 +21,18 @@ services:
     restart: unless-stopped
     volumes:
       - mongodb_data:/data/db
-    ports:
-      - "27017:27017"
+    # ports:
+    #   - "27017:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-    # networks:
-    #   - app_network
+    networks:
+      - app_network
 
   evolution-api:
     image: atendai/evolution-api:v2.1.1 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
     container_name: evolution_api
-    restart: always
+    restart: unless-stopped
     ports:
       - "8088:8080" # Porta do host:porta do contêiner. Ajuste a porta do host (primeiro número) se 8080 estiver em uso.
     env_file:
@@ -65,7 +63,7 @@ services:
   redis-evo: # <-- ESTE É O NOME DO SERVIÇO
     image: redis:7.2-alpine
     container_name: redis_evo
-    restart: always
+    restart: unless-stopped
     command: redis-server --save 60 1 --loglevel warning
     volumes:
       - redis_data:/data
@@ -73,8 +71,8 @@ services:
       - app_network
 
 volumes:
-  mongodb_data: # Volume existente para os dados do MongoDB
-  evolution_instances_data: # NOVO: Volume para os dados das instâncias da Evolution API
+  mongodb_data:
+  evolution_instances_data:
   postgres_evo_data:
   redis_data:
 

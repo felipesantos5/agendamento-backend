@@ -1,12 +1,6 @@
-// admin-frontend/src/App.tsx
-
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "./layouts/AdminLayout";
 
-// Importe as páginas do seu admin aqui
-// Por exemplo:
-// import LoginPage from './pages/LoginPage'; // Se você tiver uma página de login separada
-// import { DashboardPage } from "./pages/admin/DashboardPage"; // Exemplo de página
 import { BarbeariaConfigPage } from "./pages/BarbeariaPage";
 import { ServicesPage } from "./pages/ServicesPage";
 import { BarberPage } from "./pages/BarberPage";

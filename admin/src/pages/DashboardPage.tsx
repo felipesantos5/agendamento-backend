@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
 import useMediaQuery from "@/hooks/useMediaQuery";
+import { PriceFormater } from "@/helper/priceFormater";
 
 // Contexto e Tipos (como antes)
 interface AdminOutletContext {
@@ -138,9 +139,10 @@ export function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">
-              R${" "}
-              {dashboardData.overview?.totalRevenueCurrentMonth?.toFixed(2).replace(".", ",") ?? (
-                <span className="text-muted-foreground text-lg">--,--</span>
+              {PriceFormater(dashboardData.overview?.totalRevenueCurrentMonth) ?? (
+                <>
+                  R$ <span className="text-muted-foreground text-lg">R$ --,--</span>
+                </>
               )}
             </div>
             {/* <p className="text-xs text-muted-foreground">+10% do mês passado</p> */}
