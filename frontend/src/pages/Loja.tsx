@@ -201,7 +201,7 @@ export const Loja = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <main className="bg-gray-50 flex-grow">
-        <div className="mx-auto max-w-md pb-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-8">
+        <div className="mx-auto max-w-md pb-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:pb-8">
         <div>
           {/* {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto mb-4" />} */}
           {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-full max-h-60 m-auto mb-6" />}
@@ -213,7 +213,7 @@ export const Loja = () => {
           </p>
         </div> */}
 
-          <div className="mb-8">
+          <div className="mb-8 px-4 md:px-0">
             <StepIndicator currentStep={currentStep} totalSteps={totalSteps} />
           </div>
 
