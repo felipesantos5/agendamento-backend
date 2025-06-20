@@ -201,9 +201,11 @@ export const Loja = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <main className="bg-gray-50 flex-grow">
-        <div className="mx-auto max-w-md py-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-8">
-          {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto mb-4" />}
-
+        <div className="mx-auto max-w-md pb-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:py-8">
+        <div>
+          {/* {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto mb-4" />} */}
+          {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-full max-h-60 m-auto mb-6" />}
+          </div>
           {/* <div className="mb-8 text-center">
           <h1 className="text-2xl font-bold text-gray-900 md:text-3xl mt-6">Agende seu Horário</h1>
           <p className="mt-2 text-gray-600">
