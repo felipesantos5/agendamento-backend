@@ -185,7 +185,7 @@ export function AgendamentosPage() {
     try {
       setIsDeleting(true);
       await apiClient.delete(`/barbershops/${barbershopId}/bookings/${bookingId}`);
-      setBookings(bookings.filter(booking => booking._id !== bookingId));
+      setBookings(bookings.filter((booking) => booking._id !== bookingId));
       toast.success("Agendamento excluído com sucesso!");
     } catch (error: any) {
       console.error("Erro ao excluir agendamento:", error);
@@ -300,7 +300,9 @@ export function AgendamentosPage() {
                     <div className="flex items-center">{booking.customer.name}</div>
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center">{PhoneFormat(booking.customer.phone) || "Não informado"}</div>
+                    <a href={`https://wa.me/${booking.customer.phone}`} className="flex items-center" target="_blank">
+                      {PhoneFormat(booking.customer.phone) || "Não informado"}
+                    </a>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center">{booking.service.name}</div>
@@ -356,9 +358,7 @@ export function AgendamentosPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.
-              </AlertDialogDescription>
+              <AlertDialogDescription>Tem certeza que deseja excluir este agendamento? Esta ação não pode ser desfeita.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
