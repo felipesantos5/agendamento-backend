@@ -177,19 +177,19 @@ const BarbershopLanding = () => {
             <h1 className="text-[40px] lg:text-6xl font-bold leading-tight mb-6 text-center" style={{ color: "var(--foreground)" }}>
               Transforme a Gestão da Sua Barbearia e<span style={{ color: "var(--primary)" }}> Conquiste Mais Clientes</span>
             </h1>
-            <p className="text-xl lg:text-2xl mb-8 leading-relaxed text-center" style={{ color: "var(--muted-foreground)" }}>
+            <p className="text-2xl lg:text-2xl mb-8 leading-relaxed text-center" style={{ color: "var(--muted-foreground)" }}>
               Simplifique agendamentos, reduza faltas e ofereça uma experiência moderna aos seus clientes com nosso sistema completo, fácil de usar.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 mb-8">
               <button
-                className="px-8 py-4 rounded-lg text-xl font-semibold transition-opacity hover:opacity-90 text-red-400"
+                className="px-8 py-4 rounded-lg text-2xl font-semibold transition-opacity hover:opacity-90 text-red-400"
                 style={{ backgroundColor: "var(--primary)", color: "var(--primary-foreground)" }}
               >
                 Experimente Grátis por 30 Dias
               </button>
               {/* <a href="https://barbeariagendamento.com.br/primer" target="_blank">
                 <button
-                  className="border-2 px-8 py-4 rounded-lg text-xl font-semibold transition-colors cursor-pointer w-full"
+                  className="border-2 px-8 py-4 rounded-lg text-2xl font-semibold transition-colors cursor-pointer w-full"
                   style={{ borderColor: "var(--primary)", color: "var(--primary)" }}
                 >
                   Ver Demonstração
@@ -268,7 +268,7 @@ const BarbershopLanding = () => {
             <h2 className="text-3xl lg:text-5xl font-bold mb-6" style={{ color: "var(--foreground)" }}>
               Sua Barbearia Ainda Sofre Com Agendamentos Complicados?
             </h2>
-            <p className="text-xl lg:text-2xl max-w-4xl mx-auto leading-relaxed text-neutral-800">
+            <p className="text-2xl lg:text-2xl max-w-4xl mx-auto leading-relaxed text-neutral-800">
               Sabemos como é frustrante lidar com os desafios diários que estão freando o sucesso da sua barbearia.
             </p>
           </div>
@@ -278,7 +278,7 @@ const BarbershopLanding = () => {
               <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ backgroundColor: "var(--accent)" }}>
                 <Clock className="w-8 h-8" style={{ color: "var(--chart-2)" }} />
               </div>
-              <h3 className="text-xl font-bold mb-4 " style={{ color: "var(--card-foreground)" }}>
+              <h3 className="text-2xl font-bold mb-4 " style={{ color: "var(--card-foreground)" }}>
                 Telefone Não Para de Tocar
               </h3>
               <p className="text-lg leading-relaxed text-neutral-700">
@@ -290,7 +290,7 @@ const BarbershopLanding = () => {
               <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ backgroundColor: "var(--accent)" }}>
                 <Calendar className="w-8 h-8" style={{ color: "var(--chart-2)" }} />
               </div>
-              <h3 className="text-xl font-bold mb-4" style={{ color: "var(--card-foreground)" }}>
+              <h3 className="text-2xl font-bold mb-4" style={{ color: "var(--card-foreground)" }}>
                 Clientes Esquecem o Horário
               </h3>
               <p className="text-lg leading-relaxed text-neutral-700">
@@ -302,7 +302,7 @@ const BarbershopLanding = () => {
               <div className="w-16 h-16 rounded-full flex items-center justify-center mb-6" style={{ backgroundColor: "var(--accent)" }}>
                 <Users className="w-8 h-8" style={{ color: "var(--chart-2)" }} />
               </div>
-              <h3 className="text-xl font-bold mb-4">Gestão Desorganizada</h3>
+              <h3 className="text-2xl font-bold mb-4">Gestão Desorganizada</h3>
               <p className="text-lg leading-relaxed text-neutral-700">
                 Dificuldade para organizar múltiplos barbeiros, serviços e horários de forma eficiente.
               </p>
@@ -310,7 +310,7 @@ const BarbershopLanding = () => {
           </div>
 
           {/* <div className="text-center mt-12">
-            <p className="text-xl lg:text-2xl font-semibold" style={{ color: "var(--destructive)" }}>
+            <p className="text-2xl lg:text-2xl font-semibold" style={{ color: "var(--destructive)" }}>
               Isso significa menos clientes atendidos, receita perdida e uma equipe frustrada!
             </p>
           </div> */}
@@ -324,7 +324,7 @@ const BarbershopLanding = () => {
             <h2 className="text-3xl lg:text-5xl font-bold mb-6" style={{ color: "var(--foreground)" }}>
               Apresentamos: A Solução Completa para Sua Barbearia Prosperar!
             </h2>
-            <p className="text-xl lg:text-2xl max-w-4xl mx-auto leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+            <p className="text-2xl lg:text-2xl max-w-4xl mx-auto leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
               Veja como nosso sistema simplifica sua rotina e impulsiona seus resultados.
             </p>
           </div>
@@ -369,7 +369,7 @@ const BarbershopLanding = () => {
               <h2 className="text-3xl lg:text-5xl font-bold mb-6" style={{ color: "var(--primary-foreground)" }}>
                 Sua Barbearia na Palma da Mão
               </h2>
-              <p className="text-xl lg:text-2xl mb-8 leading-relaxed" style={{ color: "var(--primary-foreground)", opacity: 0.8 }}>
+              <p className="text-2xl lg:text-2xl mb-8 leading-relaxed" style={{ color: "var(--primary-foreground)", opacity: 0.8 }}>
                 Design pensado para você e seus clientes usarem onde estiverem, quando quiserem. Experiência mobile impecável!
               </p>
               <div className="space-y-4">
@@ -418,7 +418,7 @@ const BarbershopLanding = () => {
             <h2 className="text-3xl lg:text-5xl font-bold mb-6" style={{ color: "var(--foreground)" }}>
               Comece a Usar em Minutos: Simples Assim!
             </h2>
-            <p className="text-xl lg:text-2xl max-w-4xl mx-auto leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+            <p className="text-2xl lg:text-2xl max-w-4xl mx-auto leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
               Veja como é fácil transformar a gestão da sua barbearia.
             </p>
           </div>
@@ -476,7 +476,7 @@ const BarbershopLanding = () => {
             <h2 className="text-3xl lg:text-5xl font-bold mb-6" style={{ color: "var(--foreground)" }}>
               O Que Donos de Barbearias Como Você Estão Dizendo
             </h2>
-            <p className="text-xl lg:text-2xl max-w-4xl mx-auto leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
+            <p className="text-2xl lg:text-2xl max-w-4xl mx-auto leading-relaxed" style={{ color: "var(--muted-foreground)" }}>
               Junte-se às barbearias que já estão revolucionando sua gestão.
             </p>
           </div>
@@ -524,7 +524,7 @@ const BarbershopLanding = () => {
                   onClick={() => toggleFaq(index)}
                   className="cursor-pointer w-full px-8 py-6 text-left flex justify-between items-center rounded-xl transition-all duration-200 hover:opacity-80"
                 >
-                  <span className="text-lg lg:text-xl font-semibold pr-4" style={{ color: "var(--card-foreground)" }}>
+                  <span className="text-lg lg:text-2xl font-semibold pr-4" style={{ color: "var(--card-foreground)" }}>
                     {faq.question}
                   </span>
                   <div className="transition-transform duration-300 ease-in-out">
@@ -557,18 +557,18 @@ const BarbershopLanding = () => {
           <h2 className="text-3xl lg:text-5xl font-bold mb-6" style={{ color: "var(--primary-foreground)" }}>
             Pronto para Levar Sua Barbearia para o Próximo Nível?
           </h2>
-          <p className="text-xl lg:text-2xl mb-8 leading-relaxed text-zinc-200">
+          <p className="text-2xl lg:text-2xl mb-8 leading-relaxed text-zinc-200">
             Chega de complicação e perda de tempo. Junte-se a centenas de barbearias que já transformaram sua gestão e aumentaram sua receita.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
-            <button className="px-8 py-4 rounded-lg text-xl font-semibold transition-colors cursor-pointer bg-white hover:opacity-90 md:max-w-72 w-full">
+            <button className="px-8 py-4 rounded-lg text-2xl font-semibold transition-colors cursor-pointer bg-white hover:opacity-90 md:max-w-72 w-full">
               Adquir agora
             </button>
             <a
               href="https://wa.me/554891930508?text=Ol%C3%A1!%20Preciso%20de%20ajuda%20com%20o%20aplicativo%20BarbeariAgedamento."
               className="md:max-w-72 w-full"
             >
-              <button className="border-2 px-8 py-4 rounded-lg text-xl font-semibold transition-colors cursor-pointer text-white hover:opacity-90 ">
+              <button className="border-2 px-8 py-4 rounded-lg text-2xl font-semibold transition-colors cursor-pointer text-white hover:opacity-90 ">
                 Falar com Especialista
               </button>
             </a>

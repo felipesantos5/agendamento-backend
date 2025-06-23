@@ -202,53 +202,45 @@ export const Loja = () => {
     <div className="flex flex-col min-h-screen">
       <main className="bg-gray-50 flex-grow">
         <div className="mx-auto max-w-md pb-4 md:max-w-2xl lg:max-w-4xl md:px-6 md:pb-8">
-        <div>
-          {/* {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-40 m-auto mb-4" />} */}
-          {barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-full max-h-60 m-auto mb-6" />}
-          </div>
-          {/* <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-gray-900 md:text-3xl mt-6">Agende seu Horário</h1>
-          <p className="mt-2 text-gray-600">
-            Complete os passos abaixo para garantir seu horário em <span className="font-semibold">{barbershop.name}</span>
-          </p>
-        </div> */}
+          <div>{barbershop.logoUrl && <img src={barbershop.logoUrl} alt="logo barbearia" className="w-full max-h-60 m-auto mb-6" />}</div>
 
           <div className="mb-8 px-4 md:px-0">
             <StepIndicator currentStep={currentStep} totalSteps={totalSteps} />
           </div>
 
           <div className="rounded-lg bg-white p-6 shadow-sm md:p-8">
-            <form onSubmit={handleSubmit}>
-              {currentStep === 1 && (
-                <ServiceSelection
-                  // ✅ PASSAR LISTAS PARA ServiceSelection
-                  services={allServices}
-                  barbers={allBarbers}
-                  selectedService={formData.service}
-                  selectedBarber={formData.barber}
-                  onSelectService={(serviceId) => updateFormData({ service: serviceId })}
-                  onSelectBarber={(barberId) => updateFormData({ barber: barberId })}
-                />
-              )}
+            <form onSubmit={handleSubmit} className="flex h-full flex-col">
+              <div className="flex-grow">
+                {currentStep === 1 && (
+                  <ServiceSelection
+                    services={allServices}
+                    barbers={allBarbers}
+                    selectedService={formData.service}
+                    selectedBarber={formData.barber}
+                    onSelectService={(serviceId) => updateFormData({ service: serviceId })}
+                    onSelectBarber={(barberId) => updateFormData({ barber: barberId })}
+                  />
+                )}
 
-              {currentStep === 2 && (
-                <DateTimeSelection
-                  formData={formData}
-                  updateFormData={updateFormData}
-                  barbershopId={barbershop?._id}
-                  selectedBarber={formData.barber}
-                  selectedServiceId={formData.service}
-                />
-              )}
+                {currentStep === 2 && (
+                  <DateTimeSelection
+                    formData={formData}
+                    updateFormData={updateFormData}
+                    barbershopId={barbershop?._id}
+                    selectedBarber={formData.barber}
+                    selectedServiceId={formData.service}
+                  />
+                )}
 
-              {currentStep === 3 && (
-                <PersonalInfo
-                  formData={formData}
-                  updateFormData={updateFormData}
-                  serviceNameDisplay={selectedServiceName}
-                  barberNameDisplay={selectedBarberName}
-                />
-              )}
+                {currentStep === 3 && (
+                  <PersonalInfo
+                    formData={formData}
+                    updateFormData={updateFormData}
+                    serviceNameDisplay={selectedServiceName}
+                    barberNameDisplay={selectedBarberName}
+                  />
+                )}
+              </div>
 
               <div className="mt-8 flex justify-between">
                 <Button type="button" variant="outline" onClick={handlePrevious} className={`cursor-pointer ${currentStep === 1 ? "invisible" : ""}`}>
