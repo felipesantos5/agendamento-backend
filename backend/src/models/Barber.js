@@ -7,6 +7,6 @@ const BarberSchema = new Schema({
   image: { type: String },
 });
 
-barberSchema.index({ barbershop: 1 });
+BarberSchema.index({ barbershop: 1 });
 
 export default mongoose.model("Barber", BarberSchema);

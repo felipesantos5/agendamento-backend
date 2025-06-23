@@ -12,7 +12,7 @@ const BookingSchema = new Schema({
   status: { type: String, default: "booked" },
 });
 
-bookingSchema.index({ barber: 1, time: 1 });
-bookingSchema.index({ barbershop: 1, time: -1 });
+BookingSchema.index({ barber: 1, time: 1 });
+BookingSchema.index({ barbershop: 1, time: -1 });
 
 export default mongoose.model("Booking", BookingSchema);

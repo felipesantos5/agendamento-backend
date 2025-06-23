@@ -7,6 +7,6 @@ const ServiceSchema = new Schema({
   barbershop: { type: Schema.Types.ObjectId, ref: "Barbershop", required: true },
 });
 
-serviceSchema.index({ barbershop: 1 });
+ServiceSchema.index({ barbershop: 1 });
 
 export default mongoose.model("Service", ServiceSchema);
