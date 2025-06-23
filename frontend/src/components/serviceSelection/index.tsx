@@ -36,11 +36,11 @@ export default function ServiceSelection({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Selecione o serviço</h2>
-        <p className="mt-1 text-sm text-gray-500">Escolha qual serviço você deseja agendar</p>
+        <h2 className="text-2xl font-semibold text-gray-900">Selecione o serviço</h2>
+        <p className="mt-1 text-sm md:text-base text-gray-500">Escolha qual serviço você deseja agendar</p>
       </div>
       <div className="space-y-4">
-        <Label className="block text-sm font-medium text-gray-700">Serviço</Label>
+        <Label className="block text-sm font-medium text-gray-700 md:text-base">Serviço</Label>
         <Select value={selectedService} onValueChange={onSelectService}>
           <SelectTrigger className="w-full cursor-pointer">
             <SelectValue placeholder="Selecione um serviço" />
@@ -59,7 +59,7 @@ export default function ServiceSelection({
       </div>
 
       <div className="space-y-4">
-        <Label className="block text-sm font-medium text-gray-700">Barbeiro</Label>
+        <Label className="block text-sm font-medium text-gray-700 md:text-base">Barbeiro</Label>
         <Select value={selectedBarber} onValueChange={onSelectBarber}>
           <SelectTrigger className="w-full cursor-pointer">
             <SelectValue placeholder="Selecione um barbeiro" />

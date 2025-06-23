@@ -2,10 +2,18 @@ import { useState, useEffect, useMemo } from "react";
 import { Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/BackendUrl";
+import { useHolidays } from "@/hooks/useHolidays"; // Importe o hook
+import { Spinner } from "../ui/spinnerLoading";
 
 interface TimeSlot {
   time: string;
   isBooked: boolean;
+}
+
+interface ApiResponse {
+  isHoliday: boolean;
+  holidayName?: string;
+  slots: TimeSlot[];
 }
 
 interface DateTimeSelectionProps {
@@ -24,6 +32,10 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [loadingTimes, setLoadingTimes] = useState(false);
+  const [holidayMessage, setHolidayMessage] = useState<string | null>(null);
+
+  // ✅ NOVO: Hook para gerenciar feriados
+  const { isHoliday, getHolidayName } = useHolidays(currentMonth.getFullYear());
 
   // Efeito para buscar horários disponíveis quando a data ou o barbeiro mudam
   useEffect(() => {
@@ -31,11 +43,22 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
       if (formData.date && selectedBarber && barbershopId) {
         setLoadingTimes(true);
         setTimeSlots([]);
+        setHolidayMessage(null);
+
         try {
           const response = await axios.get(`${API_BASE_URL}/barbershops/${barbershopId}/barbers/${selectedBarber}/free-slots`, {
             params: { date: formData.date, serviceId: selectedServiceId },
           });
-          setTimeSlots(response.data);
+
+          const data: ApiResponse = response.data;
+
+          // ✅ NOVO: Verificar se é feriado
+          if (data.isHoliday) {
+            setHolidayMessage(`Esta data é feriado: ${data.holidayName}`);
+            setTimeSlots([]);
+          } else {
+            setTimeSlots(data.slots || response.data); // Compatibilidade com resposta antiga
+          }
         } catch (error) {
           console.error("Erro ao buscar horários:", error);
         } finally {
@@ -43,21 +66,20 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
         }
       } else {
         setTimeSlots([]);
+        setHolidayMessage(null);
       }
     };
     fetchTimeSlots();
-  }, [formData.date, selectedBarber, barbershopId]);
+  }, [formData.date, selectedBarber, barbershopId, selectedServiceId]);
 
   const filteredAndVisibleSlots = useMemo(() => {
-    // Se a data selecionada não for hoje, não precisa filtrar por hora
     const today = new Date();
     const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
     if (formData.date !== todayString) {
-      return timeSlots; // Retorna todos os slots para datas futuras
+      return timeSlots;
     }
 
-    // Se for hoje, filtra os horários que já passaram
     const currentHour = today.getHours();
     const currentMinute = today.getMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
@@ -65,8 +87,6 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
     return timeSlots.filter((slot) => {
       const [slotHour, slotMinute] = slot.time.split(":").map(Number);
       const slotTimeInMinutes = slotHour * 60 + slotMinute;
-
-      // Mostra o slot apenas se o horário dele for maior que o horário atual
       return slotTimeInMinutes > currentTimeInMinutes;
     });
   }, [timeSlots, formData.date]);
@@ -89,7 +109,15 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
 
   const handleDateSelect = (day: number) => {
     const selectedDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-    updateFormData({ date: selectedDate, time: "" }); // Reseta a hora ao mudar a data
+
+    // ✅ NOVO: Verificar se é feriado antes de selecionar
+    if (isHoliday(selectedDate)) {
+      const holidayName = getHolidayName(selectedDate);
+      alert(`Esta data é feriado (${holidayName}) e não está disponível para agendamento.`);
+      return;
+    }
+
+    updateFormData({ date: selectedDate, time: "" });
   };
 
   const isDateInPast = (day: number) => {
@@ -98,17 +126,23 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
     return selectedDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
   };
 
+  // ✅ NOVO: Função para verificar se um dia é feriado
+  const isDayHoliday = (day: number) => {
+    const dateString = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    return isHoliday(dateString);
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-semibold text-gray-900">Escolha a Data e Hora</h2>
+        <h2 className="text-2xl font-semibold text-gray-900">Escolha a Data e Hora</h2>
         <p className="mt-1 text-sm text-gray-500">Selecione quando você gostaria de nos visitar</p>
       </div>
 
-      <div className="lg:flex gap-8">
+      <div className="lg:flex gap-8 md:min-h-[450px]">
         <div className="space-y-4 lg:w-full">
           <div className="flex items-center justify-between">
-            <label className="flex items-center text-sm font-medium text-gray-700">
+            <label className="flex items-center text-sm md:text-base font-medium text-gray-700">
               <Calendar className="mr-2 h-4 w-4" />
               Selecione a Data
             </label>
@@ -116,7 +150,7 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
               <button type="button" onClick={handlePrevMonth} className="rounded-md p-1 text-gray-500 hover:bg-gray-100 cursor-pointer">
                 <ChevronLeft className="h-5 w-5" />
               </button>
-              <span className="text-sm font-medium">
+              <span className="text-sm md:text-base font-medium">
                 {monthNames[month]} {year}
               </span>
               <button type="button" onClick={handleNextMonth} className="rounded-md p-1 text-gray-500 hover:bg-gray-100 cursor-pointer">
@@ -139,17 +173,24 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
                   {day && (
                     <button
                       type="button"
-                      disabled={isDateInPast(day)}
+                      disabled={isDateInPast(day) || isDayHoliday(day)} // ✅ NOVO: Desabilitar feriados
                       onClick={() => handleDateSelect(day)}
-                      className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full cursor-pointer text-sm ${
-                        isDateInPast(day)
-                          ? "!cursor-not-allowed text-gray-300"
+                      className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full cursor-pointer text-sm relative ${
+                        isDateInPast(day) || isDayHoliday(day) // ✅ NOVO: Estilo para feriados
+                          ? "!cursor-not-allowed text-gray-300 bg-red-50" // ✅ NOVO: Fundo vermelho claro para feriados
                           : formData.date === `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`
                           ? "bg-[var(--loja-theme-color)] text-white"
                           : "hover:bg-[var(--loja-theme-color)]/30"
                       }`}
+                      title={
+                        isDayHoliday(day)
+                          ? `Feriado: ${getHolidayName(`${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}`
+                          : undefined
+                      } // ✅ NOVO: Tooltip para feriados
                     >
                       {day}
+                      {/* ✅ NOVO: Indicador visual para feriados */}
+                      {isDayHoliday(day) && <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></div>}
                     </button>
                   )}
                 </div>
@@ -159,40 +200,57 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
         </div>
 
         <div className="space-y-4 mt-4 lg:mt-0 lg:w-full">
-          <label className="flex items-center text-sm font-medium text-gray-700">
+          <label className="flex items-center text-sm md:text-base font-medium text-gray-700">
             <Clock className="mr-2 h-4 w-4" />
             Selecione o Horário
           </label>
-          {!selectedBarber && <p className="text-xs text-[var(--loja-theme-color)]">Por favor, selecione um barbeiro na etapa anterior.</p>}
-          {!formData.date && selectedBarber && <p className="text-xs text-gray-500">Por favor, selecione uma data primeiro.</p>}
 
-          {loadingTimes ? (
-            <p className="text-sm text-gray-500">Carregando horários...</p>
-          ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              {filteredAndVisibleSlots.length !== 0
-                ? filteredAndVisibleSlots.map((slot) => (
-                    <button
-                      key={slot.time}
-                      type="button"
-                      // ✅ NOVO: Desabilita o botão se o horário estiver ocupado
-                      disabled={slot.isBooked}
-                      onClick={() => updateFormData({ time: slot.time })}
-                      // ✅ NOVO: Classes de estilo condicionais
-                      className={`rounded-md border p-2 text-center text-sm transition-colors cursor-pointer ${
-                        formData.time === slot.time && !slot.isBooked
-                          ? "border-[var(--loja-theme-color)] bg-[var(--loja-theme-color)]/10 text-[var(--loja-theme-color)] font-semibold" // Estilo para horário selecionado
-                          : slot.isBooked
-                          ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 line-through" // Estilo para horário ocupado
-                          : "border-gray-200 hover:border-[var(--loja-theme-color)] hover:bg-[var(--loja-theme-color)]/20" // Estilo para horário livre
-                      }`}
-                    >
-                      {slot.time}
-                    </button>
-                  ))
-                : formData.date && <p className="col-span-3 text-sm text-gray-500">Nenhum horário disponível para este dia.</p>}
+          {!selectedBarber && <p className="text-xs text-[var(--loja-theme-color)]">Por favor, selecione um barbeiro na etapa anterior.</p>}
+          {!formData.date && selectedBarber && <p className="text-sm text-gray-500 md:text-base">Por favor, selecione uma data primeiro.</p>}
+
+          {/* ✅ NOVO: Mensagem de feriado */}
+          {holidayMessage && (
+            <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+              <p className="text-sm text-red-700 font-medium">🎉 {holidayMessage}</p>
+              <p className="text-xs text-red-600 mt-1">Escolha outra data para continuar com o agendamento.</p>
             </div>
           )}
+
+          {/* --- ALTERAÇÃO 2: Contêiner com altura mínima para os horários --- */}
+          <div className="flex min-h-[240px] items-center justify-center w-full">
+            {loadingTimes ? (
+              // --- ALTERAÇÃO 3: Exibir o Skeleton Loader ---
+              // <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              //   {Array.from({ length: 8 }).map((_, index) => (
+              //     <TimeSlotSkeleton key={index} />
+              //   ))}
+              // </div>
+              <Spinner />
+            ) : (
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 w-full">
+                {filteredAndVisibleSlots.length > 0
+                  ? filteredAndVisibleSlots.map((slot) => (
+                      <button
+                        key={slot.time}
+                        type="button"
+                        disabled={slot.isBooked}
+                        onClick={() => updateFormData({ time: slot.time })}
+                        className={`rounded-md border p-2 text-center text-sm transition-colors cursor-pointer ${
+                          formData.time === slot.time && !slot.isBooked
+                            ? "border-[var(--loja-theme-color)] bg-[var(--loja-theme-color)]/10 text-[var(--loja-theme-color)] font-semibold"
+                            : slot.isBooked
+                            ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 line-through"
+                            : "border-gray-200 hover:border-[var(--loja-theme-color)] hover:bg-[var(--loja-theme-color)]/20"
+                        }`}
+                      >
+                        {slot.time}
+                      </button>
+                    ))
+                  : formData.date &&
+                    !holidayMessage && <p className="col-span-full text-sm text-gray-500">Nenhum horário disponível para este dia.</p>}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
