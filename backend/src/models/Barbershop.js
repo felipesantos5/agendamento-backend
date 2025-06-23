@@ -39,4 +39,6 @@ const BarbershopSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+barbershopSchema.index({ slug: 1 });
+
 export default mongoose.model("Barbershop", BarbershopSchema);
