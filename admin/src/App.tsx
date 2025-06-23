@@ -10,6 +10,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { SetPasswordPage } from "./pages/SetPasswordPage.tsx";
 import { useAuth } from "./contexts/AuthContext.tsx";
+import CommissionsPage from "./pages/CommissionsPage.tsx";
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
               <Route path="configuracoes" element={<BarbeariaConfigPage />} />
               <Route path="servicos" element={<ServicesPage />} />
               <Route path="funcionarios" element={<BarberPage />} />
+              <Route path="comissoes" element={<CommissionsPage />} />
             </Route>
 
             {/* Rota para "não encontrado" dentro do painel admin */}

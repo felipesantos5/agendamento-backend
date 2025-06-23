@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Para o filtro
 import { Switch } from "@/components/ui/switch"; // Para o toggle
 import { Label } from "@/components/ui/label"; // Para os rótulos dos filtros
-import { Filter, Trash2 } from "lucide-react";
+import { CheckCircle2, Filter, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -26,6 +26,7 @@ import apiClient from "@/services/api";
 import { PhoneFormat } from "@/helper/phoneFormater";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { API_BASE_URL } from "@/config/BackendUrl";
 
 // Contexto do AdminLayout
 interface AdminOutletContext {
@@ -196,6 +197,39 @@ export function AgendamentosPage() {
     }
   };
 
+  const handleMarkAsCompleted = async (bookingId: string) => {
+    const originalBookings = [...bookings];
+
+    // Otimistic UI update
+    setBookings(bookings.map((b) => (b._id === bookingId ? { ...b, status: "completed" } : b)));
+
+    try {
+      await apiClient.put(`${API_BASE_URL}/barbershops/${barbershopId}/bookings/${bookingId}/status`, {
+        status: "completed",
+      });
+      toast.success("Agendamento marcado como concluído! A comissão foi gerada.");
+    } catch (error) {
+      // Reverte em caso de erro
+      setBookings(originalBookings);
+      toast.error("Falha ao atualizar o status do agendamento.");
+      console.error(error);
+    }
+  };
+
+  // const getStatusVariant = (status: Booking["status"]) => {
+  //   switch (status) {
+  //     case "completed":
+  //       return "success";
+  //     case "canceled":
+  //       return "destructive";
+  //     case "confirmed":
+  //       return "default";
+  //     case "booked":
+  //     default:
+  //       return "secondary";
+  //   }
+  // };
+
   if (isLoading && bookings.length === 0 && allBarbers.length === 0)
     return <p className="text-center p-10">Carregando agendamentos e barbeiros...</p>;
   if (error && bookings.length === 0) return <p className="text-center p-10 text-red-500">{error}</p>;
@@ -280,7 +314,7 @@ export function AgendamentosPage() {
               {isUserAdmin && <TableHead>Profissional</TableHead>}
               <TableHead className="text-right">Preço (R$)</TableHead>
               <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-center">Ações</TableHead>
+              <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -337,11 +371,17 @@ export function AgendamentosPage() {
                         : booking.status}
                     </Badge>
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-right">
+                    {booking.status === "booked" || booking.status === "confirmed" ? (
+                      <Button variant="outline" size="sm" onClick={() => handleMarkAsCompleted(booking._id)}>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                        Concluir
+                      </Button>
+                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
+                      className="ml-2 h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-100"
                       onClick={() => setBookingToDelete(booking._id)}
                       disabled={isDeleting}
                     >

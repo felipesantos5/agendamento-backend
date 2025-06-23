@@ -105,6 +105,12 @@ export function AdminLayout() {
       roles: ["admin"],
     },
     {
+      to: "comissoes",
+      label: "Comissoes",
+      icon: <Users className="mr-2 h-4 w-4" />,
+      roles: ["admin"],
+    },
+    {
       to: "servicos",
       label: "Serviços",
       icon: <Scissors className="mr-2 h-4 w-4" />,

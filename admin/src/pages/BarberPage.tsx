@@ -45,6 +45,7 @@ interface Barber {
   image?: string;
   availability: Availability[];
   email?: string;
+  commission?: number;
 }
 
 type BarberFormData = {
@@ -53,6 +54,7 @@ type BarberFormData = {
   availability: Availability[];
   email: string;
   password?: string;
+  commission?: number;
 };
 
 const daysOfWeek = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -62,6 +64,7 @@ const initialBarberFormState: BarberFormData = {
   image: "",
   email: "",
   password: "",
+  commission: 0,
   availability: [
     { day: "Segunda-feira", start: "09:00", end: "18:00" }, // Exemplo inicial
   ],
@@ -88,6 +91,7 @@ export function BarberPage() {
     try {
       const response = await apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`);
       setBarbers(response.data);
+      console.log(`response.data`, response.data);
     } catch (err) {
       console.error("Erro ao buscar funcionários:", err);
       setError("Não foi possível carregar os funcionários.");
@@ -182,6 +186,7 @@ export function BarberPage() {
       name: currentBarberForm.name,
       image: finalImageUrl, // Usa a URL da imagem (nova ou existente)
       availability: validAvailability,
+      commission: Number(currentBarberForm.commission),
     };
 
     if (dialogMode === "add") {
@@ -231,7 +236,7 @@ export function BarberPage() {
 
   const closeDialogAndReset = () => {
     setIsDialogOpen(false);
-    setSetupLink(""); // Limpa o link ao fechar
+    setSetupLink("");
   };
 
   if (isLoading && barbers.length === 0) return <p className="text-center p-10">Carregando funcionários...</p>;
@@ -322,6 +327,23 @@ export function BarberPage() {
                   <div className="space-y-1.5">
                     <Label htmlFor="name">Nome do Funcionário</Label>
                     <Input id="name" name="name" value={currentBarberForm.name || ""} onChange={handleFormInputChange} required />
+                  </div>
+
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="commission" className="text-right">
+                      Comissão (%)
+                    </Label>
+                    <Input
+                      id="commission"
+                      name="commission"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={currentBarberForm.commission || ""} // Use o valor atual ou string vazia
+                      onChange={handleFormInputChange}
+                      placeholder="Ex: 40"
+                      className="col-span-3"
+                    />
                   </div>
 
                   {dialogMode === "add" && (
