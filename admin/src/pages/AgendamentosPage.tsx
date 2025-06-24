@@ -109,7 +109,6 @@ export function AgendamentosPage() {
         } else {
           // Se for barbeiro, busca apenas os SEUS agendamentos pela nova rota
           bookingsResponse = await apiClient.get(`/barbershops/${barbershopId}/barbers/bookings/barber`);
-          console.log("bookingsResponse", bookingsResponse);
           // Não precisa buscar todos os barbeiros, pois o filtro não será mostrado
         }
 

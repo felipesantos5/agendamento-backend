@@ -91,7 +91,6 @@ export function BarberPage() {
     try {
       const response = await apiClient.get(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`);
       setBarbers(response.data);
-      console.log(`response.data`, response.data);
     } catch (err) {
       console.error("Erro ao buscar funcionários:", err);
       setError("Não foi possível carregar os funcionários.");

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Calendar, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/BackendUrl";
-import { useHolidays } from "@/hooks/useHolidays"; // Importe o hook
+import { useHolidays } from "@/hooks/useHolidays";
 import { Spinner } from "../ui/spinnerLoading";
 
 interface TimeSlot {
@@ -34,10 +34,8 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
   const [loadingTimes, setLoadingTimes] = useState(false);
   const [holidayMessage, setHolidayMessage] = useState<string | null>(null);
 
-  // ✅ NOVO: Hook para gerenciar feriados
   const { isHoliday, getHolidayName } = useHolidays(currentMonth.getFullYear());
 
-  // Efeito para buscar horários disponíveis quando a data ou o barbeiro mudam
   useEffect(() => {
     const fetchTimeSlots = async () => {
       if (formData.date && selectedBarber && barbershopId) {
@@ -52,7 +50,6 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
 
           const data: ApiResponse = response.data;
 
-          // ✅ NOVO: Verificar se é feriado
           if (data.isHoliday) {
             setHolidayMessage(`Esta data é feriado: ${data.holidayName}`);
             setTimeSlots([]);
@@ -91,7 +88,6 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
     });
   }, [timeSlots, formData.date]);
 
-  // --- Lógica do Calendário ---
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
 
@@ -110,7 +106,6 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
   const handleDateSelect = (day: number) => {
     const selectedDate = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 
-    // ✅ NOVO: Verificar se é feriado antes de selecionar
     if (isHoliday(selectedDate)) {
       const holidayName = getHolidayName(selectedDate);
       alert(`Esta data é feriado (${holidayName}) e não está disponível para agendamento.`);
@@ -126,7 +121,6 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
     return selectedDate < new Date(today.getFullYear(), today.getMonth(), today.getDate());
   };
 
-  // ✅ NOVO: Função para verificar se um dia é feriado
   const isDayHoliday = (day: number) => {
     const dateString = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return isHoliday(dateString);
@@ -208,7 +202,6 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
           {!selectedBarber && <p className="text-xs text-[var(--loja-theme-color)]">Por favor, selecione um barbeiro na etapa anterior.</p>}
           {!formData.date && selectedBarber && <p className="text-sm text-gray-500 md:text-base">Por favor, selecione uma data primeiro.</p>}
 
-          {/* ✅ NOVO: Mensagem de feriado */}
           {holidayMessage && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-md">
               <p className="text-sm text-red-700 font-medium">🎉 {holidayMessage}</p>
@@ -216,15 +209,8 @@ export default function DateTimeSelection({ formData, updateFormData, barbershop
             </div>
           )}
 
-          {/* --- ALTERAÇÃO 2: Contêiner com altura mínima para os horários --- */}
-          <div className="flex min-h-[240px] items-center justify-center w-full">
+          <div className={`flex min-h-[240px] items-center justify-center w-full ${filteredAndVisibleSlots.length === 0 && "min-h-auto"}`}>
             {loadingTimes ? (
-              // --- ALTERAÇÃO 3: Exibir o Skeleton Loader ---
-              // <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
-              //   {Array.from({ length: 8 }).map((_, index) => (
-              //     <TimeSlotSkeleton key={index} />
-              //   ))}
-              // </div>
               <Spinner />
             ) : (
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 w-full">
