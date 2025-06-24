@@ -5,7 +5,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
 import {
@@ -57,7 +57,7 @@ export function LoginPage() {
     }
     setIsSendingLink(true);
     try {
-      const response = await apiClient.post(`${API_BASE_URL}/api/auth/admin/forgot-password`, {
+      await apiClient.post(`${API_BASE_URL}/api/auth/admin/forgot-password`, {
         email: resetEmail,
       });
       document.getElementById("close-dialog-btn")?.click();
