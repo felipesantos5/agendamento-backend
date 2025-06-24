@@ -12,6 +12,7 @@ const barberBaseSchema = z.object({
       })
     )
     .optional(), // Disponibilidade pode ser opcional ao criar/editar
+  commission: z.number().min(0).max(100).optional().default(0),
 });
 
 export const barberCreationSchema = barberBaseSchema.extend({

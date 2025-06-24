@@ -13,10 +13,11 @@ import bookingRoutes from "./routes/bookingRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import authAdminRoutes from "./routes/authAdminRoutes.js";
+import commissionRoutes from "./routes/commission.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
-import './services/schedulerService.js'
+import "./services/schedulerService.js";
 
 import "./models/Barbershop.js";
 import "./models/Barber.js";
@@ -77,6 +78,7 @@ app.use("/barbershops/:barbershopId/services", serviceRoutes);
 app.use("/barbershops/:barbershopId/bookings", bookingRoutes); // bookingRoutes agora contém a sub-rota para free-slots
 app.use("/api/upload", protectAdmin, uploadRoutes);
 app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
+app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
 
 app.use("/api/auth/admin", authAdminRoutes);
 

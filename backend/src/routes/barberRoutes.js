@@ -12,6 +12,7 @@ import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { ptBR } from "date-fns/locale";
 import crypto from "crypto";
+import { checkIsHoliday } from "../services/holidayService.js";
 import "dotenv/config";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
@@ -34,6 +35,7 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
       name: data.name,
       image: data.image,
       availability: data.availability,
+      commission: data.commission,
       barbershop: req.params.barbershopId,
     });
 
@@ -107,7 +109,9 @@ router.get("/", async (req, res) => {
           name: 1,
           image: 1,
           availability: 1,
-          email: "$loginInfo.email", // Pega o email de dentro do objeto 'loginInfo' que foi juntado
+          email: "$loginInfo.email",
+          commission: 1,
+          // Pega o email de dentro do objeto 'loginInfo' que foi juntado
         },
       },
     ]);
@@ -123,9 +127,22 @@ router.get("/", async (req, res) => {
 router.get("/:barberId/free-slots", async (req, res) => {
   try {
     const { date } = req.query;
-    const serviceId = req.query.serviceId; // ✅ Agora esperamos apenas o serviceId
+    const serviceId = req.query.serviceId;
 
     const { barberId, barbershopId } = req.params;
+
+    const requestedDate = new Date(date);
+    // Adiciona o fuso horário para evitar problemas de "um dia antes"
+    requestedDate.setMinutes(requestedDate.getMinutes() + requestedDate.getTimezoneOffset());
+
+    const holidayCheck = await checkIsHoliday(requestedDate);
+    if (holidayCheck.isHoliday) {
+      return res.json({
+        isHoliday: true,
+        holidayName: holidayCheck.holidayName,
+        slots: [], // Retorna uma lista de horários vazia
+      });
+    }
 
     // Validações básicas
     // if (!date || !barberId || !barbershopId || !serviceId) {
@@ -268,7 +285,11 @@ router.get("/:barberId/free-slots", async (req, res) => {
       }
     }
 
-    res.json(slotsWithStatus);
+    res.json({
+      isHoliday: false,
+      holidayName: null,
+      slots: slotsWithStatus, // Substitua com seus horários reais
+    });
   } catch (error) {
     console.error("Erro ao buscar status dos horários:", error);
     res.status(500).json({ error: "Erro interno ao processar a solicitação." });

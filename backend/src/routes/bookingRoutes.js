@@ -1,18 +1,19 @@
 import express from "express";
 import Booking from "../models/Booking.js";
-import Barber from "../models/Barber.js";
 import Barbershop from "../models/Barbershop.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
-import {formatPhoneNumber} from '../utils/phoneFormater.js'
+import { formatPhoneNumber } from "../utils/phoneFormater.js";
+import { checkHolidayAvailability } from "../middleware/holidayCheck.js";
+import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 
 const router = express.Router({ mergeParams: true });
 
 // Criar Agendamento em uma Barbearia
 // Rota esperada: POST /barbershops/:barbershopId/bookings
-router.post("/", async (req, res) => {
+router.post("/", checkHolidayAvailability, async (req, res) => {
   try {
     const data = BookingValidationSchema.parse(req.body);
     const bookingTime = new Date(data.time);
@@ -77,6 +78,54 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.put(
+  "/:bookingId/status",
+  protectAdmin, // Apenas usuários logados no painel podem acessar
+  async (req, res) => {
+    try {
+      const { barbershopId, bookingId } = req.params;
+      const { status } = req.body;
+
+      // 1. Validação dos IDs
+      if (!mongoose.Types.ObjectId.isValid(bookingId)) {
+        return res.status(400).json({ error: "ID do agendamento inválido." });
+      }
+
+      // 2. Validação do Status recebido
+      const allowedStatuses = ["booked", "completed", "canceled", "confirmed"];
+      if (!status || !allowedStatuses.includes(status)) {
+        return res.status(400).json({
+          error: `Status inválido. Use um dos seguintes: ${allowedStatuses.join(", ")}`,
+        });
+      }
+
+      // 3. Encontrar o agendamento
+      const booking = await Booking.findOne({
+        _id: bookingId,
+        barbershop: barbershopId,
+      });
+
+      if (!booking) {
+        return res.status(404).json({ error: "Agendamento não encontrado nesta barbearia." });
+      }
+
+      // 4. Atualizar o status e salvar
+      booking.status = status;
+      await booking.save();
+
+      // 5. Retornar a resposta de sucesso com o agendamento atualizado
+      res.status(200).json({
+        success: true,
+        message: `Agendamento atualizado para '${status}' com sucesso.`,
+        data: booking,
+      });
+    } catch (error) {
+      console.error("Erro ao atualizar status do agendamento:", error);
+      res.status(500).json({ error: "Ocorreu um erro no servidor." });
+    }
+  }
+);
+
 // Excluir um Agendamento
 // Rota esperada: DELETE /barbershops/:barbershopId/bookings/:bookingId
 router.delete("/:bookingId", async (req, res) => {
@@ -89,12 +138,24 @@ router.delete("/:bookingId", async (req, res) => {
 
     const booking = await Booking.findOneAndDelete({
       _id: bookingId,
-      barbershop: barbershopId
+      barbershop: barbershopId,
     });
 
     if (!booking) {
       return res.status(404).json({ error: "Agendamento não encontrado." });
     }
+
+    const barbershop = await Barbershop.findById(barbershopId);
+
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada." });
+    }
+
+    const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${new Date(
+      booking.time
+    )}.`;
+
+    sendWhatsAppConfirmation(booking.customer.phone, message);
 
     res.status(200).json({ message: "Agendamento excluído com sucesso." });
   } catch (error) {

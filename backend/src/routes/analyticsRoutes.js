@@ -18,7 +18,7 @@ const getPeriodDates = (period) => {
       endDate = endOfMonth(subMonths(now, 1));
       break;
     case "last3Months":
-      startDate = startOfMonth(subMonths(now, 2)); // Inclui o mês atual e os 2 anteriores
+      startDate = startOfMonth(subMonths(now, 2));
       endDate = endOfMonth(now);
       break;
     case "currentMonth":
@@ -43,10 +43,13 @@ router.get("/overview", protectAdmin, requireRole("admin"), async (req, res) => 
     const currentMonthBookingsList = await Booking.find({
       barbershop: new mongoose.Types.ObjectId(barbershopId),
       time: { $gte: startDate, $lte: endDate },
-      status: "booked", // Ou inclua 'completed' se fizer sentido para receita
+      // --- ALTERAÇÃO AQUI ---
+      // Agora conta todos os agendamentos que NÃO foram cancelados.
+      status: { $ne: "canceled" },
     }).populate("service", "price");
 
     const currentMonthBookingsCount = currentMonthBookingsList.length;
+    // A receita agora reflete todos os agendamentos não cancelados do mês.
     const totalRevenueCurrentMonth = currentMonthBookingsList.reduce((sum, booking) => {
       return sum + (booking.service && typeof booking.service.price === "number" ? booking.service.price : 0);
     }, 0);
@@ -75,13 +78,16 @@ router.get("/monthly-bookings", async (req, res) => {
       {
         $match: {
           barbershop: new mongoose.Types.ObjectId(barbershopId),
-          status: { $in: ["booked", "completed"] }, // Considere quais status contar
+          // --- ALTERAÇÃO AQUI ---
+          // Usando $nin (not in) para excluir apenas os cancelados.
+          status: { $nin: ["canceled"] },
           time: {
             $gte: startOfYear(new Date(year, 0, 1)),
-            $lt: endOfYear(new Date(year, 11, 31)), // Usa endOfYear para incluir todo o ano
+            $lt: endOfYear(new Date(year, 11, 31)),
           },
         },
       },
+      // ... (resto da agregação sem alterações)
       {
         $group: {
           _id: { month: { $month: "$time" } },
@@ -124,21 +130,23 @@ router.get("/bookings-by-barber", async (req, res) => {
       {
         $match: {
           barbershop: new mongoose.Types.ObjectId(barbershopId),
-          status: { $in: ["booked", "completed"] },
+          // --- ALTERAÇÃO AQUI ---
+          status: { $nin: ["canceled"] },
           time: { $gte: startDate, $lt: endDate },
         },
       },
+      // ... (resto da agregação sem alterações)
       { $group: { _id: "$barber", count: { $sum: 1 } } },
-      { $sort: { count: -1 } }, // Opcional: ordenar por mais atendimentos
+      { $sort: { count: -1 } },
       {
         $lookup: {
-          from: "barbers", // Nome da sua coleção de Barbeiros
+          from: "barbers",
           localField: "_id",
           foreignField: "_id",
           as: "barberDetails",
         },
       },
-      { $unwind: { path: "$barberDetails", preserveNullAndEmptyArrays: true } }, // Para não quebrar se um barbeiro for deletado
+      { $unwind: { path: "$barberDetails", preserveNullAndEmptyArrays: true } },
       {
         $project: {
           _id: 0,
@@ -171,16 +179,18 @@ router.get("/popular-services", async (req, res) => {
       {
         $match: {
           barbershop: new mongoose.Types.ObjectId(barbershopId),
-          status: { $in: ["booked", "completed"] },
+          // --- ALTERAÇÃO AQUI ---
+          status: { $nin: ["canceled"] },
           time: { $gte: startDate, $lt: endDate },
         },
       },
+      // ... (resto da agregação sem alterações)
       { $group: { _id: "$service", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: limit },
       {
         $lookup: {
-          from: "services", // Nome da sua coleção de Serviços
+          from: "services",
           localField: "_id",
           foreignField: "_id",
           as: "serviceDetails",
