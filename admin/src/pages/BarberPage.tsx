@@ -328,7 +328,7 @@ export function BarberPage() {
                     <Input id="name" name="name" value={currentBarberForm.name || ""} onChange={handleFormInputChange} required />
                   </div>
 
-                  <div className="grid grid-cols-4 items-center gap-4">
+                  <div className="space-y-1.5">
                     <Label htmlFor="commission" className="text-right">
                       Comissão (%)
                     </Label>
