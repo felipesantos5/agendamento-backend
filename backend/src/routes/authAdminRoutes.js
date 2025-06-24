@@ -1,9 +1,9 @@
 import express from "express";
 import jwt from "jsonwebtoken";
-import AdminUser from "../models/AdminUser.js"; // Ajuste o caminho se necessário
-import Barbershop from "../models/Barbershop.js"; // Para buscar o slug
-import "dotenv/config"; // Para JWT_SECRET
+import AdminUser from "../models/AdminUser.js";
+import "dotenv/config";
 import crypto from "crypto";
+import { sendPasswordResetEmail } from "../services/emailService.js";
 
 const router = express.Router();
 
@@ -98,6 +98,77 @@ router.post("/set-password", async (req, res) => {
     res.status(200).json({ message: "Senha definida com sucesso! Agora você pode fazer o login." });
   } catch (error) {
     console.error("Erro ao definir senha:", error);
+    res.status(500).json({ error: "Erro interno do servidor." });
+  }
+});
+
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await AdminUser.findOne({ email });
+
+    // IMPORTANTE: Sempre retorne uma mensagem de sucesso, mesmo que o e-mail
+    // não exista, para evitar que descubram quais e-mails estão cadastrados.
+    if (!user) {
+      console.log(`Tentativa de reset para e-mail não cadastrado: ${email}`);
+      return res.status(200).json({ message: "Se um e-mail cadastrado for encontrado, um link de redefinição será enviado." });
+    }
+
+    // 1. Gerar token
+    const resetToken = crypto.randomBytes(32).toString("hex");
+
+    // 2. Salvar o token HASHED no banco de dados para segurança
+    user.passwordResetToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+    user.passwordResetExpires = Date.now() + 3600000; // Expira em 1 hora
+
+    await user.save();
+
+    // 3. Enviar o token original (NÃO HASHED) por e-mail
+    await sendPasswordResetEmail(user.email, resetToken);
+
+    res.status(200).json({ message: "Se um e-mail cadastrado for encontrado, um link de redefinição será enviado." });
+  } catch (error) {
+    console.error("Erro em /forgot-password:", error);
+    res.status(500).json({ error: "Erro interno do servidor." });
+  }
+});
+
+// ROTA: POST /api/auth/admin/reset-password/:token
+router.post("/reset-password/:token", async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: "A nova senha é obrigatória." });
+    }
+
+    // 1. Converter o token recebido para o mesmo formato hashed do banco
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+
+    // 2. Encontrar o usuário pelo token hashed E verificar se não expirou
+    const user = await AdminUser.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpires: { $gt: Date.now() }, // $gt: greater than (maior que)
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: "Token inválido ou expirado." });
+    }
+
+    // 3. Atualizar a senha
+    user.password = password; // O pre-save hook do seu model vai fazer o hash
+    user.passwordResetToken = undefined; // Limpar o token
+    user.passwordResetExpires = undefined; // Limpar a data de expiração
+
+    await user.save();
+
+    // 4. (Opcional) Gerar um novo token de login e logar o usuário automaticamente
+    // ... (sua lógica de jwt.sign que já existe no /login)
+
+    res.status(200).json({ success: true, message: "Senha redefinida com sucesso!" });
+  } catch (error) {
+    console.error("Erro em /reset-password:", error);
     res.status(500).json({ error: "Erro interno do servidor." });
   }
 });

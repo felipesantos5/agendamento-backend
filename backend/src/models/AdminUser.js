@@ -41,6 +41,8 @@ const AdminUserSchema = new Schema(
       enum: ["pending", "active"], // pending = esperando definir a senha
       default: "pending",
     },
+    passwordResetToken: String,
+    passwordResetExpires: Date,
   },
   { timestamps: true }
 );

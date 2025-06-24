@@ -8,12 +8,25 @@ import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import apiClient from "@/services/api";
 import { API_BASE_URL } from "@/config/BackendUrl";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [isSendingLink, setIsSendingLink] = useState(false);
+
   const auth = useAuth();
   const navigate = useNavigate();
 
@@ -22,7 +35,7 @@ export function LoginPage() {
     return <Navigate to={`/${auth.user?.barbershopSlug}/configuracoes`} replace />;
   }
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleLogin = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setIsLoading(true);
@@ -38,31 +51,87 @@ export function LoginPage() {
     }
   };
 
+  const handleRequestPasswordReset = async () => {
+    if (!resetEmail) {
+      return;
+    }
+    setIsSendingLink(true);
+    try {
+      const response = await apiClient.post(`${API_BASE_URL}/api/auth/admin/forgot-password`, {
+        email: resetEmail,
+      });
+      document.getElementById("close-dialog-btn")?.click();
+    } catch (error: any) {
+    } finally {
+      setIsSendingLink(false);
+      setResetEmail("");
+    }
+  };
+
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex min-h-screen items-center justify-center bg-gray-100 dark:bg-gray-950 p-4">
       <Card className="w-full max-w-sm">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold">Login do Admin</CardTitle>
-          <CardDescription>Acesse o painel da sua barbearia.</CardDescription>
+        <CardHeader>
+          <CardTitle className="text-2xl">Login do Painel</CardTitle>
+          <CardDescription>Acesse o painel de controle da sua barbearia.</CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent className="space-y-4">
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input id="email" type="email" placeholder="exemplo@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
-              <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
-          </CardContent>
-          <CardFooter className="mt-4">
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Entrando..." : "Entrar"}
             </Button>
-          </CardFooter>
-        </form>
+          </form>
+          <p className="text-sm text-red-500 mt-3">{error}</p>
+
+          <div className="mt-4 text-sm">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="link" className="p-0 h-auto font-normal">
+                  Esqueceu a senha?
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-[425px]">
+                <DialogHeader>
+                  <DialogTitle>Recuperar Senha</DialogTitle>
+                  <DialogDescription>
+                    Digite seu e-mail abaixo. Se ele estiver cadastrado, enviaremos um link para você criar uma nova senha.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4 py-4">
+                  <div className="grid grid-cols-4 items-center gap-4">
+                    <Label htmlFor="reset-email" className="text-right">
+                      Email
+                    </Label>
+                    <Input
+                      id="reset-email"
+                      type="email"
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      className="col-span-3"
+                      placeholder="seu.email@cadastrado.com"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="ghost" id="close-dialog-btn" className="hidden" />
+                  </DialogClose>
+                  <Button onClick={handleRequestPasswordReset} disabled={isSendingLink}>
+                    {isSendingLink ? "Enviando..." : "Enviar Link de Recuperação"}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </CardContent>
       </Card>
     </div>
   );

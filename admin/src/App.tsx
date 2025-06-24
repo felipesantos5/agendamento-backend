@@ -11,6 +11,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { SetPasswordPage } from "./pages/SetPasswordPage.tsx";
 import { useAuth } from "./contexts/AuthContext.tsx";
 import CommissionsPage from "./pages/CommissionsPage.tsx";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage.tsx";
 
 export default function App() {
   return (
@@ -18,17 +19,15 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/configurar-senha/:token" element={<SetPasswordPage />} />
+        <Route path="/resetar-senha/:token" element={<ResetPasswordPage />} />
 
         {/* Envolve todas as rotas do painel com uma verificação básica de login */}
         <Route element={<ProtectedRoute />}>
           <Route path="/:barbershopSlug" element={<AdminLayout />}>
-            {/* Rota padrão (index) para a área logada */}
             <Route index element={<DefaultPageBasedOnRole />} />
 
-            {/* Rota que tanto 'admin' quanto 'barber' podem acessar */}
             <Route path="agendamentos" element={<AgendamentosPage />} />
 
-            {/* ✅ Grupo de rotas que APENAS 'admin' pode acessar */}
             <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
               <Route path="metricas" element={<DashboardPage />} />
               <Route path="configuracoes" element={<BarbeariaConfigPage />} />
@@ -37,11 +36,9 @@ export default function App() {
               <Route path="comissoes" element={<CommissionsPage />} />
             </Route>
 
-            {/* Rota para "não encontrado" dentro do painel admin */}
             <Route path="*" element={<>nao encontrado</>} />
           </Route>
 
-          {/* Trata o acesso à raiz "/" para usuários logados */}
           <Route path="/" element={null} />
         </Route>
 
