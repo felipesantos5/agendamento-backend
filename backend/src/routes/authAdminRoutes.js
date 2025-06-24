@@ -44,7 +44,7 @@ router.post("/login", async (req, res) => {
       barberProfileId: user.barberProfile,
     };
 
-    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "24h" }); // Token expira em 24 horas
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "365d" }); // Token expira em 24 horas
 
     res.json({
       message: "Login bem-sucedido!",
