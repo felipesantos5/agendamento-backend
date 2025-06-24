@@ -41,6 +41,7 @@ const allowedOrigins = [
   "https://barbeariagendamento.com.br",
   "https://admin.barbeariagendamento.com.br",
   "http://31.97.30.228:8088",
+  "https://www.barbeariagendamento.com.br",
 ];
 
 const corsOptions = {
