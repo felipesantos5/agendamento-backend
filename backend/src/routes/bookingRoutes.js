@@ -151,9 +151,14 @@ router.delete("/:bookingId", async (req, res) => {
       return res.status(404).json({ error: "Barbearia não encontrada." });
     }
 
-    const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${new Date(
-      booking.time
-    )}.`;
+    const bookingDate = new Date(booking.time);
+
+    const formattedDate = new Intl.DateTimeFormat("pt-BR", {
+      day: "2-digit",
+      month: "2-digit",
+    }).format(bookingDate);
+
+    const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate} foi cancelado.`;
 
     sendWhatsAppConfirmation(booking.customer.phone, message);
 
