@@ -14,6 +14,7 @@ import uploadRoutes from "./routes/uploadRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import authAdminRoutes from "./routes/authAdminRoutes.js";
 import commissionRoutes from "./routes/commission.js";
+import blockedDayRoutes from "./routes/blockedDayRoutes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -81,6 +82,7 @@ app.use("/barbershops/:barbershopId/bookings", bookingRoutes); // bookingRoutes 
 app.use("/api/upload", protectAdmin, uploadRoutes);
 app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
 app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
+app.use("/api/barbershops/:barbershopId/blocked-days", blockedDayRoutes);
 
 app.use("/api/auth/admin", authAdminRoutes);
 

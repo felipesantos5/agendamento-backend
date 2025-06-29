@@ -7,12 +7,13 @@ import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
 import { barberCreationSchema, barberUpdateSchema } from "../validations/barberValidation.js";
 import { z } from "zod";
-import { parseISO, startOfDay, endOfDay, format as formatDateFns } from "date-fns";
+import { startOfDay, endOfDay, parseISO, format as formatDateFns } from "date-fns";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { ptBR } from "date-fns/locale";
 import crypto from "crypto";
 import { checkIsHoliday } from "../services/holidayService.js";
+import BlockedDay from "../models/BlockedDay.js";
 import "dotenv/config";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
@@ -144,13 +145,21 @@ router.get("/:barberId/free-slots", async (req, res) => {
       });
     }
 
-    // Validações básicas
-    // if (!date || !barberId || !barbershopId || !serviceId) {
-    //   return res.status(400).json({ error: "Parâmetros incompletos (data, IDs e serviceId são obrigatórios)." });
-    // }
-    // if (!mongoose.Types.ObjectId.isValid(barberId) || !mongoose.Types.ObjectId.isValid(barbershopId) || !mongoose.Types.ObjectId.isValid(serviceId)) {
-    //   return res.status(400).json({ error: "Um ou mais IDs fornecidos são inválidos." });
-    // }
+    const dayIsBlocked = await BlockedDay.findOne({
+      barbershop: barbershopId,
+      date: { $gte: startOfDay(requestedDate), $lte: endOfDay(requestedDate) },
+      // Verifica se o dia está bloqueado para a loja toda (barber: null)
+      // OU para este barbeiro específico ($in: [null, barberId])
+      barber: { $in: [null, barberId] },
+    });
+
+    if (dayIsBlocked) {
+      return res.json({
+        isBlocked: true,
+        reason: dayIsBlocked.reason || "Dia indisponível para agendamento.",
+        slots: [],
+      });
+    }
 
     // Buscar o serviço para obter a duração
     const serviceDoc = await Service.findById(serviceId).lean();
@@ -168,26 +177,20 @@ router.get("/:barberId/free-slots", async (req, res) => {
     // Ex: "2025-06-10" -> 2025-06-10T00:00:00.000Z
     const dateObjectFromQuery = parseISO(date);
 
-    // Para obter o dia da semana no Brasil, precisamos considerar o fuso.
-    // Uma forma de simular isso sem date-fns-tz é pegar os componentes da data UTC
-    // e construir uma nova data como se fosse local, mas isso pode ser complicado.
-    // A forma mais simples para o dia da semana, se date-fns-tz não funciona,
-    // é assumir que a string "YYYY-MM-DD" representa o dia local desejado.
-    const tempDateForDayName = new Date(`${date}T12:00:00`); // Meio-dia local para evitar problemas de transição de dia por fuso
+    const tempDateForDayName = new Date(`${date}T12:00:00`);
     const dayOfWeekName = formatDateFns(tempDateForDayName, "EEEE", { locale: ptBR });
 
     const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
     if (!workHours) return res.json([]);
 
     const allLocalSlots = [];
-    const [startWorkHour, startWorkMinute] = workHours.start.split(":").map(Number); // Ex: 9, 0
-    const [endWorkHour, endWorkMinute] = workHours.end.split(":").map(Number); // Ex: 18, 0
+    const [startWorkHour, startWorkMinute] = workHours.start.split(":").map(Number);
+    const [endWorkHour, endWorkMinute] = workHours.end.split(":").map(Number);
     const slotInterval = 15;
 
     let currentHour = startWorkHour;
     let currentMinute = startWorkMinute;
 
-    // Loop para gerar os horários LOCAIS baseados no workHours
     while (true) {
       const slotEndHour = currentHour + Math.floor((currentMinute + serviceDuration - 1) / 60); // Hora que o serviço terminaria
       const slotEndMinute = ((currentMinute + serviceDuration - 1) % 60) + 1; // Minuto que o serviço terminaria
