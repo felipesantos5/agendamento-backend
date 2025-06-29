@@ -10,7 +10,12 @@ const router = express.Router({ mergeParams: true });
 router.get("/", protectAdmin, async (req, res) => {
   try {
     const { barbershopId } = req.params;
-    const blockedDays = await BlockedDay.find({ barbershop: barbershopId });
+    const today = startOfToday();
+
+    const blockedDays = await BlockedDay.find({
+      barbershop: barbershopId,
+      date: { $gte: today },
+    });
     res.status(200).json(blockedDays);
   } catch (error) {
     res.status(500).json({ error: "Erro ao buscar dias bloqueados." });
