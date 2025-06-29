@@ -62,7 +62,9 @@ const corsOptions = {
 };
 
 // 2. Use as novas opções no middleware cors
-app.use(cors(corsOptions));
+// app.use(cors(corsOptions));
+
+app.use(cors({ origin: "*", credentials: true }));
 
 app.use(express.json());
 
