@@ -35,6 +35,13 @@ const BarbershopSchema = new mongoose.Schema(
       match: [/^#[0-9A-F]{6}$/i, "Formato de cor inválido (ex: #RRGGBB)"], // Validação básica de formato HEX
       default: "#D10000", // Uma cor padrão, ex: um vermelho/vinho (ajuste conforme sua preferência)
     },
+    LogoBackgroundColor: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      match: [/^#[0-9A-F]{6}$/i, "Formato de cor inválido (ex: #RRGGBB)"],
+      default: "#000",
+    },
   },
   { timestamps: true }
 );

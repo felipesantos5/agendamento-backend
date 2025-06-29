@@ -91,15 +91,6 @@ router.put(
         return res.status(400).json({ error: "ID do agendamento inválido." });
       }
 
-      // 2. Validação do Status recebido
-      const allowedStatuses = ["booked", "completed", "canceled", "confirmed"];
-      if (!status || !allowedStatuses.includes(status)) {
-        return res.status(400).json({
-          error: `Status inválido. Use um dos seguintes: ${allowedStatuses.join(", ")}`,
-        });
-      }
-
-      // 3. Encontrar o agendamento
       const booking = await Booking.findOne({
         _id: bookingId,
         barbershop: barbershopId,
@@ -108,6 +99,31 @@ router.put(
       if (!booking) {
         return res.status(404).json({ error: "Agendamento não encontrado nesta barbearia." });
       }
+
+      const barbershop = await Barbershop.findById(barbershopId);
+
+      // 2. Validação do Status recebido
+      const allowedStatuses = ["booked", "completed", "canceled", "confirmed"];
+      if (!status || !allowedStatuses.includes(status)) {
+        return res.status(400).json({
+          error: `Status inválido. Use um dos seguintes: ${allowedStatuses.join(", ")}`,
+        });
+      }
+
+      const bookingDate = new Date(booking.time);
+
+      const formattedDate = new Intl.DateTimeFormat("pt-BR", {
+        day: "2-digit",
+        month: "2-digit",
+      }).format(bookingDate);
+
+      if (status === "canceled") {
+        const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate} foi cancelado.`;
+
+        sendWhatsAppConfirmation(booking.customer.phone, message);
+      }
+
+      // 3. Encontrar o agendamento
 
       // 4. Atualizar o status e salvar
       booking.status = status;
