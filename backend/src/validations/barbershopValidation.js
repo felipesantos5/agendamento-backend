@@ -23,20 +23,17 @@ export const BarbershopSchema = z.object({
   name: z.string().min(2, "Nome obrigatório"),
   description: z.string().max(300, "Descrição muito longa"),
   address: AddressSchema,
-  logoUrl: z
-    .string()
-    .url("URL inválida") // Deve ser uma URL...
-    .or(z.literal("")) // ...OU pode ser uma string vazia
-    .optional(),
+  logoUrl: z.string().url("URL inválida").or(z.literal("")).optional(),
   contact: z.string().min(8, "Contato obrigatório"),
   instagram: z.string().optional(),
   slug: z.string().max(50, "Descrição muito longa"),
   workingHours: z.array(WorkingHourSchema).min(1, "Informe pelo menos um horário de funcionamento"),
-  themeColor: z
-    .string() // ✅ NOVO CAMPO
+  themeColor: z.string().regex(hexColorRegex, "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)").optional().default("#D10000"),
+  LogoBackgroundColor: z
+    .string()
     .regex(hexColorRegex, "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)")
-    .optional() // Opcional na criação, usará o default do Mongoose
-    .default("#D10000"), // Mesmo default do Mongoose, para consistência se o frontend não enviar
+    .optional()
+    .default("#000000"),
 });
 
 export const BarbershopUpdateSchema = BarbershopSchema.partial();

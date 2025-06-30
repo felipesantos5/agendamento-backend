@@ -28,7 +28,6 @@ const BarbershopSchema = new mongoose.Schema(
       },
     ],
     themeColor: {
-      // ✅ NOVO CAMPO PARA A COR PRINCIPAL
       type: String,
       trim: true,
       uppercase: true, // Opcional: armazenar sempre em maiúsculas
@@ -40,7 +39,7 @@ const BarbershopSchema = new mongoose.Schema(
       trim: true,
       uppercase: true,
       match: [/^#[0-9A-F]{6}$/i, "Formato de cor inválido (ex: #RRGGBB)"],
-      default: "#000",
+      default: "#000000",
     },
   },
   { timestamps: true }
