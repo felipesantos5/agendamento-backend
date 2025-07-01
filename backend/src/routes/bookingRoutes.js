@@ -40,7 +40,11 @@ router.post("/", checkHolidayAvailability, async (req, res) => {
       const formattedTime = formatBookingTime(new Date(bookingTime));
       const barberShopContact = formatPhoneNumber(barbershop.contact);
 
-      const message = `Olá, ${data.customer.name}!\n\nSeu agendamento na ${barbershop.name} foi confirmado com sucesso para o dia ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia: ${barberShopContact} \nEndereço: ${barbershop.address.rua}, ${barbershop.address.numero} - ${barbershop.address.bairro}\n\nNosso time te aguarda! 💈`;
+      const fullAddress = `${barbershop.address.rua}, ${barbershop.address.numero} - ${barbershop.address.bairro}`;
+
+      const locationLink = `https://barbeariagendamento.com.br/localizacao/${barbershop._id}`;
+
+      const message = `Olá, ${data.customer.name}!\n\nSeu agendamento na ${barbershop.name} foi confirmado com sucesso para o dia ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia: ${barberShopContact} \nEndereço: ${fullAddress}\n\n📍 *Ver no mapa:*\n${locationLink}\n\nNosso time te aguarda! 💈`;
 
       sendWhatsAppConfirmation(createdBooking.customer.phone, message);
     }

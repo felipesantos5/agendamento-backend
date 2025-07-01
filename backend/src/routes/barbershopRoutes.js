@@ -75,4 +75,29 @@ router.delete("/:id", protectAdmin, requireRole("admin"), async (req, res) => {
   }
 });
 
+router.get("/:barbershopId/location", async (req, res) => {
+  try {
+    const { barbershopId } = req.params;
+
+    // 1. Busca a barbearia pelo ID
+    const barbershop = await Barbershop.findById(barbershopId);
+    if (!barbershop) {
+      return res.status(404).send("Barbearia não encontrada.");
+    }
+
+    // 2. Monta o endereço completo a partir dos dados do banco
+    const { rua, numero, bairro, cidade, estado } = barbershop.address;
+    const fullAddress = `${rua}, ${numero}, ${bairro}, ${cidade}, ${estado}`;
+
+    // 3. Cria o link do Google Maps
+    const googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+
+    // 4. Redireciona o usuário para o Google Maps
+    res.redirect(302, googleMapsLink);
+  } catch (error) {
+    console.error("Erro ao redirecionar para localização:", error);
+    res.status(500).send("Erro ao processar sua solicitação.");
+  }
+});
+
 export default router;
