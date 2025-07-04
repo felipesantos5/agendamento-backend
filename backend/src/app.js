@@ -19,6 +19,7 @@ import authCustomerRoutes from "./routes/authCustomerRoutes.js";
 import customerRoutes from "./routes/customerRoutes.js";
 import reviewRoutes from "./routes/reviewRoutes.js";
 import healthcheckRoutes from "./routes/healtcheck.js";
+import planRoutes from "./routes/planRoutes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -74,6 +75,7 @@ app.use(express.json());
 
 app.use(express.static("public"));
 
+app.use("/api", healthcheckRoutes);
 // ✅ Servir arquivos estáticos da pasta 'public'
 // Se app.js está em src/ e public/ está na raiz do backend/
 app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
@@ -90,7 +92,7 @@ app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
 app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
 app.use("/api/barbershops/:barbershopId/blocked-days", blockedDayRoutes);
 app.use("/api/barbershops/:barbershopId/reviews", reviewRoutes);
-app.use("/api", healthcheckRoutes);
+app.use("/api/barbershops/:barbershopId/plans", planRoutes);
 
 app.use("/api/auth/customer", customerRoutes);
 
