@@ -15,6 +15,10 @@ import analyticsRoutes from "./routes/analyticsRoutes.js";
 import authAdminRoutes from "./routes/authAdminRoutes.js";
 import commissionRoutes from "./routes/commission.js";
 import blockedDayRoutes from "./routes/blockedDayRoutes.js";
+import authCustomerRoutes from "./routes/authCustomerRoutes.js";
+import customerRoutes from "./routes/customerRoutes.js";
+import reviewRoutes from "./routes/reviewRoutes.js";
+import healthcheckRoutes from "./routes/healtcheck.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -85,6 +89,12 @@ app.use("/api/upload", protectAdmin, uploadRoutes);
 app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
 app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
 app.use("/api/barbershops/:barbershopId/blocked-days", blockedDayRoutes);
+app.use("/api/barbershops/:barbershopId/reviews", reviewRoutes);
+app.use("/api", healthcheckRoutes);
+
+app.use("/api/auth/customer", customerRoutes);
+
+app.use("/api/auth/customer", authCustomerRoutes);
 
 app.use("/api/auth/admin", authAdminRoutes);
 

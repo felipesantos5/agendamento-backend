@@ -5,8 +5,9 @@ const BookingSchema = new Schema({
   barber: { type: Schema.Types.ObjectId, ref: "Barber" },
   service: { type: Schema.Types.ObjectId, ref: "Service" },
   customer: {
-    name: String,
-    phone: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Customer",
+    required: true,
   },
   time: Date,
   status: { type: String, default: "booked" },

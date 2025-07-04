@@ -1,11 +1,10 @@
 import "dotenv/config";
 import axios from "axios";
-import { formatBookingTime } from "../utils/formatBookingTime.js";
 
 export async function sendWhatsAppConfirmation(customerPhone, message) {
   // ---- CONFIGURAÇÃO ----
   // É ALTAMENTE RECOMENDADO usar variáveis de ambiente para não expor suas chaves!
-  const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL // Ex: 'http://localhost:8080'
+  const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL; // Ex: 'http://localhost:8080'
   const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY; // Sua chave da API
   const INSTANCE_NAME = "barbeariAgendamentoMensagens";
   // --------------------
