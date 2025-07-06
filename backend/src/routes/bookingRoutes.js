@@ -87,7 +87,10 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "ID da barbearia inválido ou não fornecido." });
     }
 
-    const bookings = await Booking.find({ barbershop: barbershopId }).populate("barber", "name").populate("service", "name price duration");
+    const bookings = await Booking.find({ barbershop: barbershopId })
+      .populate("barber", "name")
+      .populate("service", "name price duration")
+      .populate("customer", "name phone");
 
     res.json(bookings);
   } catch (error) {
