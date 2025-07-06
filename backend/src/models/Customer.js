@@ -36,16 +36,14 @@ const customerSchema = new mongoose.Schema(
 );
 
 customerSchema.methods.getOtp = function () {
-  // Gera um código de 6 dígitos
-  const otp = Math.floor(1000 + Math.random() * 900000).toString();
+  const otp = Math.floor(Math.random() * 1000000)
+    .toString()
+    .padStart(6, "0");
 
-  // Define a validade do código para 10 minutos a partir de agora
   this.otpExpires = Date.now() + 10 * 60 * 1000;
 
-  // Hasheia o código antes de salvar no banco de dados
   this.otpCode = bcrypt.hashSync(otp, 10);
 
-  // Retorna o código NÃO hasheado para ser enviado ao usuário
   return otp;
 };
 
