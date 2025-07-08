@@ -15,20 +15,6 @@ services:
     networks:
       - app_network
 
-  mongodb:
-    image: mongo:latest
-    container_name: barbershop-mongodb
-    restart: unless-stopped
-    volumes:
-      - mongodb_data:/data/db
-    # ports:
-    #   - "27017:27017"
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-    networks:
-      - app_network
-
   evolution-api:
     image: atendai/evolution-api:v2.2.3 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
     container_name: evolution_api
@@ -76,7 +62,6 @@ services:
       - app_network
 
 volumes:
-  mongodb_data:
   evolution_instancesv2:
     external: true
     name: evolution_instancesv2
