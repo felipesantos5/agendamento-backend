@@ -1,21 +1,15 @@
 import express from "express";
 import mongoose from "mongoose";
 import Review from "../models/Review.js";
-import Booking from "../models/Booking.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
 
 const router = express.Router({ mergeParams: true });
 
+// ROTA PÚBLICA: Lista as avaliações de uma barbearia
 router.get("/", async (req, res) => {
   try {
     const { barbershopId } = req.params;
-
-    const reviews = await Review.find({ barbershop: barbershopId })
-      .sort({ createdAt: -1 })
-      // --- A MÁGICA ACONTECE AQUI ---
-      // Pede para o Mongoose "popular" o campo 'customer',
-      // mas trazendo apenas os campos 'name' e 'imageUrl'.
-      .populate("customer", "name imageUrl");
+    const reviews = await Review.find({ barbershop: barbershopId }).sort({ createdAt: -1 }).populate("customer", "name imageUrl"); // Busca os dados do cliente
 
     res.status(200).json(reviews);
   } catch (error) {
@@ -24,12 +18,12 @@ router.get("/", async (req, res) => {
   }
 });
 
-// ROTA PROTEGIDA: POST /api/barbershops/:barbershopId/reviews
+// ROTA PROTEGIDA: Cliente logado cria uma nova avaliação
 router.post("/", protectCustomer, async (req, res) => {
   try {
     const { barbershopId } = req.params;
     const { rating, comment } = req.body;
-    const customerId = req.customer.id;
+    const customerId = req.customer.id; // Vindo do middleware de autenticação
 
     if (!rating || rating < 1 || rating > 5) {
       return res.status(400).json({ error: "A nota da avaliação (de 1 a 5) é obrigatória." });

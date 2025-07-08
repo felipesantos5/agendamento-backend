@@ -12,11 +12,9 @@ const reviewSchema = new mongoose.Schema(
       type: String,
       trim: true,
     },
-    // --- A FORMA CORRETA ---
-    // Apenas uma referência para o documento do cliente
     customer: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Customer", // Referencia o modelo 'Customer'
+      ref: "Customer",
       required: true,
     },
     barbershop: {

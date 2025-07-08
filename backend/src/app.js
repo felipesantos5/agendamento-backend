@@ -53,17 +53,13 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: function (origin, callback) {
-    // A 'origin' é a URL que está fazendo a requisição para seu backend.
-
-    // Permite requisições sem 'origin' (ex: Postman, apps mobile) E
-    // verifica se a 'origin' da requisição está na sua lista de permitidas.
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true); // Permite a requisição
+      callback(null, true);
     } else {
-      callback(new Error("Não permitido pela política de CORS")); // Bloqueia a requisição
+      callback(new Error("Não permitido pela política de CORS"));
     }
   },
-  credentials: true, // Importante para permitir o envio de cookies ou tokens de autorização
+  credentials: true,
 };
 
 // 2. Use as novas opções no middleware cors
