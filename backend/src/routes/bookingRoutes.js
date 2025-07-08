@@ -2,6 +2,8 @@ import express from "express";
 import Booking from "../models/Booking.js";
 import Barbershop from "../models/Barbershop.js";
 import Customer from "../models/Customer.js";
+import Barber from "../models/Barber.js";
+import Service from "../models/Service.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
@@ -10,6 +12,8 @@ import { formatPhoneNumber } from "../utils/phoneFormater.js";
 import { checkHolidayAvailability } from "../middleware/holidayCheck.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
+import { startOfMonth, endOfMonth, getDaysInMonth, format, isSameDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 const router = express.Router({ mergeParams: true });
 
@@ -211,6 +215,72 @@ router.put(
     }
   }
 );
+
+router.get("/:barberId/monthly-availability", async (req, res) => {
+  try {
+    const { barberId } = req.params;
+    const { year, month, serviceId } = req.query;
+
+    if (!year || !month || !serviceId) {
+      return res.status(400).json({ error: "Ano, mês e serviço são obrigatórios." });
+    }
+
+    const startDate = startOfMonth(new Date(year, month - 1));
+    const endDate = endOfMonth(new Date(year, month - 1));
+    const daysInMonth = getDaysInMonth(startDate);
+
+    // 1. Pega os dados essenciais em uma única consulta
+    const [barber, service, bookingsForMonth] = await Promise.all([
+      Barber.findById(barberId).lean(),
+      Service.findById(serviceId).lean(),
+      Booking.find({
+        barber: barberId,
+        time: { $gte: startDate, $lt: endDate },
+        status: { $nin: ["canceled"] },
+      }).lean(),
+    ]);
+
+    if (!barber || !service) {
+      return res.status(404).json({ error: "Barbeiro ou serviço não encontrado." });
+    }
+
+    const unavailableDays = [];
+
+    // 2. Itera por cada dia do mês para verificar a disponibilidade
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDate = new Date(year, month - 1, day);
+      const dayOfWeekName = format(currentDate, "EEEE", { locale: ptBR });
+
+      const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
+
+      // Se não é um dia de trabalho, o dia está indisponível
+      if (!workHours) {
+        unavailableDays.push(format(currentDate, "yyyy-MM-dd"));
+        continue; // Pula para o próximo dia
+      }
+
+      // Calcula o total de slots possíveis no dia
+      const [startH, startM] = workHours.start.split(":").map(Number);
+      const [endH, endM] = workHours.end.split(":").map(Number);
+      const totalWorkMinutes = endH * 60 + endM - (startH * 60 + startM);
+      const possibleSlots = Math.floor(totalWorkMinutes / service.duration);
+
+      // Calcula quantos slots já foram consumidos pelos agendamentos existentes
+      const bookingsOnThisDay = bookingsForMonth.filter((b) => isSameDay(new Date(b.time), currentDate));
+      const slotsTaken = bookingsOnThisDay.length; // Simplificação: 1 booking = 1 slot (refinar se necessário)
+
+      // Se os slots ocupados forem maiores ou iguais aos possíveis, o dia está indisponível
+      if (slotsTaken >= possibleSlots) {
+        unavailableDays.push(format(currentDate, "yyyy-MM-dd"));
+      }
+    }
+
+    res.status(200).json({ unavailableDays });
+  } catch (error) {
+    console.error("Erro ao calcular disponibilidade mensal:", error);
+    res.status(500).json({ error: "Erro ao processar disponibilidade." });
+  }
+});
 
 // Excluir um Agendamento
 // Rota esperada: DELETE /barbershops/:barbershopId/bookings/:bookingId
