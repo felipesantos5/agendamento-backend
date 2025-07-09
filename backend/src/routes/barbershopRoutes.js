@@ -3,6 +3,7 @@ import Barbershop from "../models/Barbershop.js";
 import { BarbershopSchema as BarbershopValidationSchema, BarbershopUpdateSchema } from "../validations/barbershopValidation.js"; // Renomeado para evitar conflito com o modelo Mongoose
 import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
+import qrcode from "qrcode";
 
 const router = express.Router();
 
@@ -97,6 +98,40 @@ router.get("/:barbershopId/location", async (req, res) => {
   } catch (error) {
     console.error("Erro ao redirecionar para localização:", error);
     res.status(500).send("Erro ao processar sua solicitação.");
+  }
+});
+
+router.get("/:barbershopId/qrcode", async (req, res) => {
+  try {
+    const { barbershopId } = req.params;
+
+    // Busca a barbearia para obter o slug
+    const barbershop = await Barbershop.findById(barbershopId).lean();
+
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada." });
+    }
+
+    // Monta a URL que será embutida no QR Code
+    const urlToEncode = `https://www.barbeariagendamento.com.br/${barbershop.slug}`;
+
+    // Gera o QR Code como um buffer de imagem PNG
+    const qrCodeBuffer = await qrcode.toBuffer(urlToEncode, {
+      type: "png",
+      errorCorrectionLevel: "H", // Alta correção de erros, bom para impressão
+      margin: 2,
+      color: {
+        dark: "#000000", // Cor dos pontos
+        light: "#FFFFFF", // Cor do fundo
+      },
+    });
+
+    // Envia a imagem diretamente como resposta da API
+    res.setHeader("Content-Type", "image/png");
+    res.send(qrCodeBuffer);
+  } catch (error) {
+    console.error("Erro ao gerar QR Code:", error);
+    res.status(500).json({ error: "Falha ao gerar QR Code." });
   }
 });
 
