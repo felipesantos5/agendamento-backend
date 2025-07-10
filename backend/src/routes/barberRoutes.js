@@ -5,9 +5,17 @@ import Barber from "../models/Barber.js";
 import AdminUser from "../models/AdminUser.js";
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
-import { barberCreationSchema, barberUpdateSchema } from "../validations/barberValidation.js";
+import {
+  barberCreationSchema,
+  barberUpdateSchema,
+} from "../validations/barberValidation.js";
 import { z } from "zod";
-import { startOfDay, endOfDay, parseISO, format as formatDateFns } from "date-fns";
+import {
+  startOfDay,
+  endOfDay,
+  parseISO,
+  format as formatDateFns,
+} from "date-fns";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { ptBR } from "date-fns/locale";
@@ -44,7 +52,10 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
 
     // ✅ GERAÇÃO DO TOKEN
     const setupToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(setupToken).digest("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(setupToken)
+      .digest("hex");
 
     // O token expira em, por exemplo, 72 horas
     const tokenExpiration = Date.now() + 72 * 60 * 60 * 1000;
@@ -71,7 +82,9 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
     });
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos.", details: e.errors });
+      return res
+        .status(400)
+        .json({ error: "Dados inválidos.", details: e.errors });
     }
     console.error("Erro ao criar funcionário:", e);
     res.status(500).json({ error: e.message || "Erro ao criar funcionário." });
@@ -133,7 +146,9 @@ router.get("/:barberId/free-slots", async (req, res) => {
     const { barberId, barbershopId } = req.params;
 
     if (!date || !serviceId) {
-      return res.status(400).json({ error: "Data e serviço são obrigatórios." });
+      return res
+        .status(400)
+        .json({ error: "Data e serviço são obrigatórios." });
     }
 
     // 1. Estabelece uma data base confiável, considerando o fuso horário
@@ -142,23 +157,36 @@ router.get("/:barberId/free-slots", async (req, res) => {
     const endOfQueryDay = endOfDay(dateInBrazil);
 
     // 2. Busca de dados essenciais em paralelo para melhor performance
-    const [serviceDoc, barber, existingBookings, timeBlocks] = await Promise.all([
-      Service.findById(serviceId).lean(),
-      Barber.findById(barberId).lean(),
-      Booking.find({ barber: barberId, time: { $gte: startOfQueryDay, $lt: endOfQueryDay }, status: { $nin: ["canceled"] } })
-        .populate("service", "duration")
-        .lean(),
-      TimeBlock.find({ barber: barberId, startTime: { $lt: endOfQueryDay }, endTime: { $gt: startOfQueryDay } }),
-    ]);
+    const [serviceDoc, barber, existingBookings, timeBlocks] =
+      await Promise.all([
+        Service.findById(serviceId).lean(),
+        Barber.findById(barberId).lean(),
+        Booking.find({
+          barber: barberId,
+          time: { $gte: startOfQueryDay, $lt: endOfQueryDay },
+          status: { $nin: ["canceled"] },
+        })
+          .populate("service", "duration")
+          .lean(),
+        TimeBlock.find({
+          barber: barberId,
+          startTime: { $lt: endOfQueryDay },
+          endTime: { $gt: startOfQueryDay },
+        }),
+      ]);
 
     if (!serviceDoc || !barber) {
-      return res.status(404).json({ error: "Serviço ou barbeiro não encontrado." });
+      return res
+        .status(404)
+        .json({ error: "Serviço ou barbeiro não encontrado." });
     }
     const serviceDuration = serviceDoc.duration;
 
     // 3. Geração de todos os horários possíveis do dia como objetos Date
     const dayOfWeekName = formatDateFns(dateInBrazil, "EEEE", { locale: ptBR });
-    const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
+    const workHours = barber.availability.find(
+      (a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase()
+    );
     if (!workHours) return res.json({ slots: [] });
 
     const allPotentialSlots = [];
@@ -179,18 +207,26 @@ router.get("/:barberId/free-slots", async (req, res) => {
       ...existingBookings.map((b) => {
         const start = new Date(b.time);
         const duration = b.service?.duration || 60;
-        return { start, end: new Date(start.getTime() + duration * 60000) };
+        return {
+          start,
+          end: new Date(start.getTime() + duration * 60000),
+          type: "booking",
+        };
       }),
       ...timeBlocks.map((b) => ({
         start: new Date(b.startTime),
         end: new Date(b.endTime),
+        type: "timeBlock",
+        title: b.title,
       })),
     ];
 
     // 5. Filtra os horários possíveis, removendo os que têm conflito
     const availableSlots = allPotentialSlots.filter((potentialStart) => {
       // Calcula o horário de término do slot potencial
-      const potentialEnd = new Date(potentialStart.getTime() + serviceDuration * 60000);
+      const potentialEnd = new Date(
+        potentialStart.getTime() + serviceDuration * 60000
+      );
 
       // Um slot não é válido se ele termina depois do fim do expediente
       if (potentialEnd > endWorkTime) {
@@ -198,7 +234,13 @@ router.get("/:barberId/free-slots", async (req, res) => {
       }
 
       // Verifica se o slot potencial se sobrepõe com ALGUM intervalo indisponível
-      const hasConflict = unavailableIntervals.some((unavailable) => potentialStart < unavailable.end && potentialEnd > unavailable.start);
+      const hasConflict = unavailableIntervals.some((unavailable) => {
+        // Um conflito ocorre quando há sobreposição de horários
+        // Verifica se os intervalos se intersectam
+        return (
+          potentialStart < unavailable.end && potentialEnd > unavailable.start
+        );
+      });
 
       // Mantém o slot apenas se NÃO houver conflito
       return !hasConflict;
@@ -225,8 +267,13 @@ router.get("/bookings/barber", protectAdmin, async (req, res) => {
 
     // Se a função for 'barber', adiciona o filtro para pegar apenas os agendamentos dele
     if (role === "barber") {
-      if (!barberProfileId || !mongoose.Types.ObjectId.isValid(barberProfileId)) {
-        return res.status(400).json({ error: "Perfil de barbeiro inválido ou não associado a este usuário." });
+      if (
+        !barberProfileId ||
+        !mongoose.Types.ObjectId.isValid(barberProfileId)
+      ) {
+        return res.status(400).json({
+          error: "Perfil de barbeiro inválido ou não associado a este usuário.",
+        });
       }
       query.barber = new mongoose.Types.ObjectId(barberProfileId);
     }
@@ -252,7 +299,9 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
 
     // 1. Validação de Autorização: O admin está tentando editar um funcionário da sua própria barbearia?
     if (req.adminUser.barbershopId !== barbershopId) {
-      return res.status(403).json({ error: "Não autorizado a modificar funcionários desta barbearia." });
+      return res.status(403).json({
+        error: "Não autorizado a modificar funcionários desta barbearia.",
+      });
     }
 
     if (!mongoose.Types.ObjectId.isValid(barberId)) {
@@ -270,13 +319,18 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
     );
 
     if (!updatedBarber) {
-      return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
+      return res
+        .status(404)
+        .json({ error: "Funcionário não encontrado nesta barbearia." });
     }
 
     res.json(updatedBarber);
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos para atualização do funcionário.", details: e.errors });
+      return res.status(400).json({
+        error: "Dados inválidos para atualização do funcionário.",
+        details: e.errors,
+      });
     }
     console.error("Erro ao atualizar funcionário:", e);
     res.status(500).json({ error: "Erro interno ao atualizar o funcionário." });
@@ -284,44 +338,59 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
 });
 
 // Rota: DELETE /barbershops/:barbershopId/barbers/:barberId
-router.delete("/:barberId", protectAdmin, requireRole("admin"), async (req, res) => {
-  try {
-    const { barbershopId, barberId } = req.params;
+router.delete(
+  "/:barberId",
+  protectAdmin,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { barbershopId, barberId } = req.params;
 
-    // 1. Validação de Autorização
-    if (req.adminUser.barbershopId !== barbershopId) {
-      return res.status(403).json({ error: "Não autorizado a deletar funcionários desta barbearia." });
+      // 1. Validação de Autorização
+      if (req.adminUser.barbershopId !== barbershopId) {
+        return res.status(403).json({
+          error: "Não autorizado a deletar funcionários desta barbearia.",
+        });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(barberId)) {
+        return res.status(400).json({ error: "ID do funcionário inválido." });
+      }
+
+      // Opcional: Verificar se o barbeiro tem agendamentos futuros antes de deletar
+      const futureBookings = await Booking.findOne({
+        barber: barberId,
+        time: { $gte: new Date() },
+      });
+
+      if (futureBookings) {
+        return res.status(400).json({
+          error:
+            "Não é possível deletar. Este funcionário possui agendamentos futuros.",
+        });
+      }
+
+      // 2. Deleção Segura no Banco
+      const deletedBarber = await Barber.findOneAndDelete({
+        _id: barberId,
+        barbershop: barbershopId, // Garante que só deleta o funcionário da barbearia correta
+      });
+
+      if (!deletedBarber) {
+        return res
+          .status(404)
+          .json({ error: "Funcionário não encontrado nesta barbearia." });
+      }
+
+      res.json({
+        message: "Funcionário deletado com sucesso.",
+        barberId: deletedBarber._id,
+      });
+    } catch (e) {
+      console.error("Erro ao deletar funcionário:", e);
+      res.status(500).json({ error: "Erro interno ao deletar o funcionário." });
     }
-
-    if (!mongoose.Types.ObjectId.isValid(barberId)) {
-      return res.status(400).json({ error: "ID do funcionário inválido." });
-    }
-
-    // Opcional: Verificar se o barbeiro tem agendamentos futuros antes de deletar
-    const futureBookings = await Booking.findOne({
-      barber: barberId,
-      time: { $gte: new Date() },
-    });
-
-    if (futureBookings) {
-      return res.status(400).json({ error: "Não é possível deletar. Este funcionário possui agendamentos futuros." });
-    }
-
-    // 2. Deleção Segura no Banco
-    const deletedBarber = await Barber.findOneAndDelete({
-      _id: barberId,
-      barbershop: barbershopId, // Garante que só deleta o funcionário da barbearia correta
-    });
-
-    if (!deletedBarber) {
-      return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
-    }
-
-    res.json({ message: "Funcionário deletado com sucesso.", barberId: deletedBarber._id });
-  } catch (e) {
-    console.error("Erro ao deletar funcionário:", e);
-    res.status(500).json({ error: "Erro interno ao deletar o funcionário." });
   }
-});
+);
 
 export default router;
