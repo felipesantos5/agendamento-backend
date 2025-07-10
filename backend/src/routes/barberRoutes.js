@@ -14,6 +14,8 @@ import { ptBR } from "date-fns/locale";
 import crypto from "crypto";
 import { checkIsHoliday } from "../services/holidayService.js";
 import BlockedDay from "../models/BlockedDay.js";
+import TimeBlock from "../models/TimeBlock.js";
+import { toZonedTime } from "date-fns-tz";
 import "dotenv/config";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
@@ -127,174 +129,90 @@ router.get("/", async (req, res) => {
 // Rota: GET /barbershops/:barbershopId/barbers/:barberId/free-slots
 router.get("/:barberId/free-slots", async (req, res) => {
   try {
-    const { date } = req.query;
-    const serviceId = req.query.serviceId;
-
+    const { date, serviceId } = req.query;
     const { barberId, barbershopId } = req.params;
 
-    const requestedDate = new Date(date);
-    // Adiciona o fuso horário para evitar problemas de "um dia antes"
-    requestedDate.setMinutes(requestedDate.getMinutes() + requestedDate.getTimezoneOffset());
-
-    const holidayCheck = await checkIsHoliday(requestedDate);
-    if (holidayCheck.isHoliday) {
-      return res.json({
-        isHoliday: true,
-        holidayName: holidayCheck.holidayName,
-        slots: [], // Retorna uma lista de horários vazia
-      });
+    if (!date || !serviceId) {
+      return res.status(400).json({ error: "Data e serviço são obrigatórios." });
     }
 
-    const dayIsBlocked = await BlockedDay.findOne({
-      barbershop: barbershopId,
-      date: { $gte: startOfDay(requestedDate), $lte: endOfDay(requestedDate) },
-      // Verifica se o dia está bloqueado para a loja toda (barber: null)
-      // OU para este barbeiro específico ($in: [null, barberId])
-      barber: { $in: [null, barberId] },
-    });
+    // 1. Estabelece uma data base confiável, considerando o fuso horário
+    const dateInBrazil = toZonedTime(new Date(date), BRAZIL_TIMEZONE);
+    const startOfQueryDay = startOfDay(dateInBrazil);
+    const endOfQueryDay = endOfDay(dateInBrazil);
 
-    if (dayIsBlocked) {
-      return res.json({
-        isBlocked: true,
-        reason: dayIsBlocked.reason || "Dia indisponível para agendamento.",
-        slots: [],
-      });
+    // 2. Busca de dados essenciais em paralelo para melhor performance
+    const [serviceDoc, barber, existingBookings, timeBlocks] = await Promise.all([
+      Service.findById(serviceId).lean(),
+      Barber.findById(barberId).lean(),
+      Booking.find({ barber: barberId, time: { $gte: startOfQueryDay, $lt: endOfQueryDay }, status: { $nin: ["canceled"] } })
+        .populate("service", "duration")
+        .lean(),
+      TimeBlock.find({ barber: barberId, startTime: { $lt: endOfQueryDay }, endTime: { $gt: startOfQueryDay } }),
+    ]);
+
+    if (!serviceDoc || !barber) {
+      return res.status(404).json({ error: "Serviço ou barbeiro não encontrado." });
     }
-
-    // Buscar o serviço para obter a duração
-    const serviceDoc = await Service.findById(serviceId).lean();
-    if (!serviceDoc) return res.status(404).json({ error: "Serviço não encontrado." });
     const serviceDuration = serviceDoc.duration;
-    if (isNaN(serviceDuration) || serviceDuration <= 0) return res.status(400).json({ error: "Duração do serviço inválida." });
 
-    const barber = await Barber.findById(barberId).lean();
-    if (!barber || barber.barbershop.toString() !== barbershopId) {
-      /* ... erro ... */
-    }
-
-    // selectedDateInput é "YYYY-MM-DD"
-    // parseISO cria uma data UTC à meia-noite desse dia.
-    // Ex: "2025-06-10" -> 2025-06-10T00:00:00.000Z
-    const dateObjectFromQuery = parseISO(date);
-
-    const tempDateForDayName = new Date(`${date}T12:00:00`);
-    const dayOfWeekName = formatDateFns(tempDateForDayName, "EEEE", { locale: ptBR });
-
+    // 3. Geração de todos os horários possíveis do dia como objetos Date
+    const dayOfWeekName = formatDateFns(dateInBrazil, "EEEE", { locale: ptBR });
     const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
-    if (!workHours) return res.json([]);
+    if (!workHours) return res.json({ slots: [] });
 
-    const allLocalSlots = [];
-    const [startWorkHour, startWorkMinute] = workHours.start.split(":").map(Number);
-    const [endWorkHour, endWorkMinute] = workHours.end.split(":").map(Number);
-    const slotInterval = 15;
+    const allPotentialSlots = [];
+    const [startH, startM] = workHours.start.split(":").map(Number);
+    const [endH, endM] = workHours.end.split(":").map(Number);
+    let currentTime = new Date(dateInBrazil);
+    currentTime.setHours(startH, startM, 0, 0);
+    const endWorkTime = new Date(dateInBrazil);
+    endWorkTime.setHours(endH, endM, 0, 0);
 
-    let currentHour = startWorkHour;
-    let currentMinute = startWorkMinute;
-
-    while (true) {
-      const slotEndHour = currentHour + Math.floor((currentMinute + serviceDuration - 1) / 60); // Hora que o serviço terminaria
-      const slotEndMinute = ((currentMinute + serviceDuration - 1) % 60) + 1; // Minuto que o serviço terminaria
-
-      // Verifica se o fim do serviço ultrapassa o fim do expediente
-      if (slotEndHour > endWorkHour || (slotEndHour === endWorkHour && slotEndMinute > endWorkMinute)) {
-        break;
-      }
-
-      const timeString = `${String(currentHour).padStart(2, "0")}:${String(currentMinute).padStart(2, "0")}`;
-      allLocalSlots.push(timeString);
-
-      currentMinute += slotInterval;
-      while (currentMinute >= 60) {
-        // Use while para caso o intervalo seja > 60
-        currentHour++;
-        currentMinute -= 60;
-      }
-      // Para o loop se a próxima hora de início já ultrapassa o limite
-      if (currentHour > endWorkHour || (currentHour === endWorkHour && currentMinute >= endWorkMinute)) {
-        break;
-      }
+    while (currentTime < endWorkTime) {
+      allPotentialSlots.push(new Date(currentTime));
+      currentTime.setMinutes(currentTime.getMinutes() + 15); // Intervalo para gerar os slots
     }
 
-    // Agendamentos existentes (armazenados em UTC)
-    const existingBookings = await Booking.find({
-      barber: barberId,
-      barbershop: barbershopId,
-      // Usamos dateObjectFromQuery que é meia-noite UTC para startOfDay e endOfDay
-      time: { $gte: startOfDay(dateObjectFromQuery), $lt: endOfDay(dateObjectFromQuery) },
-    })
-      .populate("service", "duration")
-      .lean();
+    // 4. Unifica TODOS os intervalos indisponíveis (agendamentos e bloqueios)
+    const unavailableIntervals = [
+      ...existingBookings.map((b) => {
+        const start = new Date(b.time);
+        const duration = b.service?.duration || 60;
+        return { start, end: new Date(start.getTime() + duration * 60000) };
+      }),
+      ...timeBlocks.map((b) => ({
+        start: new Date(b.startTime),
+        end: new Date(b.endTime),
+      })),
+    ];
 
-    // bookedIntervalsLocal: Array de objetos { start: string HH:mm, end: string HH:mm } no horário local
-    const bookedIntervalsLocal = existingBookings.map((booking) => {
-      // bookedTimeIsUTC é o objeto Date do banco (UTC)
-      const bookedTimeIsUTC = booking.time;
-      // Precisamos converter este UTC para a hora local do Brasil
-      // Usando toLocaleString para obter a hora local e depois extraindo
-      const localBookingStartTimeStr = new Date(bookedTimeIsUTC).toLocaleTimeString("pt-BR", {
-        hour: "2-digit",
-        minute: "2-digit",
-        timeZone: BRAZIL_TIMEZONE,
-      });
+    // 5. Filtra os horários possíveis, removendo os que têm conflito
+    const availableSlots = allPotentialSlots.filter((potentialStart) => {
+      // Calcula o horário de término do slot potencial
+      const potentialEnd = new Date(potentialStart.getTime() + serviceDuration * 60000);
 
-      const bookingDuration = booking.service?.duration || slotInterval;
-
-      const [bookedStartH, bookedStartM] = localBookingStartTimeStr.split(":").map(Number);
-
-      let bookedEndH = bookedStartH;
-      let bookedEndM = bookedStartM + bookingDuration;
-      while (bookedEndM >= 60) {
-        bookedEndH++;
-        bookedEndM -= 60;
+      // Um slot não é válido se ele termina depois do fim do expediente
+      if (potentialEnd > endWorkTime) {
+        return false;
       }
-      // Garantir que a hora não passe de 23 (embora improvável para durações normais)
-      bookedEndH = bookedEndH % 24;
 
-      const localBookingEndTimeStr = `${String(bookedEndH).padStart(2, "0")}:${String(bookedEndM).padStart(2, "0")}`;
+      // Verifica se o slot potencial se sobrepõe com ALGUM intervalo indisponível
+      const hasConflict = unavailableIntervals.some((unavailable) => potentialStart < unavailable.end && potentialEnd > unavailable.start);
 
-      return { start: localBookingStartTimeStr, end: localBookingEndTimeStr };
+      // Mantém o slot apenas se NÃO houver conflito
+      return !hasConflict;
     });
 
-    const slotsWithStatus = [];
+    // 6. Formata a lista final para o formato que o frontend espera
+    const finalSlots = availableSlots.map((date) => ({
+      time: formatDateFns(toZonedTime(date, BRAZIL_TIMEZONE), "HH:mm"),
+      isBooked: false, // Todos aqui já são livres por definição
+    }));
 
-    for (const potentialStartSlot of allLocalSlots) {
-      // "09:00", "09:15", etc. (local)
-      const [startSlotH, startSlotM] = potentialStartSlot.split(":").map(Number);
-
-      let endSlotH = startSlotH;
-      let endSlotM = startSlotM + serviceDuration;
-      while (endSlotM >= 60) {
-        endSlotH++;
-        endSlotM -= 60;
-      }
-      endSlotH = endSlotH % 24;
-      const potentialEndSlot = `${String(endSlotH).padStart(2, "0")}:${String(endSlotM).padStart(2, "0")}`;
-
-      let hasConflict = false;
-      for (const booked of bookedIntervalsLocal) {
-        // Comparação de strings de horário "HH:mm"
-        // Conflito se: (InícioSlot < FimBooked) E (FimSlot > InícioBooked)
-        if (potentialStartSlot < booked.end && potentialEndSlot > booked.start) {
-          hasConflict = true;
-          break;
-        }
-      }
-
-      if (!hasConflict) {
-        slotsWithStatus.push({
-          time: potentialStartSlot,
-          isBooked: false,
-        });
-      }
-    }
-
-    res.json({
-      isHoliday: false,
-      holidayName: null,
-      slots: slotsWithStatus, // Substitua com seus horários reais
-    });
+    res.json({ slots: finalSlots });
   } catch (error) {
-    console.error("Erro ao buscar status dos horários:", error);
+    console.error("Erro ao buscar horários livres:", error);
     res.status(500).json({ error: "Erro interno ao processar a solicitação." });
   }
 });
