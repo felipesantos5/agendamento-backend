@@ -14,8 +14,6 @@ import {
   startOfDay,
   endOfDay,
   parseISO,
-  isPast,
-  areIntervalsOverlapping,
   format as formatDateFns,
 } from "date-fns";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
@@ -25,8 +23,8 @@ import crypto from "crypto";
 import { checkIsHoliday } from "../services/holidayService.js";
 import BlockedDay from "../models/BlockedDay.js";
 import TimeBlock from "../models/TimeBlock.js";
-import { toZonedTime, formatInTimeZone } from "date-fns-tz";
-// import formatInTimeZone from date-fns-tz
+import { toZonedTime } from "date-fns-tz";
+
 import "dotenv/config";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
@@ -145,141 +143,243 @@ router.get("/", async (req, res) => {
 // Rota: GET /barbershops/:barbershopId/barbers/:barberId/free-slots
 router.get("/:barberId/free-slots", async (req, res) => {
   try {
-    const { date, serviceId } = req.query;
-    const { barberId } = req.params;
+    const { date } = req.query;
+    const serviceId = req.query.serviceId;
 
-    if (!date || !serviceId) {
-      return res
-        .status(400)
-        .json({ error: "Data e serviço são obrigatórios." });
-    }
+    const { barberId, barbershopId } = req.params;
 
-    // --- 1. SETUP DE DATAS (À PROVA DE FUSO HORÁRIO) ---
-    // Converte a string de data recebida (ex: "2025-07-16") para um objeto Date
-    // que representa o início do dia no fuso horário do Brasil.
-    const selectedDate = toZonedTime(parseISO(date), BRAZIL_TIMEZONE);
-
-    // --- 2. BUSCA DE DADOS EM PARALELO ---
-    const [serviceDoc, barber, existingBookings, timeBlocks] =
-      await Promise.all([
-        Service.findById(serviceId).lean(),
-        Barber.findById(barberId).lean(),
-        // Busca agendamentos do dia, ignorando os cancelados
-        Booking.find({
-          barber: barberId,
-          status: { $ne: "canceled" },
-          time: {
-            $gte: startOfDay(selectedDate),
-            $lt: endOfDay(selectedDate),
-          },
-        })
-          .populate("service", "duration")
-          .lean(),
-        // Busca bloqueios que se sobrepõem ao dia
-        TimeBlock.find({
-          barber: barberId,
-          startTime: { $lt: endOfDay(selectedDate) },
-          endTime: { $gt: startOfDay(selectedDate) },
-        }).lean(),
-      ]);
-
-    if (!serviceDoc || !barber) {
-      return res
-        .status(404)
-        .json({ error: "Serviço ou barbeiro não encontrado." });
-    }
-    const serviceDuration = serviceDoc.duration;
-
-    // --- 3. DEFINIÇÃO DO HORÁRIO DE TRABALHO ---
-    const dayOfWeekName = formatInTimeZone(
-      selectedDate,
-      BRAZIL_TIMEZONE,
-      "EEEE",
-      { locale: ptBR }
+    const requestedDate = new Date(date);
+    // Adiciona o fuso horário para evitar problemas de "um dia antes"
+    requestedDate.setMinutes(
+      requestedDate.getMinutes() + requestedDate.getTimezoneOffset()
     );
+
+    const holidayCheck = await checkIsHoliday(requestedDate);
+    if (holidayCheck.isHoliday) {
+      return res.json({
+        isHoliday: true,
+        holidayName: holidayCheck.holidayName,
+        slots: [], // Retorna uma lista de horários vazia
+      });
+    }
+
+    const dayIsBlocked = await BlockedDay.findOne({
+      barbershop: barbershopId,
+      date: { $gte: startOfDay(requestedDate), $lte: endOfDay(requestedDate) },
+      // Verifica se o dia está bloqueado para a loja toda (barber: null)
+      // OU para este barbeiro específico ($in: [null, barberId])
+      barber: { $in: [null, barberId] },
+    });
+
+    if (dayIsBlocked) {
+      return res.json({
+        isBlocked: true,
+        reason: dayIsBlocked.reason || "Dia indisponível para agendamento.",
+        slots: [],
+      });
+    }
+
+    // Buscar o serviço para obter a duração
+    const serviceDoc = await Service.findById(serviceId).lean();
+    if (!serviceDoc)
+      return res.status(404).json({ error: "Serviço não encontrado." });
+    const serviceDuration = serviceDoc.duration;
+    if (isNaN(serviceDuration) || serviceDuration <= 0)
+      return res.status(400).json({ error: "Duração do serviço inválida." });
+
+    const barber = await Barber.findById(barberId).lean();
+    if (!barber || barber.barbershop.toString() !== barbershopId) {
+      /* ... erro ... */
+    }
+
+    // selectedDateInput é "YYYY-MM-DD"
+    // parseISO cria uma data UTC à meia-noite desse dia.
+    // Ex: "2025-06-10" -> 2025-06-10T00:00:00.000Z
+    const dateObjectFromQuery = parseISO(date);
+
+    const tempDateForDayName = new Date(`${date}T12:00:00`);
+    const dayOfWeekName = formatDateFns(tempDateForDayName, "EEEE", {
+      locale: ptBR,
+    });
+
     const workHours = barber.availability.find(
       (a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase()
     );
     if (!workHours) return res.json([]);
 
-    const [startH, startM] = workHours.start.split(":").map(Number);
-    const [endH, endM] = workHours.end.split(":").map(Number);
+    const allLocalSlots = [];
+    const [startWorkHour, startWorkMinute] = workHours.start
+      .split(":")
+      .map(Number);
+    const [endWorkHour, endWorkMinute] = workHours.end.split(":").map(Number);
+    const slotInterval = 15;
 
-    // Cria objetos Date que representam o início e o fim do expediente NO FUSO DO BRASIL
-    const dayStart = toZonedTime(
-      new Date(selectedDate).setHours(startH, startM, 0, 0),
-      BRAZIL_TIMEZONE
-    );
-    const dayEnd = toZonedTime(
-      new Date(selectedDate).setHours(endH, endM, 0, 0),
-      BRAZIL_TIMEZONE
-    );
+    let currentHour = startWorkHour;
+    let currentMinute = startWorkMinute;
 
-    // --- 4. MAPEAMENTO DE TODOS OS INTERVALOS INDISPONÍVEIS ---
-    // Une agendamentos e bloqueios em uma única lista de intervalos.
-    // **A correção crucial é aqui**: `toZonedTime` garante que as datas UTC do banco
-    // sejam tratadas como horários de Brasília para a lógica de comparação.
-    const unavailableIntervals = [
-      ...existingBookings.map((b) => ({
-        start: toZonedTime(b.time, BRAZIL_TIMEZONE),
-        end: new Date(
-          toZonedTime(b.time, BRAZIL_TIMEZONE).getTime() +
-            b.service.duration * 60000
-        ),
-      })),
-      ...timeBlocks.map((b) => ({
-        start: toZonedTime(b.startTime, BRAZIL_TIMEZONE),
-        end: toZonedTime(b.endTime, BRAZIL_TIMEZONE),
-      })),
-    ];
+    while (true) {
+      const slotEndHour =
+        currentHour + Math.floor((currentMinute + serviceDuration - 1) / 60); // Hora que o serviço terminaria
+      const slotEndMinute = ((currentMinute + serviceDuration - 1) % 60) + 1; // Minuto que o serviço terminaria
 
-    // --- 5. LÓGICA PARA ENCONTRAR OS HORÁRIOS LIVRES ---
-    const availableSlots = [];
-    let potentialSlotStart = new Date(dayStart);
-    const nowInBrazil = toZonedTime(new Date(), BRAZIL_TIMEZONE);
+      // Verifica se o fim do serviço ultrapassa o fim do expediente
+      if (
+        slotEndHour > endWorkHour ||
+        (slotEndHour === endWorkHour && slotEndMinute > endWorkMinute)
+      ) {
+        break;
+      }
 
-    while (potentialSlotStart < dayEnd) {
-      const potentialSlotEnd = new Date(
-        potentialSlotStart.getTime() + serviceDuration * 60000
+      const timeString = `${String(currentHour).padStart(2, "0")}:${String(
+        currentMinute
+      ).padStart(2, "0")}`;
+      allLocalSlots.push(timeString);
+
+      currentMinute += slotInterval;
+      while (currentMinute >= 60) {
+        // Use while para caso o intervalo seja > 60
+        currentHour++;
+        currentMinute -= 60;
+      }
+      // Para o loop se a próxima hora de início já ultrapassa o limite
+      if (
+        currentHour > endWorkHour ||
+        (currentHour === endWorkHour && currentMinute >= endWorkMinute)
+      ) {
+        break;
+      }
+    }
+
+    // Agendamentos existentes (armazenados em UTC)
+    const existingBookings = await Booking.find({
+      barber: barberId,
+      barbershop: barbershopId,
+      // Usamos dateObjectFromQuery que é meia-noite UTC para startOfDay e endOfDay
+      time: {
+        $gte: startOfDay(dateObjectFromQuery),
+        $lt: endOfDay(dateObjectFromQuery),
+      },
+      status: { $ne: "canceled" },
+    })
+      .populate("service", "duration")
+      .lean();
+
+    const timeBlocks = await TimeBlock.find({
+      barber: barberId,
+      // A busca precisa encontrar blocos que *se sobrepõem* ao dia, não apenas que começam nele
+      startTime: { $lt: endOfDay(dateObjectFromQuery) },
+      endTime: { $gt: startOfDay(dateObjectFromQuery) },
+    }).lean();
+
+    // bookedIntervalsLocal: Array de objetos { start: string HH:mm, end: string HH:mm } no horário local
+    const bookedIntervalsLocal = existingBookings.map((booking) => {
+      // bookedTimeIsUTC é o objeto Date do banco (UTC)
+      const bookedTimeIsUTC = booking.time;
+      const localBookingStartTimeStr = new Date(
+        bookedTimeIsUTC
+      ).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: BRAZIL_TIMEZONE,
+      });
+
+      const bookingDuration = booking.service?.duration || slotInterval;
+
+      const [bookedStartH, bookedStartM] = localBookingStartTimeStr
+        .split(":")
+        .map(Number);
+
+      let bookedEndH = bookedStartH;
+      let bookedEndM = bookedStartM + bookingDuration;
+      while (bookedEndM >= 60) {
+        bookedEndH++;
+        bookedEndM -= 60;
+      }
+      // Garantir que a hora não passe de 23 (embora improvável para durações normais)
+      bookedEndH = bookedEndH % 24;
+
+      const localBookingEndTimeStr = `${String(bookedEndH).padStart(
+        2,
+        "0"
+      )}:${String(bookedEndM).padStart(2, "0")}`;
+
+      return { start: localBookingStartTimeStr, end: localBookingEndTimeStr };
+    });
+
+    timeBlocks.forEach((block) => {
+      // Converte o startTime (UTC) do bloqueio para uma string de hora local "HH:mm"
+      const localBlockStartTimeStr = new Date(
+        block.startTime
+      ).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: BRAZIL_TIMEZONE,
+      });
+
+      // Converte o endTime (UTC) do bloqueio para uma string de hora local "HH:mm"
+      const localBlockEndTimeStr = new Date(block.endTime).toLocaleTimeString(
+        "pt-BR",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: BRAZIL_TIMEZONE,
+        }
       );
 
-      // Regra 1: O horário deve terminar dentro do expediente
-      if (potentialSlotEnd > dayEnd) break;
+      // Adiciona o intervalo do bloqueio à lista de indisponíveis
+      bookedIntervalsLocal.push({
+        start: localBlockStartTimeStr,
+        end: localBlockEndTimeStr,
+      });
+    });
 
-      // Regra 2: O horário não pode ser no passado
-      const isPastTime = isPast(potentialSlotStart);
+    const slotsWithStatus = [];
 
-      if (!isPastTime) {
-        const potentialInterval = {
-          start: potentialSlotStart,
-          end: potentialSlotEnd,
-        };
+    for (const potentialStartSlot of allLocalSlots) {
+      // "09:00", "09:15", etc. (local)
+      const [startSlotH, startSlotM] = potentialStartSlot
+        .split(":")
+        .map(Number);
 
-        // Regra 3: O horário não pode ter conflito com nenhum intervalo indisponível
-        const hasConflict = unavailableIntervals.some((unavailable) =>
-          areIntervalsOverlapping(potentialInterval, unavailable)
-        );
+      let endSlotH = startSlotH;
+      let endSlotM = startSlotM + serviceDuration;
+      while (endSlotM >= 60) {
+        endSlotH++;
+        endSlotM -= 60;
+      }
+      endSlotH = endSlotH % 24;
+      const potentialEndSlot = `${String(endSlotH).padStart(2, "0")}:${String(
+        endSlotM
+      ).padStart(2, "0")}`;
 
-        if (!hasConflict) {
-          // Se passar em todas as regras, adiciona à lista
-          availableSlots.push(potentialSlotStart);
+      let hasConflict = false;
+      for (const booked of bookedIntervalsLocal) {
+        // Comparação de strings de horário "HH:mm"
+        // Conflito se: (InícioSlot < FimBooked) E (FimSlot > InícioBooked)
+        if (
+          potentialStartSlot < booked.end &&
+          potentialEndSlot > booked.start
+        ) {
+          hasConflict = true;
+          break;
         }
       }
 
-      // Avança para o próximo possível horário de início (intervalo de 15 minutos)
-      potentialSlotStart = new Date(potentialSlotStart.getTime() + 15 * 60000);
+      if (!hasConflict) {
+        slotsWithStatus.push({
+          time: potentialStartSlot,
+          isBooked: false,
+        });
+      }
     }
 
-    // --- 6. FORMATAÇÃO FINAL PARA O FRONTEND ---
-    // Formata a lista final de objetos Date para strings "HH:mm" no fuso do Brasil.
-    const finalSlots = availableSlots.map((slotDate) => ({
-      time: formatInTimeZone(slotDate, BRAZIL_TIMEZONE, "HH:mm"),
-      isBooked: false, // Por definição, todos os slots nesta lista estão livres
-    }));
-
-    res.json({ slots: finalSlots });
+    res.json({
+      isHoliday: false,
+      holidayName: null,
+      slots: slotsWithStatus, // Substitua com seus horários reais
+    });
   } catch (error) {
-    console.error("Erro ao buscar horários livres:", error);
+    console.error("Erro ao buscar status dos horários:", error);
     res.status(500).json({ error: "Erro interno ao processar a solicitação." });
   }
 });
