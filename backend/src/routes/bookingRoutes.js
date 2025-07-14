@@ -4,6 +4,7 @@ import Barbershop from "../models/Barbershop.js";
 import Customer from "../models/Customer.js";
 import Barber from "../models/Barber.js";
 import Service from "../models/Service.js";
+import TimeBlock from "../models/TimeBlock.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
@@ -255,15 +256,21 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
     const daysInMonth = getDaysInMonth(startDate);
 
     // 1. Pega os dados essenciais em uma única consulta
-    const [barber, service, bookingsForMonth] = await Promise.all([
-      Barber.findById(barberId).lean(),
-      Service.findById(serviceId).lean(),
-      Booking.find({
-        barber: barberId,
-        time: { $gte: startDate, $lt: endDate },
-        status: { $nin: ["canceled"] },
-      }).lean(),
-    ]);
+    const [barber, service, bookingsForMonth, timeBlocksForMonth] =
+      await Promise.all([
+        Barber.findById(barberId).lean(),
+        Service.findById(serviceId).lean(),
+        Booking.find({
+          barber: barberId,
+          time: { $gte: startDate, $lt: endDate },
+          status: { $nin: ["canceled"] },
+        }).lean(),
+        TimeBlock.find({
+          barber: barberId,
+          startTime: { $lt: endDate },
+          endTime: { $gt: startDate },
+        }).lean(),
+      ]);
 
     if (!barber || !service) {
       return res
@@ -300,8 +307,21 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
       );
       const slotsTaken = bookingsOnThisDay.length; // Simplificação: 1 booking = 1 slot (refinar se necessário)
 
-      // Se os slots ocupados forem maiores ou iguais aos possíveis, o dia está indisponível
-      if (slotsTaken >= possibleSlots) {
+      // Verifica se há time blocks que cobrem todo o dia de trabalho
+      const timeBlocksOnThisDay = timeBlocksForMonth.filter((block) => {
+        const blockStart = new Date(block.startTime);
+        const blockEnd = new Date(block.endTime);
+        const dayStart = new Date(currentDate);
+        dayStart.setHours(startH, startM, 0, 0);
+        const dayEnd = new Date(currentDate);
+        dayEnd.setHours(endH, endM, 0, 0);
+
+        // Verifica se o bloqueio cobre todo o período de trabalho do dia
+        return blockStart <= dayStart && blockEnd >= dayEnd;
+      });
+
+      // Se há um time block que cobre todo o dia OU se os slots ocupados forem maiores ou iguais aos possíveis, o dia está indisponível
+      if (timeBlocksOnThisDay.length > 0 || slotsTaken >= possibleSlots) {
         unavailableDays.push(format(currentDate, "yyyy-MM-dd"));
       }
     }
