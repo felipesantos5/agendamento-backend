@@ -5,9 +5,17 @@ import Barber from "../models/Barber.js";
 import AdminUser from "../models/AdminUser.js";
 import Booking from "../models/Booking.js";
 import Service from "../models/Service.js";
-import { barberCreationSchema, barberUpdateSchema } from "../validations/barberValidation.js";
+import {
+  barberCreationSchema,
+  barberUpdateSchema,
+} from "../validations/barberValidation.js";
 import { z } from "zod";
-import { startOfDay, endOfDay, parseISO, format as formatDateFns } from "date-fns";
+import {
+  startOfDay,
+  endOfDay,
+  parseISO,
+  format as formatDateFns,
+} from "date-fns";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { ptBR } from "date-fns/locale";
@@ -16,6 +24,7 @@ import { checkIsHoliday } from "../services/holidayService.js";
 import BlockedDay from "../models/BlockedDay.js";
 import TimeBlock from "../models/TimeBlock.js";
 import { toZonedTime } from "date-fns-tz";
+
 import "dotenv/config";
 
 const router = express.Router({ mergeParams: true }); // mergeParams é importante para acessar :barbershopId
@@ -44,7 +53,10 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
 
     // ✅ GERAÇÃO DO TOKEN
     const setupToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(setupToken).digest("hex");
+    const hashedToken = crypto
+      .createHash("sha256")
+      .update(setupToken)
+      .digest("hex");
 
     // O token expira em, por exemplo, 72 horas
     const tokenExpiration = Date.now() + 72 * 60 * 60 * 1000;
@@ -71,7 +83,9 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
     });
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos.", details: e.errors });
+      return res
+        .status(400)
+        .json({ error: "Dados inválidos.", details: e.errors });
     }
     console.error("Erro ao criar funcionário:", e);
     res.status(500).json({ error: e.message || "Erro ao criar funcionário." });
@@ -129,90 +143,242 @@ router.get("/", async (req, res) => {
 // Rota: GET /barbershops/:barbershopId/barbers/:barberId/free-slots
 router.get("/:barberId/free-slots", async (req, res) => {
   try {
-    const { date, serviceId } = req.query;
+    const { date } = req.query;
+    const serviceId = req.query.serviceId;
+
     const { barberId, barbershopId } = req.params;
 
-    if (!date || !serviceId) {
-      return res.status(400).json({ error: "Data e serviço são obrigatórios." });
+    const requestedDate = new Date(date);
+    // Adiciona o fuso horário para evitar problemas de "um dia antes"
+    requestedDate.setMinutes(
+      requestedDate.getMinutes() + requestedDate.getTimezoneOffset()
+    );
+
+    const holidayCheck = await checkIsHoliday(requestedDate);
+    if (holidayCheck.isHoliday) {
+      return res.json({
+        isHoliday: true,
+        holidayName: holidayCheck.holidayName,
+        slots: [], // Retorna uma lista de horários vazia
+      });
     }
 
-    // 1. Estabelece uma data base confiável, considerando o fuso horário
-    const dateInBrazil = toZonedTime(new Date(date), BRAZIL_TIMEZONE);
-    const startOfQueryDay = startOfDay(dateInBrazil);
-    const endOfQueryDay = endOfDay(dateInBrazil);
-
-    // 2. Busca de dados essenciais em paralelo para melhor performance
-    const [serviceDoc, barber, existingBookings, timeBlocks] = await Promise.all([
-      Service.findById(serviceId).lean(),
-      Barber.findById(barberId).lean(),
-      Booking.find({ barber: barberId, time: { $gte: startOfQueryDay, $lt: endOfQueryDay }, status: { $nin: ["canceled"] } })
-        .populate("service", "duration")
-        .lean(),
-      TimeBlock.find({ barber: barberId, startTime: { $lt: endOfQueryDay }, endTime: { $gt: startOfQueryDay } }),
-    ]);
-
-    if (!serviceDoc || !barber) {
-      return res.status(404).json({ error: "Serviço ou barbeiro não encontrado." });
-    }
-    const serviceDuration = serviceDoc.duration;
-
-    // 3. Geração de todos os horários possíveis do dia como objetos Date
-    const dayOfWeekName = formatDateFns(dateInBrazil, "EEEE", { locale: ptBR });
-    const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
-    if (!workHours) return res.json({ slots: [] });
-
-    const allPotentialSlots = [];
-    const [startH, startM] = workHours.start.split(":").map(Number);
-    const [endH, endM] = workHours.end.split(":").map(Number);
-    let currentTime = new Date(dateInBrazil);
-    currentTime.setHours(startH, startM, 0, 0);
-    const endWorkTime = new Date(dateInBrazil);
-    endWorkTime.setHours(endH, endM, 0, 0);
-
-    while (currentTime < endWorkTime) {
-      allPotentialSlots.push(new Date(currentTime));
-      currentTime.setMinutes(currentTime.getMinutes() + 15); // Intervalo para gerar os slots
-    }
-
-    // 4. Unifica TODOS os intervalos indisponíveis (agendamentos e bloqueios)
-    const unavailableIntervals = [
-      ...existingBookings.map((b) => {
-        const start = new Date(b.time);
-        const duration = b.service?.duration || 60;
-        return { start, end: new Date(start.getTime() + duration * 60000) };
-      }),
-      ...timeBlocks.map((b) => ({
-        start: new Date(b.startTime),
-        end: new Date(b.endTime),
-      })),
-    ];
-
-    // 5. Filtra os horários possíveis, removendo os que têm conflito
-    const availableSlots = allPotentialSlots.filter((potentialStart) => {
-      // Calcula o horário de término do slot potencial
-      const potentialEnd = new Date(potentialStart.getTime() + serviceDuration * 60000);
-
-      // Um slot não é válido se ele termina depois do fim do expediente
-      if (potentialEnd > endWorkTime) {
-        return false;
-      }
-
-      // Verifica se o slot potencial se sobrepõe com ALGUM intervalo indisponível
-      const hasConflict = unavailableIntervals.some((unavailable) => potentialStart < unavailable.end && potentialEnd > unavailable.start);
-
-      // Mantém o slot apenas se NÃO houver conflito
-      return !hasConflict;
+    const dayIsBlocked = await BlockedDay.findOne({
+      barbershop: barbershopId,
+      date: { $gte: startOfDay(requestedDate), $lte: endOfDay(requestedDate) },
+      // Verifica se o dia está bloqueado para a loja toda (barber: null)
+      // OU para este barbeiro específico ($in: [null, barberId])
+      barber: { $in: [null, barberId] },
     });
 
-    // 6. Formata a lista final para o formato que o frontend espera
-    const finalSlots = availableSlots.map((date) => ({
-      time: formatDateFns(toZonedTime(date, BRAZIL_TIMEZONE), "HH:mm"),
-      isBooked: false, // Todos aqui já são livres por definição
-    }));
+    if (dayIsBlocked) {
+      return res.json({
+        isBlocked: true,
+        reason: dayIsBlocked.reason || "Dia indisponível para agendamento.",
+        slots: [],
+      });
+    }
 
-    res.json({ slots: finalSlots });
+    // Buscar o serviço para obter a duração
+    const serviceDoc = await Service.findById(serviceId).lean();
+    if (!serviceDoc)
+      return res.status(404).json({ error: "Serviço não encontrado." });
+    const serviceDuration = serviceDoc.duration;
+    if (isNaN(serviceDuration) || serviceDuration <= 0)
+      return res.status(400).json({ error: "Duração do serviço inválida." });
+
+    const barber = await Barber.findById(barberId).lean();
+    if (!barber || barber.barbershop.toString() !== barbershopId) {
+      /* ... erro ... */
+    }
+
+    // selectedDateInput é "YYYY-MM-DD"
+    // parseISO cria uma data UTC à meia-noite desse dia.
+    // Ex: "2025-06-10" -> 2025-06-10T00:00:00.000Z
+    const dateObjectFromQuery = parseISO(date);
+
+    const tempDateForDayName = new Date(`${date}T12:00:00`);
+    const dayOfWeekName = formatDateFns(tempDateForDayName, "EEEE", {
+      locale: ptBR,
+    });
+
+    const workHours = barber.availability.find(
+      (a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase()
+    );
+    if (!workHours) return res.json([]);
+
+    const allLocalSlots = [];
+    const [startWorkHour, startWorkMinute] = workHours.start
+      .split(":")
+      .map(Number);
+    const [endWorkHour, endWorkMinute] = workHours.end.split(":").map(Number);
+    const slotInterval = 15;
+
+    let currentHour = startWorkHour;
+    let currentMinute = startWorkMinute;
+
+    while (true) {
+      const slotEndHour =
+        currentHour + Math.floor((currentMinute + serviceDuration - 1) / 60); // Hora que o serviço terminaria
+      const slotEndMinute = ((currentMinute + serviceDuration - 1) % 60) + 1; // Minuto que o serviço terminaria
+
+      // Verifica se o fim do serviço ultrapassa o fim do expediente
+      if (
+        slotEndHour > endWorkHour ||
+        (slotEndHour === endWorkHour && slotEndMinute > endWorkMinute)
+      ) {
+        break;
+      }
+
+      const timeString = `${String(currentHour).padStart(2, "0")}:${String(
+        currentMinute
+      ).padStart(2, "0")}`;
+      allLocalSlots.push(timeString);
+
+      currentMinute += slotInterval;
+      while (currentMinute >= 60) {
+        // Use while para caso o intervalo seja > 60
+        currentHour++;
+        currentMinute -= 60;
+      }
+      // Para o loop se a próxima hora de início já ultrapassa o limite
+      if (
+        currentHour > endWorkHour ||
+        (currentHour === endWorkHour && currentMinute >= endWorkMinute)
+      ) {
+        break;
+      }
+    }
+
+    // Agendamentos existentes (armazenados em UTC)
+    const existingBookings = await Booking.find({
+      barber: barberId,
+      barbershop: barbershopId,
+      // Usamos dateObjectFromQuery que é meia-noite UTC para startOfDay e endOfDay
+      time: {
+        $gte: startOfDay(dateObjectFromQuery),
+        $lt: endOfDay(dateObjectFromQuery),
+      },
+    })
+      .populate("service", "duration")
+      .lean();
+
+    const timeBlocks = await TimeBlock.find({
+      barber: barberId,
+      // A busca precisa encontrar blocos que *se sobrepõem* ao dia, não apenas que começam nele
+      startTime: { $lt: endOfDay(dateObjectFromQuery) },
+      endTime: { $gt: startOfDay(dateObjectFromQuery) },
+    }).lean();
+
+    // bookedIntervalsLocal: Array de objetos { start: string HH:mm, end: string HH:mm } no horário local
+    const bookedIntervalsLocal = existingBookings.map((booking) => {
+      // bookedTimeIsUTC é o objeto Date do banco (UTC)
+      const bookedTimeIsUTC = booking.time;
+      const localBookingStartTimeStr = new Date(
+        bookedTimeIsUTC
+      ).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: BRAZIL_TIMEZONE,
+      });
+
+      const bookingDuration = booking.service?.duration || slotInterval;
+
+      const [bookedStartH, bookedStartM] = localBookingStartTimeStr
+        .split(":")
+        .map(Number);
+
+      let bookedEndH = bookedStartH;
+      let bookedEndM = bookedStartM + bookingDuration;
+      while (bookedEndM >= 60) {
+        bookedEndH++;
+        bookedEndM -= 60;
+      }
+      // Garantir que a hora não passe de 23 (embora improvável para durações normais)
+      bookedEndH = bookedEndH % 24;
+
+      const localBookingEndTimeStr = `${String(bookedEndH).padStart(
+        2,
+        "0"
+      )}:${String(bookedEndM).padStart(2, "0")}`;
+
+      return { start: localBookingStartTimeStr, end: localBookingEndTimeStr };
+    });
+
+    timeBlocks.forEach((block) => {
+      // Converte o startTime (UTC) do bloqueio para uma string de hora local "HH:mm"
+      const localBlockStartTimeStr = new Date(
+        block.startTime
+      ).toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        timeZone: BRAZIL_TIMEZONE,
+      });
+
+      // Converte o endTime (UTC) do bloqueio para uma string de hora local "HH:mm"
+      const localBlockEndTimeStr = new Date(block.endTime).toLocaleTimeString(
+        "pt-BR",
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+          timeZone: BRAZIL_TIMEZONE,
+        }
+      );
+
+      // Adiciona o intervalo do bloqueio à lista de indisponíveis
+      bookedIntervalsLocal.push({
+        start: localBlockStartTimeStr,
+        end: localBlockEndTimeStr,
+      });
+    });
+
+    const slotsWithStatus = [];
+
+    for (const potentialStartSlot of allLocalSlots) {
+      // "09:00", "09:15", etc. (local)
+      const [startSlotH, startSlotM] = potentialStartSlot
+        .split(":")
+        .map(Number);
+
+      let endSlotH = startSlotH;
+      let endSlotM = startSlotM + serviceDuration;
+      while (endSlotM >= 60) {
+        endSlotH++;
+        endSlotM -= 60;
+      }
+      endSlotH = endSlotH % 24;
+      const potentialEndSlot = `${String(endSlotH).padStart(2, "0")}:${String(
+        endSlotM
+      ).padStart(2, "0")}`;
+
+      let hasConflict = false;
+      for (const booked of bookedIntervalsLocal) {
+        // Comparação de strings de horário "HH:mm"
+        // Conflito se: (InícioSlot < FimBooked) E (FimSlot > InícioBooked)
+        if (
+          potentialStartSlot < booked.end &&
+          potentialEndSlot > booked.start
+        ) {
+          hasConflict = true;
+          break;
+        }
+      }
+
+      if (!hasConflict) {
+        slotsWithStatus.push({
+          time: potentialStartSlot,
+          isBooked: false,
+        });
+      }
+    }
+
+    res.json({
+      isHoliday: false,
+      holidayName: null,
+      slots: slotsWithStatus, // Substitua com seus horários reais
+    });
   } catch (error) {
-    console.error("Erro ao buscar horários livres:", error);
+    console.error("Erro ao buscar status dos horários:", error);
     res.status(500).json({ error: "Erro interno ao processar a solicitação." });
   }
 });
@@ -225,8 +391,13 @@ router.get("/bookings/barber", protectAdmin, async (req, res) => {
 
     // Se a função for 'barber', adiciona o filtro para pegar apenas os agendamentos dele
     if (role === "barber") {
-      if (!barberProfileId || !mongoose.Types.ObjectId.isValid(barberProfileId)) {
-        return res.status(400).json({ error: "Perfil de barbeiro inválido ou não associado a este usuário." });
+      if (
+        !barberProfileId ||
+        !mongoose.Types.ObjectId.isValid(barberProfileId)
+      ) {
+        return res.status(400).json({
+          error: "Perfil de barbeiro inválido ou não associado a este usuário.",
+        });
       }
       query.barber = new mongoose.Types.ObjectId(barberProfileId);
     }
@@ -252,7 +423,9 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
 
     // 1. Validação de Autorização: O admin está tentando editar um funcionário da sua própria barbearia?
     if (req.adminUser.barbershopId !== barbershopId) {
-      return res.status(403).json({ error: "Não autorizado a modificar funcionários desta barbearia." });
+      return res.status(403).json({
+        error: "Não autorizado a modificar funcionários desta barbearia.",
+      });
     }
 
     if (!mongoose.Types.ObjectId.isValid(barberId)) {
@@ -270,13 +443,18 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
     );
 
     if (!updatedBarber) {
-      return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
+      return res
+        .status(404)
+        .json({ error: "Funcionário não encontrado nesta barbearia." });
     }
 
     res.json(updatedBarber);
   } catch (e) {
     if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados inválidos para atualização do funcionário.", details: e.errors });
+      return res.status(400).json({
+        error: "Dados inválidos para atualização do funcionário.",
+        details: e.errors,
+      });
     }
     console.error("Erro ao atualizar funcionário:", e);
     res.status(500).json({ error: "Erro interno ao atualizar o funcionário." });
@@ -284,44 +462,59 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
 });
 
 // Rota: DELETE /barbershops/:barbershopId/barbers/:barberId
-router.delete("/:barberId", protectAdmin, requireRole("admin"), async (req, res) => {
-  try {
-    const { barbershopId, barberId } = req.params;
+router.delete(
+  "/:barberId",
+  protectAdmin,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { barbershopId, barberId } = req.params;
 
-    // 1. Validação de Autorização
-    if (req.adminUser.barbershopId !== barbershopId) {
-      return res.status(403).json({ error: "Não autorizado a deletar funcionários desta barbearia." });
+      // 1. Validação de Autorização
+      if (req.adminUser.barbershopId !== barbershopId) {
+        return res.status(403).json({
+          error: "Não autorizado a deletar funcionários desta barbearia.",
+        });
+      }
+
+      if (!mongoose.Types.ObjectId.isValid(barberId)) {
+        return res.status(400).json({ error: "ID do funcionário inválido." });
+      }
+
+      // Opcional: Verificar se o barbeiro tem agendamentos futuros antes de deletar
+      const futureBookings = await Booking.findOne({
+        barber: barberId,
+        time: { $gte: new Date() },
+      });
+
+      if (futureBookings) {
+        return res.status(400).json({
+          error:
+            "Não é possível deletar. Este funcionário possui agendamentos futuros.",
+        });
+      }
+
+      // 2. Deleção Segura no Banco
+      const deletedBarber = await Barber.findOneAndDelete({
+        _id: barberId,
+        barbershop: barbershopId, // Garante que só deleta o funcionário da barbearia correta
+      });
+
+      if (!deletedBarber) {
+        return res
+          .status(404)
+          .json({ error: "Funcionário não encontrado nesta barbearia." });
+      }
+
+      res.json({
+        message: "Funcionário deletado com sucesso.",
+        barberId: deletedBarber._id,
+      });
+    } catch (e) {
+      console.error("Erro ao deletar funcionário:", e);
+      res.status(500).json({ error: "Erro interno ao deletar o funcionário." });
     }
-
-    if (!mongoose.Types.ObjectId.isValid(barberId)) {
-      return res.status(400).json({ error: "ID do funcionário inválido." });
-    }
-
-    // Opcional: Verificar se o barbeiro tem agendamentos futuros antes de deletar
-    const futureBookings = await Booking.findOne({
-      barber: barberId,
-      time: { $gte: new Date() },
-    });
-
-    if (futureBookings) {
-      return res.status(400).json({ error: "Não é possível deletar. Este funcionário possui agendamentos futuros." });
-    }
-
-    // 2. Deleção Segura no Banco
-    const deletedBarber = await Barber.findOneAndDelete({
-      _id: barberId,
-      barbershop: barbershopId, // Garante que só deleta o funcionário da barbearia correta
-    });
-
-    if (!deletedBarber) {
-      return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
-    }
-
-    res.json({ message: "Funcionário deletado com sucesso.", barberId: deletedBarber._id });
-  } catch (e) {
-    console.error("Erro ao deletar funcionário:", e);
-    res.status(500).json({ error: "Erro interno ao deletar o funcionário." });
   }
-});
+);
 
 export default router;

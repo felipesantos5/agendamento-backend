@@ -12,8 +12,15 @@ import { formatPhoneNumber } from "../utils/phoneFormater.js";
 import { checkHolidayAvailability } from "../middleware/holidayCheck.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
-import { startOfMonth, endOfMonth, getDaysInMonth, format, isSameDay } from "date-fns";
+import {
+  startOfMonth,
+  endOfMonth,
+  getDaysInMonth,
+  format,
+  isSameDay,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toZonedTime } from "date-fns-tz";
 
 const router = express.Router({ mergeParams: true });
 
@@ -22,7 +29,7 @@ const router = express.Router({ mergeParams: true });
 router.post("/", checkHolidayAvailability, async (req, res) => {
   try {
     const data = BookingValidationSchema.parse(req.body);
-    const bookingTime = new Date(data.time);
+    const bookingTime = toZonedTime(new Date(data.time), "America/Sao_Paulo");
 
     const customer = await Customer.findOneAndUpdate(
       { phone: data.customer.phone }, // Condição de busca
@@ -71,12 +78,18 @@ router.post("/", checkHolidayAvailability, async (req, res) => {
   } catch (e) {
     console.error("ERRO AO CRIAR AGENDAMENTO:", e);
     if (e instanceof z.ZodError) {
-      return res.status(400).json({ error: "Dados de agendamento inválidos.", details: e.errors });
+      return res
+        .status(400)
+        .json({ error: "Dados de agendamento inválidos.", details: e.errors });
     }
     if (e.name === "CastError") {
-      return res.status(400).json({ error: "ID inválido fornecido para um dos campos." });
+      return res
+        .status(400)
+        .json({ error: "ID inválido fornecido para um dos campos." });
     }
-    res.status(500).json({ error: "Ocorreu um erro interno ao processar sua solicitação." });
+    res
+      .status(500)
+      .json({ error: "Ocorreu um erro interno ao processar sua solicitação." });
   }
 });
 
@@ -88,7 +101,9 @@ router.get("/", async (req, res) => {
     const barbershopId = req.params.barbershopId;
 
     if (!barbershopId || !mongoose.Types.ObjectId.isValid(barbershopId)) {
-      return res.status(400).json({ error: "ID da barbearia inválido ou não fornecido." });
+      return res
+        .status(400)
+        .json({ error: "ID da barbearia inválido ou não fornecido." });
     }
 
     const bookings = await Booking.find({ barbershop: barbershopId })
@@ -122,7 +137,9 @@ router.put(
       });
 
       if (!booking) {
-        return res.status(404).json({ error: "Agendamento não encontrado nesta barbearia." });
+        return res
+          .status(404)
+          .json({ error: "Agendamento não encontrado nesta barbearia." });
       }
 
       const barbershop = await Barbershop.findById(barbershopId);
@@ -131,7 +148,9 @@ router.put(
       const allowedStatuses = ["booked", "completed", "canceled", "confirmed"];
       if (!status || !allowedStatuses.includes(status)) {
         return res.status(400).json({
-          error: `Status inválido. Use um dos seguintes: ${allowedStatuses.join(", ")}`,
+          error: `Status inválido. Use um dos seguintes: ${allowedStatuses.join(
+            ", "
+          )}`,
         });
       }
 
@@ -190,12 +209,16 @@ router.put(
       // Garante que o ID do cliente logado é o mesmo ID do cliente no agendamento.
       // Isso impede que o cliente A cancele o agendamento do cliente B.
       if (booking.customer.toString() !== customerId) {
-        return res.status(403).json({ error: "Você não tem permissão para cancelar este agendamento." });
+        return res.status(403).json({
+          error: "Você não tem permissão para cancelar este agendamento.",
+        });
       }
 
       // 3. Regra de negócio: não permitir cancelamento de agendamentos que já passaram
       if (new Date(booking.time) < new Date()) {
-        return res.status(400).json({ error: "Não é possível cancelar um agendamento que já ocorreu." });
+        return res.status(400).json({
+          error: "Não é possível cancelar um agendamento que já ocorreu.",
+        });
       }
 
       // 4. Se tudo estiver certo, atualiza o status
@@ -222,7 +245,9 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
     const { year, month, serviceId } = req.query;
 
     if (!year || !month || !serviceId) {
-      return res.status(400).json({ error: "Ano, mês e serviço são obrigatórios." });
+      return res
+        .status(400)
+        .json({ error: "Ano, mês e serviço são obrigatórios." });
     }
 
     const startDate = startOfMonth(new Date(year, month - 1));
@@ -241,7 +266,9 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
     ]);
 
     if (!barber || !service) {
-      return res.status(404).json({ error: "Barbeiro ou serviço não encontrado." });
+      return res
+        .status(404)
+        .json({ error: "Barbeiro ou serviço não encontrado." });
     }
 
     const unavailableDays = [];
@@ -251,7 +278,9 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
       const currentDate = new Date(year, month - 1, day);
       const dayOfWeekName = format(currentDate, "EEEE", { locale: ptBR });
 
-      const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
+      const workHours = barber.availability.find(
+        (a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase()
+      );
 
       // Se não é um dia de trabalho, o dia está indisponível
       if (!workHours) {
@@ -266,7 +295,9 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
       const possibleSlots = Math.floor(totalWorkMinutes / service.duration);
 
       // Calcula quantos slots já foram consumidos pelos agendamentos existentes
-      const bookingsOnThisDay = bookingsForMonth.filter((b) => isSameDay(new Date(b.time), currentDate));
+      const bookingsOnThisDay = bookingsForMonth.filter((b) =>
+        isSameDay(new Date(b.time), currentDate)
+      );
       const slotsTaken = bookingsOnThisDay.length; // Simplificação: 1 booking = 1 slot (refinar se necessário)
 
       // Se os slots ocupados forem maiores ou iguais aos possíveis, o dia está indisponível

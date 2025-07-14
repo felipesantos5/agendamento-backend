@@ -12,7 +12,9 @@ router.post("/request-otp", async (req, res) => {
   try {
     const { phone, name } = req.body;
     if (!phone) {
-      return res.status(400).json({ error: "O número de telefone é obrigatório." });
+      return res
+        .status(400)
+        .json({ error: "O número de telefone é obrigatório." });
     }
 
     // Encontra ou cria o cliente
@@ -27,12 +29,15 @@ router.post("/request-otp", async (req, res) => {
     await customer.save();
 
     // Envia o OTP via WhatsApp
-    const message = `Olá! Seu código de acesso para a Barbearia Agendamento é: *${otpToSend}*\n\nEste código é válido por 10 minutos.`;
+    const message = `Olá! Seu código de acesso para a BarbeariAgendamento é: *${otpToSend}*`;
     await sendWhatsAppConfirmation(phone, message);
 
     console.log(`OTP para ${phone}: ${otpToSend}`); // Para teste em desenvolvimento
 
-    res.status(200).json({ success: true, message: "Código de acesso enviado para seu WhatsApp." });
+    res.status(200).json({
+      success: true,
+      message: "Código de acesso enviado para seu WhatsApp.",
+    });
   } catch (error) {
     console.error("Erro ao solicitar OTP:", error);
     res.status(500).json({ error: "Erro interno ao solicitar código." });
@@ -45,7 +50,9 @@ router.post("/verify-otp", async (req, res) => {
   try {
     const { phone, otp } = req.body;
     if (!phone || !otp) {
-      return res.status(400).json({ error: "Telefone e código são obrigatórios." });
+      return res
+        .status(400)
+        .json({ error: "Telefone e código são obrigatórios." });
     }
 
     // Encontra o cliente e verifica se o token não expirou
@@ -55,13 +62,17 @@ router.post("/verify-otp", async (req, res) => {
     });
 
     if (!customer) {
-      return res.status(401).json({ error: "Código inválido ou expirado. Tente novamente." });
+      return res
+        .status(401)
+        .json({ error: "Código inválido ou expirado. Tente novamente." });
     }
 
     // Compara o código enviado com o código hasheado no banco
     const isMatch = await bcrypt.compare(otp, customer.otpCode);
     if (!isMatch) {
-      return res.status(401).json({ error: "Código inválido ou expirado. Tente novamente." });
+      return res
+        .status(401)
+        .json({ error: "Código inválido ou expirado. Tente novamente." });
     }
 
     // Limpa o OTP do banco para que não possa ser usado novamente
