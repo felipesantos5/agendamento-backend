@@ -259,6 +259,7 @@ router.get("/:barberId/free-slots", async (req, res) => {
         $gte: startOfDay(dateObjectFromQuery),
         $lt: endOfDay(dateObjectFromQuery),
       },
+      status: { $ne: "canceled" },
     })
       .populate("service", "duration")
       .lean();
