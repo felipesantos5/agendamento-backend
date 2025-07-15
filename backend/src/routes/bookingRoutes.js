@@ -30,7 +30,7 @@ const router = express.Router({ mergeParams: true });
 router.post("/", checkHolidayAvailability, async (req, res) => {
   try {
     const data = BookingValidationSchema.parse(req.body);
-    const bookingTime = toZonedTime(new Date(data.time), "America/Sao_Paulo");
+    const bookingTime = new Date(data.time);
 
     const customer = await Customer.findOneAndUpdate(
       { phone: data.customer.phone }, // Condição de busca
@@ -62,7 +62,7 @@ router.post("/", checkHolidayAvailability, async (req, res) => {
 
     if (createdBooking) {
       const barbershop = await Barbershop.findById(req.params.barbershopId);
-      const formattedTime = formatBookingTime(new Date(bookingTime));
+      const formattedTime = formatBookingTime(bookingTime, true);
 
       const cleanPhoneNumber = barbershop.contact.replace(/\D/g, "");
 
