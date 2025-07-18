@@ -135,7 +135,7 @@ router.put(
       const booking = await Booking.findOne({
         _id: bookingId,
         barbershop: barbershopId,
-      });
+      }).populate("customer", "name phone");
 
       if (!booking) {
         return res
@@ -161,6 +161,8 @@ router.put(
         day: "2-digit",
         month: "2-digit",
       }).format(bookingDate);
+
+      console.log(`booking`, booking);
 
       if (status === "canceled") {
         const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate}.`;
