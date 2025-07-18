@@ -13,13 +13,13 @@ router.post("/", async (req, res) => {
     const { title, startTime, endTime, barberId } = req.body;
 
     if (!title || !startTime || !endTime || !barberId) {
-      return res.status(400).json({ error: "Todos os campos são obrigatórios." });
+      return res
+        .status(400)
+        .json({ error: "Todos os campos são obrigatórios." });
     }
 
     const startBlock = new Date(startTime);
     const endBlock = new Date(endTime);
-
-    console.log("end time", endTime);
 
     const conflictingBookings = await Booking.find({
       barber: barberId,
@@ -28,13 +28,24 @@ router.post("/", async (req, res) => {
     }).populate("service", "duration");
 
     for (const booking of conflictingBookings) {
-      const bookingEndTime = new Date(new Date(booking.time).getTime() + (booking.service.duration || 60) * 60000);
+      const bookingEndTime = new Date(
+        new Date(booking.time).getTime() +
+          (booking.service.duration || 60) * 60000
+      );
       if (bookingEndTime > startBlock) {
-        return res.status(409).json({ error: `Conflito: já existe um agendamento neste período.` });
+        return res
+          .status(409)
+          .json({ error: `Conflito: já existe um agendamento neste período.` });
       }
     }
 
-    const newBlock = await TimeBlock.create({ title, startTime: startBlock, endTime: endBlock, barber: barberId, barbershop: barbershopId });
+    const newBlock = await TimeBlock.create({
+      title,
+      startTime: startBlock,
+      endTime: endBlock,
+      barber: barberId,
+      barbershop: barbershopId,
+    });
     res.status(201).json(newBlock);
   } catch (error) {
     console.error("Erro ao criar bloqueio:", error);

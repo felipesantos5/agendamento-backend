@@ -162,8 +162,6 @@ router.put(
         month: "2-digit",
       }).format(bookingDate);
 
-      console.log(`booking`, booking);
-
       if (status === "canceled") {
         const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate}.`;
 
