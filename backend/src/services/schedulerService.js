@@ -59,7 +59,7 @@ const sendDailyReminders = async () => {
         "HH:mm"
       );
 
-      const message = `Bom dia, ${booking.customer.name}! Lembrete do seu agendamento hoje na ${booking.barbershop.name} às ${appointmentTime} com ${booking.barber.name} ✅\n\n... (resto da sua mensagem) ...`;
+      const message = `Bom dia, ${booking.customer.name}! Lembrete do seu agendamento hoje na ${booking.barbershop.name} às ${appointmentTime} com ${booking.barber.name} ✅\n\nPara mais informações, entre em contato com a barbearia: ${barberShopContact} 📱\nEndereço: ${barberShopAdress}💈`;
 
       await sendWhatsAppConfirmation(customerPhone, message);
       console.log(
