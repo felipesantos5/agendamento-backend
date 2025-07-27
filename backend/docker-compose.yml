@@ -1,4 +1,4 @@
-version: "3.9"
+version: "3.8"
 
 services:
   backend:
@@ -15,7 +15,7 @@ services:
       - app_network
 
   evolution-api:
-    image: atendai/evolution-api:v2.2.3 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
+    image: atendai/evolution-api:v2.1.1 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
     container_name: evolution_api
     restart: unless-stopped
     ports:
