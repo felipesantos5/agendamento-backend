@@ -6,12 +6,14 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
   // É ALTAMENTE RECOMENDADO usar variáveis de ambiente para não expor suas chaves!
   const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL; // Ex: 'http://localhost:8080'
   const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY; // Sua chave da API
-  const INSTANCE_NAME = "barbeariAgendamentoMensagens";
+  const INSTANCE_NAME = "teste";
   // --------------------
 
   // Verifica se as configurações essenciais foram definidas
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-    console.error("ERRO DE CONFIGURAÇÃO: As variáveis de ambiente EVOLUTION_API_URL e EVOLUTION_API_KEY são necessárias.");
+    console.error(
+      "ERRO DE CONFIGURAÇÃO: As variáveis de ambiente EVOLUTION_API_URL e EVOLUTION_API_KEY são necessárias."
+    );
     return; // Interrompe a execução se a API não estiver configurada
   }
 
@@ -33,15 +35,24 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
   };
 
   try {
-    console.log(`Enviando confirmação via WhatsApp para o número: ${customerPhone}`);
+    console.log(
+      `Enviando confirmação via WhatsApp para o número: ${customerPhone}`
+    );
     const response = await axios.post(url, payload, { headers });
-    console.log("Mensagem de confirmação enviada com sucesso! ID:", response.data.key.id);
+    console.log(
+      "Mensagem de confirmação enviada com sucesso! ID:",
+      response.data.key.id
+    );
   } catch (error) {
     // Apenas registra o erro no console, mas não quebra a requisição principal do agendamento
     console.error("FALHA AO ENVIAR MENSAGEM WHATSAPP:");
     if (error.response) {
       // O erro veio da API (ex: número inválido, API Key errada)
-      console.error("Detalhes do Erro:", error.response.data, error.response.message);
+      console.error(
+        "Detalhes do Erro:",
+        error.response.data,
+        error.response.message
+      );
     } else {
       // O erro foi na conexão (ex: API offline, URL errada)
       console.error("Erro de Conexão:", error.message);
