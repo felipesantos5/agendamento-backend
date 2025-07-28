@@ -15,38 +15,37 @@ services:
       - app_network
 
   evolution-api:
-    image: atendai/evolution-api:v2.1.1 # Ou a v2.x.x estável mais recente, ex: v2.2.3 [4]
+    image: atendai/evolution-api:latest
     container_name: evolution_api
     restart: unless-stopped
     ports:
-      - "8088:8080" # Porta do host:porta do contêiner. Ajuste a porta do host (primeiro número) se 8080 estiver em uso.
+      - "8088:8080"
     env_file:
-      - .env # Carrega variáveis de ambiente específicas da Evolution API
+      - .en
     volumes:
-      - evolution_instancesv2:/evolution/instances # Volume nomeado para persistência dos dados das instâncias
+      - evolution_instancesv2:/evolution/instances
     depends_on:
       - postgresql-evo
       - redis
     networks:
       - app_network
     environment:
-      - CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143
+      # - CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_REDIS_ENABLED=true
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
 
   postgresql-evo:
-    image: postgres:14-alpine # Exemplo com versão específica e alpine para PostgreSQL
+    image: postgres:14-alpine
     container_name: evolution_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER_EVO} # Carregado do.env
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_EVO} # Carregado do.env
-      POSTGRES_DB: ${POSTGRES_DB_EVO} # Carregado do.env
+      POSTGRES_USER: ${POSTGRES_USER_EVO}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_EVO}
+      POSTGRES_DB: ${POSTGRES_DB_EVO}
     volumes:
-      - postgres_evo_data:/var/lib/postgresql/data # Volume nomeado para persistência dos dados do PostgreSQL
-    # ports: # Descomente apenas se precisar de acesso direto do host ao PostgreSQL da Evolution API
-    # - "5433:5432" # Exporia a porta 5432 do contêiner na porta 5433 do host
+      - postgres_evo_data:/var/lib/postgresql/data
     networks:
       - app_network
 
@@ -54,7 +53,16 @@ services:
     image: redis:latest
     container_name: redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--port", "6379"]
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--port",
+        "6379",
+        "--requirepass",
+        "${REDIS_PASSWORD}",
+      ]
     volumes:
       - redis_data:/data
     networks:
