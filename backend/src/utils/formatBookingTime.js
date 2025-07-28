@@ -5,20 +5,30 @@
  * @returns {string} A data e hora formatadas.
  */
 export function formatBookingTime(dateObject) {
-  // Opções para formatar a data e hora
-  const options = {
-    weekday: "long", // "terça-feira"
-    month: "long", // "junho"
-    day: "numeric", // "17"
-    hour: "2-digit", // "14"
-    minute: "2-digit", // "30"
-    hour12: false, // Formato 24h
-    timeZone: "America/Sao_Paulo", // ESSENCIAL para garantir o fuso horário correto!
+  // Opções para formatar a data
+  const dateOptions = {
+    weekday: "long", // "segunda-feira"
+    month: "long", // "julho"
+    day: "numeric", // "28"
+    timeZone: "America/Sao_Paulo",
   };
 
-  // Cria a string inicial, ex: "terça-feira, 17 de junho 14:30"
-  const formattedString = new Intl.DateTimeFormat("pt-BR", options).format(dateObject);
+  // Opções para formatar a hora
+  const timeOptions = {
+    hour: "2-digit", // "19"
+    minute: "2-digit", // "30"
+    hour12: false,
+    timeZone: "America/Sao_Paulo",
+  };
 
-  // Adiciona ", às" antes do horário
-  return formattedString.replace(/(\d{2}:\d{2})/, ", às $1");
+  // Formata a data e a hora separadamente
+  const formattedDate = new Intl.DateTimeFormat("pt-BR", dateOptions).format(
+    dateObject
+  );
+  const formattedTime = new Intl.DateTimeFormat("pt-BR", timeOptions).format(
+    dateObject
+  );
+
+  // Combina as strings no formato desejado
+  return `${formattedDate}, às ${formattedTime}`;
 }
