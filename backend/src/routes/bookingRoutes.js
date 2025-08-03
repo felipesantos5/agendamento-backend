@@ -22,77 +22,88 @@ import {
 } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
+import { appointmentLimiter } from "../middleware/rateLimiting.js";
 
 const router = express.Router({ mergeParams: true });
 
 // Criar Agendamento em uma Barbearia
 // Rota esperada: POST /barbershops/:barbershopId/bookings
-router.post("/", checkHolidayAvailability, async (req, res) => {
-  try {
-    const data = BookingValidationSchema.parse(req.body);
-    const bookingTime = new Date(data.time);
+router.post(
+  "/",
+  checkHolidayAvailability,
+  appointmentLimiter,
+  async (req, res) => {
+    try {
+      const data = BookingValidationSchema.parse(req.body);
+      const bookingTime = new Date(data.time);
 
-    const customer = await Customer.findOneAndUpdate(
-      { phone: data.customer.phone }, // Condição de busca
-      { $set: { name: data.customer.name, phone: data.customer.phone } }, // Dados para inserir/atualizar
-      { new: true, upsert: true } // Opções: new->retorna o doc atualizado, upsert->cria se não existir
-    );
+      const customer = await Customer.findOneAndUpdate(
+        { phone: data.customer.phone }, // Condição de busca
+        { $set: { name: data.customer.name, phone: data.customer.phone } }, // Dados para inserir/atualizar
+        { new: true, upsert: true } // Opções: new->retorna o doc atualizado, upsert->cria se não existir
+      );
 
-    const conflict = await Booking.findOne({
-      barber: data.barber,
-      time: bookingTime,
-      status: { $nin: ["canceled"] },
-    });
-
-    if (conflict) {
-      return res.status(409).json({
-        error: "Este horário já foi preenchido. Por favor, escolha outro.",
+      const conflict = await Booking.findOne({
+        barber: data.barber,
+        time: bookingTime,
+        status: { $nin: ["canceled"] },
       });
+
+      if (conflict) {
+        return res.status(409).json({
+          error: "Este horário já foi preenchido. Por favor, escolha outro.",
+        });
+      }
+
+      const createdBooking = await Booking.create({
+        ...data,
+        customer: customer._id,
+        barbershop: req.params.barbershopId,
+        time: bookingTime,
+      });
+
+      customer.bookings.push(createdBooking._id);
+      await customer.save();
+
+      if (createdBooking) {
+        const barbershop = await Barbershop.findById(req.params.barbershopId);
+        const formattedTime = formatBookingTime(bookingTime, true);
+
+        const cleanPhoneNumber = barbershop.contact.replace(/\D/g, "");
+
+        const whatsappLink = `https://wa.me/55${cleanPhoneNumber}`;
+
+        const locationLink = `https://barbeariagendamento.com.br/localizacao/${barbershop._id}`;
+
+        const message = `Olá, ${customer.name}! Seu agendamento na ${barbershop.name} foi confirmado com sucesso para ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia:\n${whatsappLink}\n\n📍 Ver no mapa:\n${locationLink}\n\nNosso time te aguarda! 💈`;
+
+        sendWhatsAppConfirmation(customer.phone, message);
+      }
+
+      res.status(201).json(createdBooking);
+    } catch (e) {
+      console.error("ERRO AO CRIAR AGENDAMENTO:", e);
+      if (e instanceof z.ZodError) {
+        return res
+          .status(400)
+          .json({
+            error: "Dados de agendamento inválidos.",
+            details: e.errors,
+          });
+      }
+      if (e.name === "CastError") {
+        return res
+          .status(400)
+          .json({ error: "ID inválido fornecido para um dos campos." });
+      }
+      res
+        .status(500)
+        .json({
+          error: "Ocorreu um erro interno ao processar sua solicitação.",
+        });
     }
-
-    const createdBooking = await Booking.create({
-      ...data,
-      customer: customer._id,
-      barbershop: req.params.barbershopId,
-      time: bookingTime,
-    });
-
-    customer.bookings.push(createdBooking._id);
-    await customer.save();
-
-    if (createdBooking) {
-      const barbershop = await Barbershop.findById(req.params.barbershopId);
-      const formattedTime = formatBookingTime(bookingTime, true);
-
-      const cleanPhoneNumber = barbershop.contact.replace(/\D/g, "");
-
-      const whatsappLink = `https://wa.me/55${cleanPhoneNumber}`;
-
-      const locationLink = `https://barbeariagendamento.com.br/localizacao/${barbershop._id}`;
-
-      const message = `Olá, ${customer.name}! Seu agendamento na ${barbershop.name} foi confirmado com sucesso para ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia:\n${whatsappLink}\n\n📍 Ver no mapa:\n${locationLink}\n\nNosso time te aguarda! 💈`;
-
-      sendWhatsAppConfirmation(customer.phone, message);
-    }
-
-    res.status(201).json(createdBooking);
-  } catch (e) {
-    console.error("ERRO AO CRIAR AGENDAMENTO:", e);
-    if (e instanceof z.ZodError) {
-      return res
-        .status(400)
-        .json({ error: "Dados de agendamento inválidos.", details: e.errors });
-    }
-    if (e.name === "CastError") {
-      return res
-        .status(400)
-        .json({ error: "ID inválido fornecido para um dos campos." });
-    }
-    res
-      .status(500)
-      .json({ error: "Ocorreu um erro interno ao processar sua solicitação." });
   }
-});
+);
 
 // Listar Agendamentos de uma Barbearia
 // Rota esperada: GET /barbershops/:barbershopId/bookings
