@@ -23,6 +23,8 @@
     "date-holidays": "^3.24.3",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.0.1",
+    "express-slow-down": "^2.1.0",
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.14.1",
     "multer": "^2.0.0",

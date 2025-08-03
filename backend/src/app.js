@@ -21,6 +21,7 @@ import reviewRoutes from "./routes/reviewRoutes.js";
 import healthcheckRoutes from "./routes/healtcheck.js";
 import planRoutes from "./routes/planRoutes.js";
 import timeBlockRoutes from "./routes/admin/timeBlockRoutes.js";
+import customerAdminRoutes from "./routes/admin/customerRoutes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -86,7 +87,11 @@ app.use("/barbershops/:barbershopId/services", serviceRoutes);
 app.use("/barbershops/:barbershopId/bookings", bookingRoutes); // bookingRoutes agora contém a sub-rota para free-slots
 app.use("/api/upload", protectAdmin, uploadRoutes);
 app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
-app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
+app.use(
+  "/barbershops/:barbershopId/commissions",
+  protectAdmin,
+  commissionRoutes
+);
 app.use("/api/barbershops/:barbershopId/blocked-days", blockedDayRoutes);
 app.use("/api/barbershops/:barbershopId/reviews", reviewRoutes);
 app.use("/api/barbershops/:barbershopId/plans", planRoutes);
@@ -96,6 +101,7 @@ app.use("/api/auth/customer", customerRoutes);
 app.use("/api/auth/customer", authCustomerRoutes);
 
 app.use("/api/auth/admin", authAdminRoutes);
+app.use("/api/barbershops/:barbershopId/admin/customers", customerAdminRoutes);
 
 // admin
 

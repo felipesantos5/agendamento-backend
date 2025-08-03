@@ -29,6 +29,12 @@ const customerSchema = new mongoose.Schema(
     otpExpires: {
       type: Date,
     },
+    subscriptions: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Subscription",
+      },
+    ],
   },
   {
     timestamps: true, // Adiciona campos createdAt e updatedAt automaticamente
