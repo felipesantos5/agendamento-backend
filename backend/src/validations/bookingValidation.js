@@ -3,12 +3,10 @@ import { z } from "zod";
 import { ZodObjectId } from "./utils.js";
 
 export const bookingSchema = z.object({
-  // barbershop ID virá da URL
-  barber: ZodObjectId, // ID do Barbeiro
-  service: ZodObjectId, // ID do Serviço
+  barber: ZodObjectId,
+  service: ZodObjectId,
   customer: z.object({
     name: z.string().min(2, "Nome do cliente é obrigatório"),
-    // Ajuste para 'whatsapp' se for o caso, e adicione validação de formato de telefone
     phone: z
       .string()
       .regex(
@@ -16,5 +14,5 @@ export const bookingSchema = z.object({
         "Número de telefone inválido (apenas dígitos, 10 ou 11)"
       ),
   }),
-  time: z.string().datetime({ message: "Formato de data e hora inválido" }), // ISO String
+  time: z.string().datetime({ message: "Formato de data e hora inválido" }),
 });

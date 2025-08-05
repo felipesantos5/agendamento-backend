@@ -152,4 +152,25 @@ router.post("/:customerId/subscribe", async (req, res) => {
   }
 });
 
+router.get("/:customerId/bookings", async (req, res) => {
+  try {
+    const { barbershopId, customerId } = req.params;
+
+    // Buscar agendamentos do cliente nesta barbearia
+    const bookings = await Booking.find({
+      customer: customerId,
+      barbershop: barbershopId,
+    })
+      .sort({ date: -1, time: -1 }) // Ordena do mais recente para o mais antigo
+      .populate("service", "name price duration")
+      .populate("barber", "name")
+      .populate("barbershop", "name");
+
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error("Erro ao buscar agendamentos do cliente:", error);
+    res.status(500).json({ error: "Erro ao buscar agendamentos do cliente." });
+  }
+});
+
 export default router;

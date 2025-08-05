@@ -38,9 +38,14 @@ router.post(
       const bookingTime = new Date(data.time);
 
       const customer = await Customer.findOneAndUpdate(
-        { phone: data.customer.phone }, // Condição de busca
-        { $set: { name: data.customer.name, phone: data.customer.phone } }, // Dados para inserir/atualizar
-        { new: true, upsert: true } // Opções: new->retorna o doc atualizado, upsert->cria se não existir
+        { phone: data.customer.phone },
+        {
+          $setOnInsert: {
+            name: data.customer.name,
+            phone: data.customer.phone,
+          },
+        },
+        { new: true, upsert: true }
       );
 
       const conflict = await Booking.findOne({
@@ -59,7 +64,6 @@ router.post(
         ...data,
         customer: customer._id,
         barbershop: req.params.barbershopId,
-        time: bookingTime,
       });
 
       customer.bookings.push(createdBooking._id);
@@ -84,23 +88,19 @@ router.post(
     } catch (e) {
       console.error("ERRO AO CRIAR AGENDAMENTO:", e);
       if (e instanceof z.ZodError) {
-        return res
-          .status(400)
-          .json({
-            error: "Dados de agendamento inválidos.",
-            details: e.errors,
-          });
+        return res.status(400).json({
+          error: "Dados de agendamento inválidos.",
+          details: e.errors,
+        });
       }
       if (e.name === "CastError") {
         return res
           .status(400)
           .json({ error: "ID inválido fornecido para um dos campos." });
       }
-      res
-        .status(500)
-        .json({
-          error: "Ocorreu um erro interno ao processar sua solicitação.",
-        });
+      res.status(500).json({
+        error: "Ocorreu um erro interno ao processar sua solicitação.",
+      });
     }
   }
 );
