@@ -2,30 +2,25 @@ import "dotenv/config";
 import axios from "axios";
 
 export async function sendWhatsAppConfirmation(customerPhone, message) {
-  // ---- CONFIGURAÇÃO ----
-  // É ALTAMENTE RECOMENDADO usar variáveis de ambiente para não expor suas chaves!
-  const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL; // Ex: 'http://localhost:8080'
-  const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY; // Sua chave da API
+  const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
+  const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
   const INSTANCE_NAME = "teste";
   // --------------------
 
-  // Verifica se as configurações essenciais foram definidas
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
     console.error(
       "ERRO DE CONFIGURAÇÃO: As variáveis de ambiente EVOLUTION_API_URL e EVOLUTION_API_KEY são necessárias."
     );
-    return; // Interrompe a execução se a API não estiver configurada
+    return;
   }
 
-  // Formata a data e cria a mensagem personalizada
-  // const formattedTime = formatBookingTime(new Date(bookingTime));
-  // const message = `Olá, ${customerName}! ✅\n\nSeu agendamento na barbearia foi confirmado com sucesso para o dia ${formattedTime}.\n\nMal podemos esperar para te ver!`;
+  const cleanPhone = customerPhone.replace(/\D/g, "");
 
   const url = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
 
   const payload = {
-    number: `55${customerPhone}`,
-    linkPreview: true,
+    number: `55${cleanPhone}`,
+    linkPreview: false,
     text: message,
   };
 
@@ -36,7 +31,7 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
 
   try {
     console.log(
-      `Enviando confirmação via WhatsApp para o número: ${customerPhone}`
+      `Enviando confirmação via WhatsApp para o número: ${cleanPhone}`
     );
     const response = await axios.post(url, payload, { headers });
     console.log(
@@ -44,17 +39,32 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
       response.data.key.id
     );
   } catch (error) {
-    // Apenas registra o erro no console, mas não quebra a requisição principal do agendamento
     console.error("FALHA AO ENVIAR MENSAGEM WHATSAPP:");
+
+    if (error.response.status === 400) {
+      console.error("🔍 Erro 400 - Verificar:");
+      console.error("- Número do telefone:", `55${cleanPhone}`);
+      console.error("- Tamanho da mensagem:", message.length);
+      console.error("- Instância:", INSTANCE_NAME);
+    }
+
+    if ([400, 401, 403].includes(error.response.status)) {
+      return {
+        success: false,
+        error:
+          errorData?.response?.message || errorData?.error || "Erro na API",
+        status: error.response.status,
+        finalAttempt: attempt,
+      };
+    }
+
     if (error.response) {
-      // O erro veio da API (ex: número inválido, API Key errada)
       console.error(
         "Detalhes do Erro:",
         error.response.data,
         error.response.message
       );
     } else {
-      // O erro foi na conexão (ex: API offline, URL errada)
       console.error("Erro de Conexão:", error.message);
     }
   }
