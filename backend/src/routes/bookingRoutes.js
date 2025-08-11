@@ -20,6 +20,7 @@ import {
   format,
   isSameDay,
 } from "date-fns";
+import { z } from "zod";
 import { ptBR } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { appointmentLimiter } from "../middleware/rateLimiting.js";
