@@ -13,10 +13,14 @@ router.get("/", protectAdmin, async (req, res) => {
     const { barbershopId } = req.params;
     const today = startOfToday();
 
+    // --- CORREÇÃO APLICADA AQUI ---
+    // Adicionamos .populate() para buscar os dados do barbeiro (apenas o nome)
+    // junto com cada dia bloqueado.
     const blockedDays = await BlockedDay.find({
       barbershop: barbershopId,
       date: { $gte: today },
-    });
+    }).populate("barber", "name"); // Popula o campo 'barber' e seleciona apenas o campo 'name'
+
     res.status(200).json(blockedDays);
   } catch (error) {
     res.status(500).json({ error: "Erro ao buscar dias bloqueados." });
@@ -66,7 +70,9 @@ router.delete("/:id", protectAdmin, async (req, res) => {
       return res.status(404).json({ error: "Bloqueio não encontrado." });
     }
 
-    res.status(200).json({ success: true, message: "Dia desbloqueado com sucesso." });
+    res
+      .status(200)
+      .json({ success: true, message: "Dia desbloqueado com sucesso." });
   } catch (error) {
     res.status(500).json({ error: "Erro ao desbloquear o dia." });
   }
