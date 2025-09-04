@@ -7,12 +7,16 @@ const barberBaseSchema = z.object({
     .array(
       z.object({
         day: z.string().min(3, "Dia da semana inválido"),
-        start: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm"),
-        end: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm"),
+        start: z
+          .string()
+          .regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm"),
+        end: z
+          .string()
+          .regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm"),
       })
     )
     .optional(), // Disponibilidade pode ser opcional ao criar/editar
-  commission: z.number().min(0).max(100).optional().default(0),
+  commission: z.number().optional().default(0),
 });
 
 export const barberCreationSchema = barberBaseSchema.extend({
