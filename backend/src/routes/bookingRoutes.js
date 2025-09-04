@@ -38,13 +38,22 @@ router.post(
       const data = BookingValidationSchema.parse(req.body);
       const bookingTime = new Date(data.time);
 
+      if (
+        !data.customer.name ||
+        data.customer.name.trim() === "" ||
+        !data.customer.phone ||
+        data.customer.phone.trim() === ""
+      ) {
+        return res.status(400).json({
+          error: "Nome do cliente é obrigatório.",
+        });
+      }
+
       const customer = await Customer.findOneAndUpdate(
         { phone: data.customer.phone },
         {
-          $setOnInsert: {
-            name: data.customer.name,
-            phone: data.customer.phone,
-          },
+          name: data.customer.name, // Sempre atualiza o nome
+          phone: data.customer.phone,
         },
         { new: true, upsert: true }
       );
