@@ -16,6 +16,43 @@ const barberBaseSchema = z.object({
       })
     )
     .optional(), // Disponibilidade pode ser opcional ao criar/editar
+  break: z
+    .object({
+      enabled: z.boolean().default(false),
+      start: z
+        .string()
+        .regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm")
+        .default("12:00"),
+      end: z
+        .string()
+        .regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm")
+        .default("13:00"),
+      days: z
+        .array(z.string())
+        .default([])
+        .refine(
+          (days) =>
+            days.every((day) =>
+              [
+                "Domingo",
+                "Segunda-feira",
+                "Terça-feira",
+                "Quarta-feira",
+                "Quinta-feira",
+                "Sexta-feira",
+                "Sábado",
+              ].includes(day)
+            ),
+          "Dias da semana inválidos"
+        ),
+    })
+    .optional()
+    .default({
+      enabled: false,
+      start: "12:00",
+      end: "13:00",
+      days: [],
+    }),
   commission: z.number().optional().default(0),
 });
 

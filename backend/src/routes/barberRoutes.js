@@ -47,6 +47,12 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
       name: data.name,
       image: data.image,
       availability: data.availability,
+      break: data.break || {
+        enabled: false,
+        start: "12:00",
+        end: "13:00",
+        days: [],
+      },
       commission: data.commission,
       barbershop: req.params.barbershopId,
     });
@@ -126,6 +132,7 @@ router.get("/", async (req, res) => {
           name: 1,
           image: 1,
           availability: 1,
+          break: 1,
           email: "$loginInfo.email",
           commission: 1,
           // Pega o email de dentro do objeto 'loginInfo' que foi juntado
@@ -332,6 +339,22 @@ router.get("/:barberId/free-slots", async (req, res) => {
         end: localBlockEndTimeStr,
       });
     });
+
+    // ✅ NOVA LÓGICA: Adicionar horário de break se habilitado
+    if (barber.break?.enabled && barber.break.days?.length > 0) {
+      // Verifica se o dia atual está nos dias configurados para break
+      const dayHasBreak = barber.break.days.some(
+        (breakDay) => breakDay.toLowerCase() === dayOfWeekName.toLowerCase()
+      );
+
+      if (dayHasBreak) {
+        // Adiciona o horário de break como um intervalo bloqueado
+        bookedIntervalsLocal.push({
+          start: barber.break.start,
+          end: barber.break.end,
+        });
+      }
+    }
 
     const slotsWithStatus = [];
 
