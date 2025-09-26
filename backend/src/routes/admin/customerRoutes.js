@@ -11,7 +11,7 @@ import { addDays } from "date-fns";
 import mongoose from "mongoose";
 
 const router = express.Router({ mergeParams: true });
-router.use(protectAdmin, requireRole("admin"));
+// router.use(protectAdmin, requireRole("admin", "barber"));
 
 // ROTA PARA LISTAR TODOS OS CLIENTES DA BARBEARIA
 // GET /api/barbershops/:barbershopId/admin/customers
@@ -113,44 +113,48 @@ router.get("/:customerId", async (req, res) => {
 
 // ROTA PARA ATRELAR UM PLANO A UM CLIENTE
 // POST /api/barbershops/:barbershopId/admin/customers/:customerId/subscribe
-router.post("/:customerId/subscribe", async (req, res) => {
-  try {
-    const { barbershopId, customerId } = req.params;
-    const { planId } = req.body;
+router.post(
+  "/:customerId/subscribe",
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { barbershopId, customerId } = req.params;
+      const { planId } = req.body;
 
-    const [customer, plan] = await Promise.all([
-      Customer.findById(customerId),
-      Plan.findById(planId),
-    ]);
+      const [customer, plan] = await Promise.all([
+        Customer.findById(customerId),
+        Plan.findById(planId),
+      ]);
 
-    if (!customer || !plan) {
-      return res
-        .status(404)
-        .json({ error: "Cliente ou plano não encontrado." });
+      if (!customer || !plan) {
+        return res
+          .status(404)
+          .json({ error: "Cliente ou plano não encontrado." });
+      }
+
+      const startDate = new Date();
+      const endDate = addDays(startDate, plan.durationInDays);
+
+      const newSubscription = await Subscription.create({
+        customer: customerId,
+        plan: planId,
+        barbershop: barbershopId,
+        startDate,
+        endDate,
+        status: "active",
+      });
+
+      // Adiciona a referência da nova assinatura ao cliente
+      customer.subscriptions.push(newSubscription._id);
+      await customer.save();
+
+      res.status(201).json(newSubscription);
+    } catch (error) {
+      console.error("Erro ao inscrever cliente no plano:", error);
+      res.status(500).json({ error: "Falha ao atrelar o plano." });
     }
-
-    const startDate = new Date();
-    const endDate = addDays(startDate, plan.durationInDays);
-
-    const newSubscription = await Subscription.create({
-      customer: customerId,
-      plan: planId,
-      barbershop: barbershopId,
-      startDate,
-      endDate,
-      status: "active",
-    });
-
-    // Adiciona a referência da nova assinatura ao cliente
-    customer.subscriptions.push(newSubscription._id);
-    await customer.save();
-
-    res.status(201).json(newSubscription);
-  } catch (error) {
-    console.error("Erro ao inscrever cliente no plano:", error);
-    res.status(500).json({ error: "Falha ao atrelar o plano." });
   }
-});
+);
 
 router.get("/:customerId/bookings", async (req, res) => {
   try {
