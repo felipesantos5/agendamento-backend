@@ -1,26 +1,17 @@
 import express from "express";
 import mongoose from "mongoose";
 import Product from "../models/Product.js";
+import Barbershop from "../models/Barbershop.js";
 import StockMovement from "../models/StockMovement.js";
-import {
-  requireRole,
-  protectAdmin,
-} from "../middleware/authAdminMiddleware.js";
+import { requireRole, protectAdmin } from "../middleware/authAdminMiddleware.js";
 
 const router = express.Router({ mergeParams: true });
 
 // GET /api/barbershops/:barbershopId/products - Listar produtos
-router.get("/", protectAdmin, async (req, res) => {
+router.get("/", async (req, res) => {
   try {
     const { barbershopId } = req.params;
-    const {
-      category,
-      status = "ativo",
-      lowStock,
-      search,
-      page = 1,
-      limit = 20,
-    } = req.query;
+    const { category, status = "ativo", lowStock, search, page = 1, limit = 20 } = req.query;
 
     const query = { barbershop: barbershopId };
 
@@ -63,6 +54,66 @@ router.get("/", protectAdmin, async (req, res) => {
     });
   } catch (error) {
     console.error("Erro ao buscar produtos:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
+  }
+});
+
+router.get("/store", async (req, res) => {
+  try {
+    const { barbershopId } = req.params;
+    const { category, search, page = 1, limit = 12 } = req.query;
+
+    // Primeiro, buscar a barbearia pelo barbershopId
+    const barbershop = await Barbershop.findOne({ slug: barbershopId });
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada" });
+    }
+
+    const query = {
+      barbershop: barbershop._id,
+      status: "ativo", // ✅ Apenas produtos ativos
+      "stock.current": { $gt: 0 }, // ✅ Apenas produtos em estoque (opcional)
+    };
+
+    // Filtros
+    if (category && category !== "all") {
+      query.category = category;
+    }
+
+    if (search) {
+      query.$or = [{ name: { $regex: search, $options: "i" } }, { brand: { $regex: search, $options: "i" } }];
+    }
+
+    const products = await Product.find(query)
+      .select("name description category brand price.sale unit image") // ✅ Apenas campos públicos
+      .sort({ name: 1 })
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+
+    const total = await Product.countDocuments(query);
+
+    // ✅ Resposta limpa e otimizada
+    const publicProducts = products.map((product) => ({
+      _id: product._id,
+      name: product.name,
+      description: product.description,
+      category: product.category,
+      brand: product.brand,
+      price: product.price.sale,
+      unit: product.unit,
+      image: product.image,
+    }));
+
+    res.json({
+      products: publicProducts,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total,
+      },
+    });
+  } catch (error) {
+    console.error("Erro ao buscar produtos públicos:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
   }
 });
@@ -131,68 +182,57 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
 });
 
 // PUT /api/barbershops/:barbershopId/products/:productId - Atualizar produto
-router.put(
-  "/:productId",
-  protectAdmin,
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const { barbershopId, productId } = req.params;
-      const updateData = { ...req.body };
+router.put("/:productId", protectAdmin, requireRole("admin"), async (req, res) => {
+  try {
+    const { barbershopId, productId } = req.params;
+    const updateData = { ...req.body };
 
-      // Remove campos que não devem ser atualizados diretamente
-      delete updateData.stock;
-      delete updateData.barbershop;
+    // Remove campos que não devem ser atualizados diretamente
+    delete updateData.stock;
+    delete updateData.barbershop;
 
-      const product = await Product.findOneAndUpdate(
-        { _id: productId, barbershop: barbershopId },
-        updateData,
-        { new: true, runValidators: true }
-      ).populate("name email");
+    const product = await Product.findOneAndUpdate({ _id: productId, barbershop: barbershopId }, updateData, {
+      new: true,
+      runValidators: true,
+    }).populate("name email");
 
-      if (!product) {
-        return res.status(404).json({ error: "Produto não encontrado" });
-      }
-
-      res.json(product);
-    } catch (error) {
-      console.error("Erro ao atualizar produto:", error);
-      if (error.code === 11000) {
-        return res.status(400).json({ error: "Código de barras já existe" });
-      }
-      res.status(500).json({ error: "Erro interno do servidor" });
+    if (!product) {
+      return res.status(404).json({ error: "Produto não encontrado" });
     }
+
+    res.json(product);
+  } catch (error) {
+    console.error("Erro ao atualizar produto:", error);
+    if (error.code === 11000) {
+      return res.status(400).json({ error: "Código de barras já existe" });
+    }
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
-);
+});
 
 // DELETE /api/barbershops/:barbershopId/products/:productId - Deletar produto
-router.delete(
-  "/:productId",
-  protectAdmin,
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const { barbershopId, productId } = req.params;
+router.delete("/:productId", protectAdmin, requireRole("admin"), async (req, res) => {
+  try {
+    const { barbershopId, productId } = req.params;
 
-      const product = await Product.findOneAndDelete({
-        _id: productId,
-        barbershop: barbershopId,
-      });
+    const product = await Product.findOneAndDelete({
+      _id: productId,
+      barbershop: barbershopId,
+    });
 
-      if (!product) {
-        return res.status(404).json({ error: "Produto não encontrado" });
-      }
-
-      // Deletar todas as movimentações relacionadas
-      await StockMovement.deleteMany({ product: productId });
-
-      res.json({ message: "Produto deletado com sucesso" });
-    } catch (error) {
-      console.error("Erro ao deletar produto:", error);
-      res.status(500).json({ error: "Erro interno do servidor" });
+    if (!product) {
+      return res.status(404).json({ error: "Produto não encontrado" });
     }
+
+    // Deletar todas as movimentações relacionadas
+    await StockMovement.deleteMany({ product: productId });
+
+    res.json({ message: "Produto deletado com sucesso" });
+  } catch (error) {
+    console.error("Erro ao deletar produto:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
-);
+});
 
 // POST /api/barbershops/:barbershopId/products/:productId/stock - Movimentar estoque
 router.post("/:productId/stock", protectAdmin, async (req, res) => {
@@ -205,9 +245,7 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
     }
 
     if (!quantity || quantity <= 0) {
-      return res
-        .status(400)
-        .json({ error: "Quantidade deve ser maior que zero" });
+      return res.status(400).json({ error: "Quantidade deve ser maior que zero" });
     }
 
     if (!reason) {
@@ -260,9 +298,7 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
 
     await stockMovement.save();
 
-    const updatedProduct = await Product.findById(productId).populate(
-      "name email"
-    );
+    const updatedProduct = await Product.findById(productId).populate("name email");
 
     res.json({
       product: updatedProduct,
@@ -331,35 +367,30 @@ router.get("/reports/low-stock", protectAdmin, async (req, res) => {
 });
 
 // GET /api/barbershops/:barbershopId/products/reports/categories - Relatório por categorias
-router.get(
-  "/reports/categories",
-  protectAdmin,
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const { barbershopId } = req.params;
+router.get("/reports/categories", protectAdmin, requireRole("admin"), async (req, res) => {
+  try {
+    const { barbershopId } = req.params;
 
-      const categoryReport = await Product.aggregate([
-        { $match: { barbershop: new mongoose.Types.ObjectId(barbershopId) } },
-        {
-          $group: {
-            _id: "$category",
-            count: { $sum: 1 },
-            totalValue: {
-              $sum: { $multiply: ["$stock.current", "$price.purchase"] },
-            },
-            averageStock: { $avg: "$stock.current" },
+    const categoryReport = await Product.aggregate([
+      { $match: { barbershop: new mongoose.Types.ObjectId(barbershopId) } },
+      {
+        $group: {
+          _id: "$category",
+          count: { $sum: 1 },
+          totalValue: {
+            $sum: { $multiply: ["$stock.current", "$price.purchase"] },
           },
+          averageStock: { $avg: "$stock.current" },
         },
-        { $sort: { count: -1 } },
-      ]);
+      },
+      { $sort: { count: -1 } },
+    ]);
 
-      res.json(categoryReport);
-    } catch (error) {
-      console.error("Erro ao gerar relatório por categorias:", error);
-      res.status(500).json({ error: "Erro interno do servidor" });
-    }
+    res.json(categoryReport);
+  } catch (error) {
+    console.error("Erro ao gerar relatório por categorias:", error);
+    res.status(500).json({ error: "Erro interno do servidor" });
   }
-);
+});
 
 export default router;
