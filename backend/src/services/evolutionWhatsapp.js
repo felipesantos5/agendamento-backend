@@ -30,14 +30,7 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
   };
 
   try {
-    console.log(
-      `Enviando confirmação via WhatsApp para o número: ${cleanPhone}`
-    );
-    const response = await axios.post(url, payload, { headers });
-    console.log(
-      "Mensagem de confirmação enviada com sucesso! ID:",
-      response.data.key.id
-    );
+    await axios.post(url, payload, { headers });
   } catch (error) {
     console.error("FALHA AO ENVIAR MENSAGEM WHATSAPP:");
 

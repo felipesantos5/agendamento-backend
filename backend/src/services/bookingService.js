@@ -19,12 +19,6 @@ export const updateExpiredBookings = async () => {
       }
     );
 
-    if (result.modifiedCount > 0) {
-      console.log(
-        `✅ ${result.modifiedCount} agendamentos marcados como completed automaticamente`
-      );
-    }
-
     return result.modifiedCount;
   } catch (error) {
     console.error("❌ Erro ao atualizar bookings expirados:", error);
