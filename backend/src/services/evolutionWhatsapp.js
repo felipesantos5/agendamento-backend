@@ -34,31 +34,35 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
   } catch (error) {
     console.error("FALHA AO ENVIAR MENSAGEM WHATSAPP:");
 
-    if (error.response.status === 400) {
-      console.error("🔍 Erro 400 - Verificar:");
-      console.error("- Número do telefone:", `55${cleanPhone}`);
-      console.error("- Tamanho da mensagem:", message.length);
-      console.error("- Instância:", INSTANCE_NAME);
-    }
-
-    if ([400, 401, 403].includes(error.response.status)) {
-      return {
-        success: false,
-        error:
-          errorData?.response?.message || errorData?.error || "Erro na API",
-        status: error.response.status,
-        finalAttempt: attempt,
-      };
-    }
-
+    // Verifica se o erro possui uma resposta da API
     if (error.response) {
       console.error(
         "Detalhes do Erro:",
         error.response.data,
-        error.response.message
+        error.response.status
       );
+
+      if (error.response.status === 400) {
+        console.error("🔍 Erro 400 - Verificar:");
+        console.error("- Número do telefone:", `55${cleanPhone}`);
+        console.error("- Tamanho da mensagem:", message.length);
+        console.error("- Instância:", INSTANCE_NAME);
+      }
+
+      // Corrigido: usando a variável 'error' em vez de 'errorData' e removendo 'attempt'
+      if ([400, 401, 403].includes(error.response.status)) {
+        return {
+          success: false,
+          error:
+            error.response?.data?.message ||
+            error.response?.data?.error ||
+            "Erro na API",
+          status: error.response.status,
+        };
+      }
     } else {
-      console.error("Erro de Conexão:", error.message);
+      // Se não houver 'error.response', é um erro de conexão ou de configuração
+      console.error("Erro de Conexão ou Configuração:", error.message);
     }
   }
 }
