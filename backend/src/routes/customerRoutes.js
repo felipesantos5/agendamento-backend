@@ -16,7 +16,7 @@ router.get("/me/bookings", protectCustomer, async (req, res) => {
       // É aqui que a mágica acontece!
       .populate("service", "name price") // Substitui o ID do serviço pelo seu nome e preço
       .populate("barber", "name") // Substitui o ID do barbeiro pelo seu nome
-      .populate("barbershop", "name slug logoUrl"); // Substitui o ID da barbearia pelo seu nome
+      .populate("barbershop", "name slug logoUrl paymentsEnabled"); // Substitui o ID da barbearia pelo seu nome
 
     res.status(200).json(bookings);
   } catch (error) {

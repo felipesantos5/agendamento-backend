@@ -8,7 +8,9 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
   // --------------------
 
   if (!EVOLUTION_API_URL || !EVOLUTION_API_KEY) {
-    console.error("ERRO DE CONFIGURAÇÃO: As variáveis de ambiente EVOLUTION_API_URL e EVOLUTION_API_KEY são necessárias.");
+    console.error(
+      "ERRO DE CONFIGURAÇÃO: As variáveis de ambiente EVOLUTION_API_URL e EVOLUTION_API_KEY são necessárias."
+    );
     return;
   }
 
@@ -28,15 +30,17 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
   };
 
   try {
-    console.log(`Enviando confirmação via WhatsApp para o número: ${cleanPhone}`);
-    const response = await axios.post(url, payload, { headers });
-    console.log("Mensagem de confirmação enviada com sucesso! ID:", response.data.key.id);
+    await axios.post(url, payload, { headers });
   } catch (error) {
     console.error("FALHA AO ENVIAR MENSAGEM WHATSAPP:");
 
     // Verifica se o erro possui uma resposta da API
     if (error.response) {
-      console.error("Detalhes do Erro:", error.response.data, error.response.status);
+      console.error(
+        "Detalhes do Erro:",
+        error.response.data,
+        error.response.status
+      );
 
       if (error.response.status === 400) {
         console.error("🔍 Erro 400 - Verificar:");
@@ -49,7 +53,10 @@ export async function sendWhatsAppConfirmation(customerPhone, message) {
       if ([400, 401, 403].includes(error.response.status)) {
         return {
           success: false,
-          error: error.response?.data?.message || error.response?.data?.error || "Erro na API",
+          error:
+            error.response?.data?.message ||
+            error.response?.data?.error ||
+            "Erro na API",
           status: error.response.status,
         };
       }

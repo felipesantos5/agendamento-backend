@@ -119,7 +119,6 @@ router.post(
 // Rota esperada: GET /barbershops/:barbershopId/bookings
 router.get("/", async (req, res) => {
   try {
-    // ✅ Use req.params.barbershopId aqui, que vem da rota pai graças ao mergeParams
     const barbershopId = req.params.barbershopId;
 
     if (!barbershopId || !mongoose.Types.ObjectId.isValid(barbershopId)) {
@@ -129,6 +128,7 @@ router.get("/", async (req, res) => {
     }
 
     const bookings = await Booking.find({ barbershop: barbershopId })
+      .sort({ time: -1 }) // <-- ADICIONE ESTA LINHA
       .populate("barber", "name")
       .populate("service", "name price duration")
       .populate("customer", "name phone");

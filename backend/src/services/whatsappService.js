@@ -14,7 +14,9 @@ const apiUrl = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messag
 const isConfigured = accessToken && phoneNumberId;
 
 if (!isConfigured) {
-  console.warn("‼️  Credenciais da API Cloud do WhatsApp não configuradas. As mensagens não serão enviadas.");
+  console.warn(
+    "‼️  Credenciais da API Cloud do WhatsApp não configuradas. As mensagens não serão enviadas."
+  );
 }
 
 /**
@@ -23,7 +25,6 @@ if (!isConfigured) {
  */
 export async function sendWhatsAppConfirmation(booking) {
   if (!isConfigured) {
-    console.log("-> Mensagem não enviada: Cliente WhatsApp não inicializado.");
     return;
   }
 
@@ -32,7 +33,9 @@ export async function sendWhatsAppConfirmation(booking) {
 
     // Formata o número do cliente para o padrão E.164 SEM o "+"
     const customerPhone = `55${customer.phone.replace(/\D/g, "")}`;
-    const formattedDate = format(new Date(time), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    const formattedDate = format(new Date(time), "dd 'de' MMMM 'de' yyyy", {
+      locale: ptBR,
+    });
     const formattedTime = format(new Date(time), "HH:mm");
 
     const templateName = "confirmacao_agendamento"; // O nome EXATO do seu modelo aprovado
@@ -68,10 +71,10 @@ export async function sendWhatsAppConfirmation(booking) {
         "Content-Type": "application/json",
       },
     });
-
-    console.log(`✅ Mensagem de confirmação (template: ${templateName}) enviada para ${customer.name}`);
   } catch (error) {
-    console.error(`❌ Erro ao enviar mensagem de WhatsApp para ${booking.customer?.name}:`);
+    console.error(
+      `❌ Erro ao enviar mensagem de WhatsApp para ${booking.customer?.name}:`
+    );
     // A API da Meta retorna erros detalhados no response.data
     if (error.response) {
       console.error(JSON.stringify(error.response.data, null, 2));
