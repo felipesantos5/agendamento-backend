@@ -74,7 +74,7 @@ router.post("/:bookingId/create-payment", async (req, res) => {
           pending: `https://barbeariagendamento.com.br/${barbershop.slug}`,
         },
         auto_return: "approved",
-        notification_url: `https://api.barbeariagendamento.com.br/api/barbershops/${barbershopId}/bookings/webhook`,
+        notification_url: `https://api.barbeariagendamento.com.br/api/barbershops/${barbershopId}/bookings/webhook?barbershopId=${barbershopId}`,
         external_reference: booking._id.toString(),
       },
     };
@@ -101,27 +101,30 @@ router.post("/:bookingId/create-payment", async (req, res) => {
 // Rota para Webhook (receber notificações do Mercado Pago)
 router.post("/webhook", async (req, res) => {
   const notification = req.body;
-  const { barbershopId } = req.query;
+  const { barbershopId } = req.query; // Pega o barbershopId aqui, mas só usa se precisar
 
   console.log("🔔 Webhook recebido:", notification);
+  console.log(`Query Params recebidos: barbershopId=${barbershopId}`);
 
   try {
+    // A lógica principal SÓ RODA se for a notificação de atualização de pagamento
     if (
       notification.type === "payment" &&
       notification.action === "payment.updated"
     ) {
-      const paymentId = notification.data.id;
-
+      // Validação movida para DENTRO do IF
       if (!barbershopId) {
         throw new Error(
-          "barbershopId não foi fornecido na notificação do webhook."
+          "barbershopId não foi fornecido na notificação de pagamento."
         );
       }
+
+      const paymentId = notification.data.id;
 
       const barbershop = await Barbershop.findById(barbershopId);
       if (!barbershop || !barbershop.mercadoPagoAccessToken) {
         throw new Error(
-          `Barbearia ${barbershopId} não encontrada ou sem token de acesso configurado.`
+          `Barbearia ${barbershopId} não encontrada ou sem token de acesso.`
         );
       }
 
@@ -129,7 +132,6 @@ router.post("/webhook", async (req, res) => {
         accessToken: barbershop.mercadoPagoAccessToken,
       });
 
-      // AGORA a variável 'Payment' existe por causa da importação
       const payment = await new Payment(client).get({ id: paymentId });
 
       if (payment && payment.external_reference) {
@@ -137,7 +139,7 @@ router.post("/webhook", async (req, res) => {
         const paymentStatus = payment.status;
 
         console.log(
-          `- Pagamento ID: ${paymentId}, Status: ${paymentStatus} ${bookingId}`
+          `- Processando Pagamento ID: ${paymentId}, Status: ${paymentStatus}`
         );
 
         const updatedBooking = await Booking.findByIdAndUpdate(
@@ -148,15 +150,18 @@ router.post("/webhook", async (req, res) => {
 
         if (updatedBooking) {
           console.log(
-            `✅ Agendamento ${bookingId} atualizado para status de pagamento: ${paymentStatus}`
+            `✅ Agendamento ${bookingId} atualizado para status: ${paymentStatus}`
           );
         }
       }
     }
 
+    // Para QUALQUER notificação recebida (seja a correta ou não),
+    // respondemos 200 para o Mercado Pago parar de enviar.
     res.sendStatus(200);
   } catch (error) {
-    console.error("❌ Erro no webhook:", error);
+    console.error("❌ Erro ao processar webhook:", error);
+    // Informa ao Mercado Pago que algo deu errado para que ele tente reenviar depois
     res.sendStatus(500);
   }
 });
