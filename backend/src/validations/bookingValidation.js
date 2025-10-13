@@ -6,7 +6,7 @@ export const bookingSchema = z.object({
   barber: ZodObjectId,
   service: ZodObjectId,
   customer: z.object({
-    name: z.string().min(2, "Nome do cliente é obrigatório"),
+    name: z.string(),
     phone: z
       .string()
       .regex(
