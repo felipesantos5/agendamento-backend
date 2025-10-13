@@ -24,6 +24,7 @@ import timeBlockRoutes from "./routes/admin/timeBlockRoutes.js";
 import customerAdminRoutes from "./routes/admin/customerRoutes.js";
 import { updateExpiredBookings } from "./services/bookingService.js";
 import productRoutes from "./routes/products.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -69,7 +70,7 @@ const corsOptions = {
 // 2. Use as novas opções no middleware cors
 // app.use(cors(corsOptions));
 
-app.set("trust proxy", true);
+app.set("trust proxy", 1);
 
 app.use(cors({ origin: "*", credentials: true }));
 
@@ -123,6 +124,7 @@ app.use("/api/barbershops/:barbershopId/products", productRoutes);
 // admin
 
 app.use("/api/barbershops/:barbershopId/time-blocks", timeBlockRoutes);
+app.use("/api/barbershops/:barbershopId/bookings", paymentRoutes);
 
 // Exemplo de como você usaria o setBarbershopContext para as rotas da loja pública
 // import { setBarbershopContext } from './middlewares/barbershopContext.js';

@@ -12,6 +12,8 @@ const BookingSchema = new Schema(
     },
     time: Date,
     status: { type: String, default: "booked" },
+    paymentStatus: { type: String, default: "pending" },
+    paymentId: { type: String },
   },
   {
     timestamps: true,
