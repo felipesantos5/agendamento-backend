@@ -69,9 +69,9 @@ router.post("/:bookingId/create-payment", async (req, res) => {
           },
         },
         back_urls: {
-          success: `https://api.barbeariagendamento.com.br/${barbershop.slug}/pagamento-sucesso`,
-          failure: `https://api.barbeariagendamento.com.br/${barbershop.slug}`,
-          pending: `https://api.barbeariagendamento.com.br/${barbershop.slug}`,
+          success: `https://barbeariagendamento.com.br/${barbershop.slug}/pagamento-sucesso`,
+          failure: `https://barbeariagendamento.com.br/${barbershop.slug}`,
+          pending: `https://barbeariagendamento.com.br/${barbershop.slug}`,
         },
         auto_return: "approved",
         notification_url: `https://api.barbeariagendamento.com.br/api/barbershops/6851dbf31f3fdbf60410f501/bookings/webhook`,
@@ -101,6 +101,7 @@ router.post("/:bookingId/create-payment", async (req, res) => {
 // Rota para Webhook (receber notificações do Mercado Pago)
 router.post("/webhook", async (req, res) => {
   const notification = req.body;
+  const { barbershopId } = req.query;
   console.log("🔔 Webhook recebido:", notification);
 
   try {
@@ -110,8 +111,21 @@ router.post("/webhook", async (req, res) => {
     ) {
       const paymentId = notification.data.id;
 
+      if (!barbershopId) {
+        throw new Error(
+          "barbershopId não foi fornecido na notificação do webhook."
+        );
+      }
+
+      const barbershop = await Barbershop.findById(barbershopId);
+      if (!barbershop || !barbershop.mercadoPagoAccessToken) {
+        throw new Error(
+          `Barbearia ${barbershopId} não encontrada ou sem token de acesso configurado.`
+        );
+      }
+
       const client = new MercadoPagoConfig({
-        accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN,
+        accessToken: barbershop.mercadoPagoAccessToken,
       });
 
       // AGORA a variável 'Payment' existe por causa da importação
