@@ -20,7 +20,7 @@ router.post("/request-otp", async (req, res) => {
     // Encontra ou cria o cliente
     const customer = await Customer.findOneAndUpdate(
       { phone },
-      { $set: { phone, name: name || "Cliente" } }, // Atualiza o nome se fornecido
+      { $set: { phone, name: name } }, // Atualiza o nome se fornecido
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
 
@@ -31,8 +31,6 @@ router.post("/request-otp", async (req, res) => {
     // Envia o OTP via WhatsApp
     const message = `Olá! Seu código de acesso para a BarbeariAgendamento é: *${otpToSend}*`;
     await sendWhatsAppConfirmation(phone, message);
-
-    console.log(`OTP para ${phone}: ${otpToSend}`); // Para teste em desenvolvimento
 
     res.status(200).json({
       success: true,

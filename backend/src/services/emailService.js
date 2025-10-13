@@ -79,7 +79,6 @@ export const sendPasswordResetEmail = async (to, token) => {
 
   try {
     await transporter.sendMail(mailOptions);
-    console.log("E-mail de redefinição de senha enviado para:", to);
   } catch (error) {
     console.error("Erro ao enviar e-mail de redefinição:", error);
     // Em produção, você pode querer lançar um erro mais específico

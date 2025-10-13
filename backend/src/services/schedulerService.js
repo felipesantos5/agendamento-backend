@@ -36,13 +36,8 @@ const sendDailyReminders = async () => {
       .populate("barbershop");
 
     if (bookings.length === 0) {
-      console.log("Nenhum agendamento para hoje.");
       return;
     }
-
-    console.log(
-      `${bookings.length} agendamentos encontrados para hoje. Enviando lembretes...`
-    );
 
     for (const booking of bookings) {
       // Verifica se os dados necessários existem para evitar erros
@@ -66,9 +61,6 @@ const sendDailyReminders = async () => {
       const message = `Bom dia, ${booking.customer.name}! Lembrete do seu agendamento hoje na ${booking.barbershop.name} às ${appointmentTime} com ${booking.barber.name} ✅\n\nPara mais informações, entre em contato com a barbearia: ${booking.barbershop.contact} 📱\nEndereço: ${barberShopAdress}💈`;
 
       await sendWhatsAppConfirmation(customerPhone, message);
-      console.log(
-        `Mensagem enviada para ${booking.customer.name} (${customerPhone})`
-      );
 
       // --- PASSO 3: ADICIONE A PAUSA ALEATÓRIA ---
       // Define um tempo de espera mínimo e máximo em milissegundos
@@ -78,12 +70,6 @@ const sendDailyReminders = async () => {
       // Calcula um tempo de espera aleatório dentro do intervalo
       const randomDelay =
         Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY + 1)) + MIN_DELAY;
-
-      console.log(
-        `Pausando por ${(randomDelay / 1000).toFixed(
-          1
-        )} segundos antes do próximo envio...`
-      );
 
       // Pausa a execução do loop pelo tempo calculado
       await delay(randomDelay);
@@ -97,9 +83,6 @@ const sendDailyReminders = async () => {
 cron.schedule(
   "0 8 * * *",
   () => {
-    console.log(
-      "Executando tarefa agendada: Envio de lembretes de agendamento."
-    );
     sendDailyReminders();
   },
   {
@@ -107,5 +90,3 @@ cron.schedule(
     timezone: "America/Sao_Paulo", // Defina o fuso horário correto
   }
 );
-
-console.log("Serviço de agendamento de lembretes iniciado.");

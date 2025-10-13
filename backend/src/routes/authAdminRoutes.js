@@ -9,7 +9,9 @@ const router = express.Router();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  console.error("FATAL ERROR: JWT_SECRET não está definido nas variáveis de ambiente.");
+  console.error(
+    "FATAL ERROR: JWT_SECRET não está definido nas variáveis de ambiente."
+  );
   process.exit(1);
 }
 
@@ -21,7 +23,10 @@ router.post("/login", async (req, res) => {
       return res.status(400).json({ error: "Email e senha são obrigatórios." });
     }
 
-    const user = await AdminUser.findOne({ email }).populate("barbershop", "slug name"); // Popula o slug e nome da barbearia
+    const user = await AdminUser.findOne({ email }).populate(
+      "barbershop",
+      "slug name"
+    ); // Popula o slug e nome da barbearia
     if (!user) {
       return res.status(401).json({ error: "Credenciais inválidas." }); // Usuário não encontrado
     }
@@ -32,7 +37,9 @@ router.post("/login", async (req, res) => {
     }
 
     if (!user.barbershop) {
-      return res.status(500).json({ error: "Usuário não associado a uma barbearia." });
+      return res
+        .status(500)
+        .json({ error: "Usuário não associado a uma barbearia." });
     }
 
     const payload = {
@@ -72,7 +79,9 @@ router.post("/set-password", async (req, res) => {
       return res.status(400).json({ error: "Token e senha são obrigatórios." });
     }
     if (password.length < 6) {
-      return res.status(400).json({ error: "A senha deve ter no mínimo 6 caracteres." });
+      return res
+        .status(400)
+        .json({ error: "A senha deve ter no mínimo 6 caracteres." });
     }
 
     // Hasheia o token recebido para comparar com o que está no banco
@@ -85,7 +94,11 @@ router.post("/set-password", async (req, res) => {
     });
 
     if (!user) {
-      return res.status(400).json({ error: "Token inválido ou expirado. Solicite um novo convite." });
+      return res
+        .status(400)
+        .json({
+          error: "Token inválido ou expirado. Solicite um novo convite.",
+        });
     }
 
     // Define a nova senha, atualiza o status e limpa os campos do token
@@ -95,7 +108,11 @@ router.post("/set-password", async (req, res) => {
     user.accountSetupTokenExpires = undefined;
     await user.save();
 
-    res.status(200).json({ message: "Senha definida com sucesso! Agora você pode fazer o login." });
+    res
+      .status(200)
+      .json({
+        message: "Senha definida com sucesso! Agora você pode fazer o login.",
+      });
   } catch (error) {
     console.error("Erro ao definir senha:", error);
     res.status(500).json({ error: "Erro interno do servidor." });
@@ -110,15 +127,22 @@ router.post("/forgot-password", async (req, res) => {
     // IMPORTANTE: Sempre retorne uma mensagem de sucesso, mesmo que o e-mail
     // não exista, para evitar que descubram quais e-mails estão cadastrados.
     if (!user) {
-      console.log(`Tentativa de reset para e-mail não cadastrado: ${email}`);
-      return res.status(200).json({ message: "Se um e-mail cadastrado for encontrado, um link de redefinição será enviado." });
+      return res
+        .status(200)
+        .json({
+          message:
+            "Se um e-mail cadastrado for encontrado, um link de redefinição será enviado.",
+        });
     }
 
     // 1. Gerar token
     const resetToken = crypto.randomBytes(32).toString("hex");
 
     // 2. Salvar o token HASHED no banco de dados para segurança
-    user.passwordResetToken = crypto.createHash("sha256").update(resetToken).digest("hex");
+    user.passwordResetToken = crypto
+      .createHash("sha256")
+      .update(resetToken)
+      .digest("hex");
     user.passwordResetExpires = Date.now() + 3600000; // Expira em 1 hora
 
     await user.save();
@@ -126,7 +150,12 @@ router.post("/forgot-password", async (req, res) => {
     // 3. Enviar o token original (NÃO HASHED) por e-mail
     await sendPasswordResetEmail(user.email, resetToken);
 
-    res.status(200).json({ message: "Se um e-mail cadastrado for encontrado, um link de redefinição será enviado." });
+    res
+      .status(200)
+      .json({
+        message:
+          "Se um e-mail cadastrado for encontrado, um link de redefinição será enviado.",
+      });
   } catch (error) {
     console.error("Erro em /forgot-password:", error);
     res.status(500).json({ error: "Erro interno do servidor." });
@@ -166,7 +195,9 @@ router.post("/reset-password/:token", async (req, res) => {
     // 4. (Opcional) Gerar um novo token de login e logar o usuário automaticamente
     // ... (sua lógica de jwt.sign que já existe no /login)
 
-    res.status(200).json({ success: true, message: "Senha redefinida com sucesso!" });
+    res
+      .status(200)
+      .json({ success: true, message: "Senha redefinida com sucesso!" });
   } catch (error) {
     console.error("Erro em /reset-password:", error);
     res.status(500).json({ error: "Erro interno do servidor." });

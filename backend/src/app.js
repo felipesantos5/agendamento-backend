@@ -22,6 +22,9 @@ import healthcheckRoutes from "./routes/healtcheck.js";
 import planRoutes from "./routes/planRoutes.js";
 import timeBlockRoutes from "./routes/admin/timeBlockRoutes.js";
 import customerAdminRoutes from "./routes/admin/customerRoutes.js";
+import { updateExpiredBookings } from "./services/bookingService.js";
+import productRoutes from "./routes/products.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -67,11 +70,25 @@ const corsOptions = {
 // 2. Use as novas opções no middleware cors
 // app.use(cors(corsOptions));
 
+app.set("trust proxy", 1);
+
 app.use(cors({ origin: "*", credentials: true }));
 
 app.use(express.json());
 
 app.use(express.static("public"));
+
+updateExpiredBookings().then((count) => {
+  if (count > 0) {
+    console.log(
+      `🚀 Servidor iniciado - ${count} agendamentos atualizados na inicialização`
+    );
+  } else {
+    console.log(
+      "🚀 Servidor iniciado - Nenhum agendamento expirado encontrado"
+    );
+  }
+});
 
 app.use("/api", healthcheckRoutes);
 // ✅ Servir arquivos estáticos da pasta 'public'
@@ -102,10 +119,12 @@ app.use("/api/auth/customer", authCustomerRoutes);
 
 app.use("/api/auth/admin", authAdminRoutes);
 app.use("/api/barbershops/:barbershopId/admin/customers", customerAdminRoutes);
+app.use("/api/barbershops/:barbershopId/products", productRoutes);
 
 // admin
 
 app.use("/api/barbershops/:barbershopId/time-blocks", timeBlockRoutes);
+app.use("/api/barbershops/:barbershopId/bookings", paymentRoutes);
 
 // Exemplo de como você usaria o setBarbershopContext para as rotas da loja pública
 // import { setBarbershopContext } from './middlewares/barbershopContext.js';

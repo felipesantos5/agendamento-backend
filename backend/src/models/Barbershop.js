@@ -41,6 +41,8 @@ const BarbershopSchema = new mongoose.Schema(
       match: [/^#[0-9A-F]{6}$/i, "Formato de cor inválido (ex: #RRGGBB)"],
       default: "#000000",
     },
+    mercadoPagoAccessToken: { type: String, trim: true },
+    paymentsEnabled: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
