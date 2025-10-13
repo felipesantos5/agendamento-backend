@@ -101,10 +101,7 @@ router.post("/:bookingId/create-payment", async (req, res) => {
 // Rota para Webhook (receber notificações do Mercado Pago)
 router.post("/webhook", async (req, res) => {
   const notification = req.body;
-  const { barbershopId } = req.query; // Pega o barbershopId aqui, mas só usa se precisar
-
-  console.log("🔔 Webhook recebido:", notification);
-  console.log(`Query Params recebidos: barbershopId=${barbershopId}`);
+  const { barbershopId } = req.query;
 
   try {
     // A lógica principal SÓ RODA se for a notificação de atualização de pagamento
