@@ -74,7 +74,7 @@ router.post("/:bookingId/create-payment", async (req, res) => {
           pending: `https://barbeariagendamento.com.br/${barbershop.slug}`,
         },
         auto_return: "approved",
-        notification_url: `https://api.barbeariagendamento.com.br/api/barbershops/6851dbf31f3fdbf60410f501/bookings/webhook`,
+        notification_url: `https://api.barbeariagendamento.com.br/api/barbershops/${barbershopId}/bookings/webhook`,
         external_reference: booking._id.toString(),
       },
     };
