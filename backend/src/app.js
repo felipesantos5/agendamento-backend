@@ -46,6 +46,8 @@ connectDB();
 
 const app = express();
 
+app.set("trust proxy", 1);
+
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
@@ -54,10 +56,12 @@ const allowedOrigins = [
   "https://www.admin.barbeariagendamento.com.br",
   "http://31.97.30.228:8088",
   "https://www.barbeariagendamento.com.br",
+  "https://barbeariagendamento.com.br/",
 ];
 
 const corsOptions = {
   origin: function (origin, callback) {
+    // Permite requisições sem 'origin' (como Postman) ou de origens na lista
     if (!origin || allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -68,11 +72,9 @@ const corsOptions = {
 };
 
 // 2. Use as novas opções no middleware cors
-// app.use(cors(corsOptions));
+app.use(cors(corsOptions));
 
-app.set("trust proxy", 1);
-
-app.use(cors({ origin: "*", credentials: true }));
+// app.use(cors({ origin: "*", credentials: true }));
 
 app.use(express.json());
 
