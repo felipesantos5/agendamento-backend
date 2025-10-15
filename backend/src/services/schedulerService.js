@@ -79,6 +79,44 @@ const sendDailyReminders = async () => {
   }
 };
 
+const updateExpiredBookings = async () => {
+  const now = new Date();
+  console.log(
+    `[${now.toLocaleTimeString()}] Executando verificação de agendamentos expirados...`
+  );
+
+  try {
+    // 1. Define a condição de busca:
+    //    - A data/hora do agendamento é anterior a agora.
+    //    - O status ainda é 'booked' ou 'confirmed'.
+    const filter = {
+      time: { $lt: now },
+      status: { $in: ["booked", "confirmed"] },
+    };
+
+    // 2. Define a atualização a ser aplicada
+    const update = {
+      $set: { status: "completed" },
+    };
+
+    // 3. Executa a atualização em massa no banco de dados
+    const result = await Booking.updateMany(filter, update);
+
+    if (result.modifiedCount > 0) {
+      console.log(
+        `✅ ${result.modifiedCount} agendamento(s) atualizado(s) para 'completed'.`
+      );
+    } else {
+      console.log("-> Nenhum agendamento expirado encontrado para atualizar.");
+    }
+  } catch (error) {
+    console.error(
+      "❌ Erro ao atualizar status de agendamentos expirados:",
+      error
+    );
+  }
+};
+
 // Agenda a tarefa para ser executada todos os dias às 8h da manhã
 cron.schedule(
   "0 8 * * *",
@@ -87,6 +125,23 @@ cron.schedule(
   },
   {
     scheduled: true,
-    timezone: "America/Sao_Paulo", // Defina o fuso horário correto
+    timezone: "America/Sao_Paulo",
   }
 );
+
+cron.schedule(
+  "0 * * * *",
+  () => {
+    updateExpiredBookings();
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
+
+console.log(
+  "✅ Serviço de atualização de status de agendamentos iniciado (executa a cada hora)."
+);
+
+updateExpiredBookings();
