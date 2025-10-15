@@ -4,22 +4,23 @@ import Barbershop from "../models/Barbershop.js";
 import Customer from "../models/Customer.js";
 import Barber from "../models/Barber.js";
 import Service from "../models/Service.js";
+import BlockedDay from "../models/BlockedDay.js";
 import TimeBlock from "../models/TimeBlock.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
-import { formatPhoneNumber } from "../utils/phoneFormater.js";
 import { checkHolidayAvailability } from "../middleware/holidayCheck.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
 import {
   startOfMonth,
   endOfMonth,
-  getDaysInMonth,
   format,
-  isSameDay,
+  eachDayOfInterval,
+  isToday,
 } from "date-fns";
+import { checkIsHoliday } from "../services/holidayService.js";
 import { z } from "zod";
 import { ptBR } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
@@ -27,14 +28,13 @@ import { appointmentLimiter } from "../middleware/rateLimiting.js";
 
 const router = express.Router({ mergeParams: true });
 
-// Criar Agendamento em uma Barbearia
-// Rota esperada: POST /barbershops/:barbershopId/bookings
 router.post(
   "/",
   checkHolidayAvailability,
   appointmentLimiter,
   async (req, res) => {
     try {
+      const { barbershopId } = req.params;
       const data = BookingValidationSchema.parse(req.body);
       const bookingTime = new Date(data.time);
 
@@ -47,6 +47,11 @@ router.post(
         return res.status(400).json({
           error: "Nome do cliente é obrigatório.",
         });
+      }
+
+      const barbershop = await Barbershop.findById(barbershopId);
+      if (!barbershop) {
+        return res.status(404).json({ error: "Barbearia não encontrada." });
       }
 
       const customer = await Customer.findOneAndUpdate(
@@ -70,11 +75,18 @@ router.post(
         });
       }
 
-      const createdBooking = await Booking.create({
+      const bookingPayload = {
         ...data,
         customer: customer._id,
-        barbershop: req.params.barbershopId,
-      });
+        barbershop: barbershopId,
+      };
+
+      // ---- ALTERAÇÃO 3: Adicionamos o status do pagamento CONDICIONALMENTE ----
+      if (barbershop.paymentsEnabled) {
+        bookingPayload.paymentStatus = "pending";
+      }
+
+      const createdBooking = await Booking.create(bookingPayload);
 
       customer.bookings.push(createdBooking._id);
       await customer.save();
@@ -263,7 +275,7 @@ router.put(
 
 router.get("/:barberId/monthly-availability", async (req, res) => {
   try {
-    const { barberId } = req.params;
+    const { barbershopId, barberId } = req.params;
     const { year, month, serviceId } = req.query;
 
     if (!year || !month || !serviceId) {
@@ -272,19 +284,28 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
         .json({ error: "Ano, mês e serviço são obrigatórios." });
     }
 
-    const startDate = startOfMonth(new Date(year, month - 1));
-    const endDate = endOfMonth(new Date(year, month - 1));
-    const daysInMonth = getDaysInMonth(startDate);
+    const startDate = startOfMonth(
+      new Date(parseInt(year), parseInt(month) - 1)
+    );
+    const endDate = endOfMonth(startDate);
 
-    // 1. Pega os dados essenciais em uma única consulta
-    const [barber, service, bookingsForMonth, timeBlocksForMonth] =
+    // Obtém a data/hora atual no fuso horário do Brasil para comparação
+    const nowInBrazil = toZonedTime(new Date(), "America/Sao_Paulo");
+
+    // 1. Buscar todos os dados necessários para o mês de uma só vez
+    const [barber, service, bookings, blockedDays, timeBlocks] =
       await Promise.all([
         Barber.findById(barberId).lean(),
         Service.findById(serviceId).lean(),
         Booking.find({
           barber: barberId,
-          time: { $gte: startDate, $lt: endDate },
-          status: { $nin: ["canceled"] },
+          time: { $gte: startDate, $lte: endDate },
+          status: { $ne: "canceled" },
+        }).lean(),
+        BlockedDay.find({
+          barbershop: barbershopId,
+          date: { $gte: startDate, $lte: endDate },
+          barber: { $in: [null, barberId] },
         }).lean(),
         TimeBlock.find({
           barber: barberId,
@@ -299,57 +320,127 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
         .json({ error: "Barbeiro ou serviço não encontrado." });
     }
 
-    const unavailableDays = [];
+    const serviceDuration = service.duration;
+    const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate });
+    const unavailableDays = new Set();
 
-    // 2. Itera por cada dia do mês para verificar a disponibilidade
-    for (let day = 1; day <= daysInMonth; day++) {
-      const currentDate = new Date(year, month - 1, day);
-      const dayOfWeekName = format(currentDate, "EEEE", { locale: ptBR });
+    const availabilityMap = new Map(
+      barber.availability.map((a) => [a.day.toLowerCase(), a])
+    );
 
-      const workHours = barber.availability.find(
-        (a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase()
+    // 2. Iterar sobre cada dia do mês
+    for (const day of daysInMonth) {
+      const dayString = format(day, "yyyy-MM-dd");
+      const dayOfWeekName = format(day, "EEEE", { locale: ptBR });
+
+      // Causa #1: Dia bloqueado
+      const isDayBlocked = blockedDays.some(
+        (blocked) => format(new Date(blocked.date), "yyyy-MM-dd") === dayString
       );
-
-      // Se não é um dia de trabalho, o dia está indisponível
-      if (!workHours) {
-        unavailableDays.push(format(currentDate, "yyyy-MM-dd"));
-        continue; // Pula para o próximo dia
+      if (isDayBlocked) {
+        unavailableDays.add(dayString);
+        continue;
       }
 
-      // Calcula o total de slots possíveis no dia
-      const [startH, startM] = workHours.start.split(":").map(Number);
-      const [endH, endM] = workHours.end.split(":").map(Number);
-      const totalWorkMinutes = endH * 60 + endM - (startH * 60 + startM);
-      const possibleSlots = Math.floor(totalWorkMinutes / service.duration);
+      // Causa #2: Feriado
+      const holidayCheck = await checkIsHoliday(day);
+      if (holidayCheck.isHoliday) {
+        unavailableDays.add(dayString);
+        continue;
+      }
 
-      // Calcula quantos slots já foram consumidos pelos agendamentos existentes
-      const bookingsOnThisDay = bookingsForMonth.filter((b) =>
-        isSameDay(new Date(b.time), currentDate)
+      // Causa #3: Barbeiro não trabalha
+      const workHours = availabilityMap.get(dayOfWeekName.toLowerCase());
+      if (!workHours) {
+        unavailableDays.add(dayString);
+        continue;
+      }
+
+      // Causa #4: Nenhum horário vago no dia
+      let hasAvailableSlot = false;
+      const slotInterval = 15;
+
+      const [startWorkH, startWorkM] = workHours.start.split(":").map(Number);
+      const [endWorkH, endWorkM] = workHours.end.split(":").map(Number);
+
+      const dayStart = new Date(day);
+      dayStart.setHours(startWorkH, startWorkM, 0, 0);
+      const dayEnd = new Date(day);
+      dayEnd.setHours(endWorkH, endWorkM, 0, 0);
+
+      const todaysBookings = bookings.filter(
+        (b) => format(new Date(b.time), "yyyy-MM-dd") === dayString
       );
-      const slotsTaken = bookingsOnThisDay.length; // Simplificação: 1 booking = 1 slot (refinar se necessário)
+      const todaysTimeBlocks = timeBlocks.filter(
+        (tb) => tb.startTime < dayEnd && tb.endTime > dayStart
+      );
 
-      // Verifica se há time blocks que cobrem todo o dia de trabalho
-      const timeBlocksOnThisDay = timeBlocksForMonth.filter((block) => {
-        const blockStart = new Date(block.startTime);
-        const blockEnd = new Date(block.endTime);
-        const dayStart = new Date(currentDate);
-        dayStart.setHours(startH, startM, 0, 0);
-        const dayEnd = new Date(currentDate);
-        dayEnd.setHours(endH, endM, 0, 0);
+      // ---- VALIDAÇÃO ADICIONADA ----
+      // Ajusta o ponto de partida da verificação para o dia de hoje
+      let initialSlotTime = new Date(dayStart);
+      if (isToday(day) && nowInBrazil > initialSlotTime) {
+        // Define a hora inicial como a hora atual se já passamos do início do expediente
+        initialSlotTime = nowInBrazil;
+      }
+      // -----------------------------
 
-        // Verifica se o bloqueio cobre todo o período de trabalho do dia
-        return blockStart <= dayStart && blockEnd >= dayEnd;
-      });
+      let currentSlotTime = new Date(initialSlotTime);
 
-      // Se há um time block que cobre todo o dia OU se os slots ocupados forem maiores ou iguais aos possíveis, o dia está indisponível
-      if (timeBlocksOnThisDay.length > 0 || slotsTaken >= possibleSlots) {
-        unavailableDays.push(format(currentDate, "yyyy-MM-dd"));
+      while (currentSlotTime < dayEnd) {
+        const potentialEndTime = new Date(
+          currentSlotTime.getTime() + serviceDuration * 60000
+        );
+
+        if (potentialEndTime > dayEnd) break;
+
+        let hasConflict = false;
+
+        // Verifica conflito com agendamentos
+        for (const booking of todaysBookings) {
+          const bookingStart = new Date(booking.time);
+          const bookingEnd = new Date(
+            bookingStart.getTime() +
+              (booking.service?.duration || serviceDuration) * 60000
+          );
+          if (currentSlotTime < bookingEnd && potentialEndTime > bookingStart) {
+            hasConflict = true;
+            break;
+          }
+        }
+        if (hasConflict) {
+          currentSlotTime.setMinutes(
+            currentSlotTime.getMinutes() + slotInterval
+          );
+          continue;
+        }
+
+        // Verifica conflito com bloqueios de tempo
+        for (const block of todaysTimeBlocks) {
+          if (
+            currentSlotTime < new Date(block.endTime) &&
+            potentialEndTime > new Date(block.startTime)
+          ) {
+            hasConflict = true;
+            break;
+          }
+        }
+
+        if (!hasConflict) {
+          hasAvailableSlot = true;
+          break;
+        }
+
+        currentSlotTime.setMinutes(currentSlotTime.getMinutes() + slotInterval);
+      }
+
+      if (!hasAvailableSlot) {
+        unavailableDays.add(dayString);
       }
     }
 
-    res.status(200).json({ unavailableDays });
+    res.status(200).json({ unavailableDays: Array.from(unavailableDays) });
   } catch (error) {
-    console.error("Erro ao calcular disponibilidade mensal:", error);
+    console.error("Erro ao buscar disponibilidade mensal:", error);
     res.status(500).json({ error: "Erro ao processar disponibilidade." });
   }
 });

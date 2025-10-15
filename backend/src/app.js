@@ -1,3 +1,14 @@
+process.on("uncaughtException", (error) => {
+  console.error("🔥 ERRO NÃO TRATADO (Uncaught Exception):", error);
+  // Em produção, é recomendado reiniciar a aplicação após um erro desses,
+  // pois o estado dela pode estar corrompido.
+  // process.exit(1);
+});
+
+process.on("unhandledRejection", (reason, promise) => {
+  console.error("🔥 ERRO NÃO TRATADO (Unhandled Rejection):", reason);
+});
+
 import express from "express";
 import cors from "cors";
 import "dotenv/config";
@@ -22,7 +33,6 @@ import healthcheckRoutes from "./routes/healtcheck.js";
 import planRoutes from "./routes/planRoutes.js";
 import timeBlockRoutes from "./routes/admin/timeBlockRoutes.js";
 import customerAdminRoutes from "./routes/admin/customerRoutes.js";
-import { updateExpiredBookings } from "./services/bookingService.js";
 import productRoutes from "./routes/products.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 
@@ -77,18 +87,6 @@ app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json());
 
 app.use(express.static("public"));
-
-updateExpiredBookings().then((count) => {
-  if (count > 0) {
-    console.log(
-      `🚀 Servidor iniciado - ${count} agendamentos atualizados na inicialização`
-    );
-  } else {
-    console.log(
-      "🚀 Servidor iniciado - Nenhum agendamento expirado encontrado"
-    );
-  }
-});
 
 app.use("/api", healthcheckRoutes);
 // ✅ Servir arquivos estáticos da pasta 'public'
