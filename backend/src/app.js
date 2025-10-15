@@ -33,7 +33,6 @@ import healthcheckRoutes from "./routes/healtcheck.js";
 import planRoutes from "./routes/planRoutes.js";
 import timeBlockRoutes from "./routes/admin/timeBlockRoutes.js";
 import customerAdminRoutes from "./routes/admin/customerRoutes.js";
-import { updateExpiredBookings } from "./services/bookingService.js";
 import productRoutes from "./routes/products.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 
@@ -89,8 +88,6 @@ app.use(express.json());
 
 app.use(express.static("public"));
 
-updateExpiredBookings();
-
 app.use("/api", healthcheckRoutes);
 // ✅ Servir arquivos estáticos da pasta 'public'
 // Se app.js está em src/ e public/ está na raiz do backend/
@@ -105,7 +102,11 @@ app.use("/barbershops/:barbershopId/services", serviceRoutes);
 app.use("/barbershops/:barbershopId/bookings", bookingRoutes); // bookingRoutes agora contém a sub-rota para free-slots
 app.use("/api/upload", protectAdmin, uploadRoutes);
 app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
-app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
+app.use(
+  "/barbershops/:barbershopId/commissions",
+  protectAdmin,
+  commissionRoutes
+);
 app.use("/api/barbershops/:barbershopId/blocked-days", blockedDayRoutes);
 app.use("/api/barbershops/:barbershopId/reviews", reviewRoutes);
 app.use("/api/barbershops/:barbershopId/plans", planRoutes);
