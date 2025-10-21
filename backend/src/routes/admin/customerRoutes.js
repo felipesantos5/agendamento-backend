@@ -3,10 +3,7 @@ import Customer from "../../models/Customer.js";
 import Plan from "../../models/Plan.js";
 import Booking from "../../models/Booking.js";
 import Subscription from "../../models/Subscription.js";
-import {
-  protectAdmin,
-  requireRole,
-} from "../../middleware/authAdminMiddleware.js";
+import { protectAdmin, requireRole } from "../../middleware/authAdminMiddleware.js";
 import { addDays } from "date-fns";
 import mongoose from "mongoose";
 
@@ -45,9 +42,7 @@ router.get("/", async (req, res) => {
     }
 
     // Extrair apenas os IDs válidos
-    const validCustomerIds = customerData
-      .map((item) => item.customerId)
-      .filter((id) => id && mongoose.Types.ObjectId.isValid(id));
+    const validCustomerIds = customerData.map((item) => item.customerId).filter((id) => id && mongoose.Types.ObjectId.isValid(id));
 
     // Buscar clientes
     const customers = await Customer.find({
@@ -57,9 +52,11 @@ router.get("/", async (req, res) => {
     // Buscar subscriptions para cada cliente
     const customersWithSubscriptions = await Promise.all(
       customers.map(async (customer) => {
+        // AQUI: Adicione o filtro barbershop
         const activeSubscriptions = await Subscription.find({
           customer: customer._id,
           status: "active",
+          barbershop: barbershopId, // <--- Adicione esta linha
         }).populate({
           path: "plan",
           select: "name description price durationInDays",
@@ -81,8 +78,7 @@ router.get("/", async (req, res) => {
     console.error("💥 Erro ao listar clientes:", error);
     res.status(500).json({
       error: "Erro ao listar clientes.",
-      details:
-        process.env.NODE_ENV === "development" ? error.message : undefined,
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
   }
 });
@@ -113,48 +109,39 @@ router.get("/:customerId", async (req, res) => {
 
 // ROTA PARA ATRELAR UM PLANO A UM CLIENTE
 // POST /api/barbershops/:barbershopId/admin/customers/:customerId/subscribe
-router.post(
-  "/:customerId/subscribe",
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const { barbershopId, customerId } = req.params;
-      const { planId } = req.body;
+router.post("/:customerId/subscribe", requireRole("admin"), async (req, res) => {
+  try {
+    const { barbershopId, customerId } = req.params;
+    const { planId } = req.body;
 
-      const [customer, plan] = await Promise.all([
-        Customer.findById(customerId),
-        Plan.findById(planId),
-      ]);
+    const [customer, plan] = await Promise.all([Customer.findById(customerId), Plan.findById(planId)]);
 
-      if (!customer || !plan) {
-        return res
-          .status(404)
-          .json({ error: "Cliente ou plano não encontrado." });
-      }
-
-      const startDate = new Date();
-      const endDate = addDays(startDate, plan.durationInDays);
-
-      const newSubscription = await Subscription.create({
-        customer: customerId,
-        plan: planId,
-        barbershop: barbershopId,
-        startDate,
-        endDate,
-        status: "active",
-      });
-
-      // Adiciona a referência da nova assinatura ao cliente
-      customer.subscriptions.push(newSubscription._id);
-      await customer.save();
-
-      res.status(201).json(newSubscription);
-    } catch (error) {
-      console.error("Erro ao inscrever cliente no plano:", error);
-      res.status(500).json({ error: "Falha ao atrelar o plano." });
+    if (!customer || !plan) {
+      return res.status(404).json({ error: "Cliente ou plano não encontrado." });
     }
+
+    const startDate = new Date();
+    const endDate = addDays(startDate, plan.durationInDays);
+
+    const newSubscription = await Subscription.create({
+      customer: customerId,
+      plan: planId,
+      barbershop: barbershopId,
+      startDate,
+      endDate,
+      status: "active",
+    });
+
+    // Adiciona a referência da nova assinatura ao cliente
+    customer.subscriptions.push(newSubscription._id);
+    await customer.save();
+
+    res.status(201).json(newSubscription);
+  } catch (error) {
+    console.error("Erro ao inscrever cliente no plano:", error);
+    res.status(500).json({ error: "Falha ao atrelar o plano." });
   }
-);
+});
 
 router.get("/:customerId/bookings", async (req, res) => {
   try {
