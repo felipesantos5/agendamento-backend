@@ -53,10 +53,12 @@ router.get("/", async (req, res) => {
     const customersWithSubscriptions = await Promise.all(
       customers.map(async (customer) => {
         // AQUI: Adicione o filtro barbershop
+        const now = new Date(); // Pega a data/hora atual
         const activeSubscriptions = await Subscription.find({
           customer: customer._id,
           status: "active",
-          barbershop: barbershopId, // <--- Adicione esta linha
+          barbershop: barbershopId,
+          endDate: { $gte: now }, // <--- Adicione esta linha: Garante que a data final ainda não passou
         }).populate({
           path: "plan",
           select: "name description price durationInDays",
@@ -109,39 +111,73 @@ router.get("/:customerId", async (req, res) => {
 
 // ROTA PARA ATRELAR UM PLANO A UM CLIENTE
 // POST /api/barbershops/:barbershopId/admin/customers/:customerId/subscribe
-router.post("/:customerId/subscribe", requireRole("admin"), async (req, res) => {
-  try {
-    const { barbershopId, customerId } = req.params;
-    const { planId } = req.body;
+router.post(
+  "/:customerId/subscribe",
+  protectAdmin, // Mova protectAdmin para cá se ainda não estiver
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      const { barbershopId, customerId } = req.params;
+      const { planId } = req.body;
 
-    const [customer, plan] = await Promise.all([Customer.findById(customerId), Plan.findById(planId)]);
+      // Validação básica dos IDs
+      if (!mongoose.Types.ObjectId.isValid(customerId) || !mongoose.Types.ObjectId.isValid(planId)) {
+        return res.status(400).json({ error: "ID do cliente ou plano inválido." });
+      }
 
-    if (!customer || !plan) {
-      return res.status(404).json({ error: "Cliente ou plano não encontrado." });
+      const [customer, plan] = await Promise.all([Customer.findById(customerId), Plan.findById(planId)]);
+
+      if (!customer || !plan) {
+        return res.status(404).json({ error: "Cliente ou plano não encontrado." });
+      }
+
+      // --- VERIFICAÇÃO ADICIONADA ---
+      // Verifica se durationInDays existe, é um número e é maior que zero
+      if (!plan.durationInDays || typeof plan.durationInDays !== "number" || plan.durationInDays <= 0) {
+        return res.status(400).json({
+          error: `O plano "${plan.name}" não possui uma duração válida definida. Verifique a configuração do plano.`,
+        });
+      }
+      // -----------------------------
+
+      const startDate = new Date();
+      // Agora é seguro usar plan.durationInDays
+      const endDate = addDays(startDate, plan.durationInDays);
+
+      // Verifica se endDate é uma data válida após o cálculo
+      if (isNaN(endDate.getTime())) {
+        console.error("endDate resultou em Data Inválida mesmo após a verificação. startDate:", startDate, "durationInDays:", plan.durationInDays);
+        return res.status(500).json({ error: "Falha ao calcular a data final da assinatura." });
+      }
+
+      const newSubscription = await Subscription.create({
+        customer: customerId,
+        plan: planId,
+        barbershop: barbershopId,
+        startDate,
+        endDate,
+        status: "active",
+      });
+
+      // Adiciona a referência da nova assinatura ao cliente
+      // É mais seguro usar $addToSet para evitar duplicatas, embora improvável aqui
+      customer.subscriptions.push(newSubscription._id);
+      await customer.save();
+
+      // Opcional: Popular o plano na resposta para mais detalhes
+      const populatedSubscription = await Subscription.findById(newSubscription._id).populate("plan", "name price durationInDays"); // Popula o plano
+
+      res.status(201).json(populatedSubscription || newSubscription); // Retorna a versão populada se disponível
+    } catch (error) {
+      console.error("Erro ao inscrever cliente no plano:", error);
+      // Tratamento de erro mais específico para validação do Mongoose
+      if (error.name === "ValidationError") {
+        return res.status(400).json({ error: "Dados inválidos para a assinatura.", details: error.errors });
+      }
+      res.status(500).json({ error: "Falha ao atrelar o plano." });
     }
-
-    const startDate = new Date();
-    const endDate = addDays(startDate, plan.durationInDays);
-
-    const newSubscription = await Subscription.create({
-      customer: customerId,
-      plan: planId,
-      barbershop: barbershopId,
-      startDate,
-      endDate,
-      status: "active",
-    });
-
-    // Adiciona a referência da nova assinatura ao cliente
-    customer.subscriptions.push(newSubscription._id);
-    await customer.save();
-
-    res.status(201).json(newSubscription);
-  } catch (error) {
-    console.error("Erro ao inscrever cliente no plano:", error);
-    res.status(500).json({ error: "Falha ao atrelar o plano." });
   }
-});
+);
 
 router.get("/:customerId/bookings", async (req, res) => {
   try {
