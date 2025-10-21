@@ -11,6 +11,7 @@ process.on("unhandledRejection", (reason, promise) => {
 
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import "dotenv/config";
 import { fileURLToPath } from "url";
 import path from "path";
@@ -81,11 +82,10 @@ const corsOptions = {
   credentials: true,
 };
 
-// 2. Use as novas opções no middleware cors
 app.use(cors(corsOptions));
-
 // app.use(cors({ origin: "*", credentials: true }));
 
+app.use(cookieParser());
 app.use(express.json());
 
 app.use(express.static("public"));
@@ -104,11 +104,7 @@ app.use("/barbershops/:barbershopId/services", serviceRoutes);
 app.use("/barbershops/:barbershopId/bookings", bookingRoutes); // bookingRoutes agora contém a sub-rota para free-slots
 app.use("/api/upload", protectAdmin, uploadRoutes);
 app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
-app.use(
-  "/barbershops/:barbershopId/commissions",
-  protectAdmin,
-  commissionRoutes
-);
+app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
 app.use("/api/barbershops/:barbershopId/blocked-days", blockedDayRoutes);
 app.use("/api/barbershops/:barbershopId/reviews", reviewRoutes);
 app.use("/api/barbershops/:barbershopId/plans", planRoutes);
