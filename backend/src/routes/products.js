@@ -192,19 +192,25 @@ router.put("/:productId", protectAdmin, requireRole("admin"), async (req, res) =
     delete updateData.barbershop;
 
     const product = await Product.findOneAndUpdate({ _id: productId, barbershop: barbershopId }, updateData, {
-      new: true,
+      new: true, // Retorna o documento modificado
       runValidators: true,
-    }).populate("name email");
+    }); // <--- REMOVA O .populate("name email") DAQUI
 
     if (!product) {
       return res.status(404).json({ error: "Produto não encontrado" });
     }
 
-    res.json(product);
+    res.json(product); // O 'product' aqui já terá o 'name' atualizado
   } catch (error) {
     console.error("Erro ao atualizar produto:", error);
     if (error.code === 11000) {
-      return res.status(400).json({ error: "Código de barras já existe" });
+      // Código de erro para violação de índice único (ex: barcode duplicado)
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({ error: `O campo '${field}' já está em uso.` });
+    }
+    // Tratamento para erros de validação do Mongoose
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ error: "Dados inválidos.", details: error.errors });
     }
     res.status(500).json({ error: "Erro interno do servidor" });
   }
