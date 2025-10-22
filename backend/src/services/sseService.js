@@ -11,7 +11,6 @@ function addClient(barbershopId, client) {
     clients.set(barbershopId, []);
   }
   clients.get(barbershopId).push(client);
-  console.log(`[SSE] Cliente conectado para barbershop ${barbershopId}. Total: ${clients.get(barbershopId).length}`);
 }
 
 /**
@@ -26,7 +25,6 @@ function removeClient(barbershopId, client) {
       barbershopId,
       barbershopClients.filter((c) => c !== client)
     );
-    console.log(`[SSE] Cliente desconectado da barbershop ${barbershopId}. Restantes: ${clients.get(barbershopId).length}`);
     // Limpa o mapa se não houver mais clientes para essa barbearia
     if (clients.get(barbershopId).length === 0) {
       clients.delete(barbershopId);
