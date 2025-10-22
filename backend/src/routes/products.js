@@ -118,11 +118,11 @@ router.get("/store", async (req, res) => {
   }
 });
 
-// GET /api/barbershops/:barbershopId/products/:productId - Buscar produto específico
 router.get("/:productId", protectAdmin, async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
 
+    // A busca já inclui todos os campos do schema, incluindo 'image' se existir no documento
     const product = await Product.findOne({
       _id: productId,
       barbershop: barbershopId,
@@ -132,7 +132,7 @@ router.get("/:productId", protectAdmin, async (req, res) => {
       return res.status(404).json({ error: "Produto não encontrado" });
     }
 
-    res.json(product);
+    res.json(product); // Retorna o produto com todos os campos, incluindo 'image'
   } catch (error) {
     console.error("Erro ao buscar produto:", error);
     res.status(500).json({ error: "Erro interno do servidor" });
@@ -144,16 +144,23 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId } = req.params;
 
+    // --- ALTERAÇÃO AQUI ---
+    // Explicitamente pegue 'image' do corpo da requisição
+    const { image, ...otherData } = req.body;
+
     const productData = {
-      ...req.body,
+      ...otherData, // Pega todos os outros dados (name, price, stock, etc.)
+      image: image, // Adiciona o campo 'image' explicitamente
       barbershop: barbershopId,
     };
+    // ---------------------
 
     const product = new Product(productData);
-    await product.save();
+    await product.save(); // Salva o produto com a imagem
 
-    // Registrar movimentação inicial se houver estoque
-    if (product.stock.current > 0) {
+    // Registrar movimentação inicial (código existente)
+    if (product.stock && product.stock.current > 0) {
+      // Adicionado verificação para product.stock
       const stockMovement = new StockMovement({
         product: product._id,
         type: "entrada",
@@ -161,21 +168,24 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
         reason: "Estoque inicial",
         previousStock: 0,
         newStock: product.stock.current,
-        unitCost: product.price.purchase,
-        totalCost: product.price.purchase * product.stock.current,
+        unitCost: product.price?.purchase, // Acesso seguro
+        totalCost: (product.price?.purchase || 0) * product.stock.current, // Acesso seguro e valor padrão
         barbershop: barbershopId,
         notes: "Cadastro inicial do produto",
       });
       await stockMovement.save();
     }
 
-    const populatedProduct = await Product.findById(product._id);
-
-    res.status(201).json(populatedProduct);
+    // Não é necessário buscar novamente, 'product' já contém o documento salvo
+    res.status(201).json(product); // Retorna o produto recém-criado, incluindo a imagem
   } catch (error) {
     console.error("Erro ao criar produto:", error);
     if (error.code === 11000) {
-      return res.status(400).json({ error: "Código de barras já existe" });
+      const field = Object.keys(error.keyValue)[0];
+      return res.status(400).json({ error: `O campo '${field}' já está em uso.` });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ error: "Dados inválidos para o produto.", details: error.errors });
     }
     res.status(500).json({ error: "Erro interno do servidor" });
   }
@@ -185,30 +195,41 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
 router.put("/:productId", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
-    const updateData = { ...req.body };
 
-    // Remove campos que não devem ser atualizados diretamente
+    // --- ALTERAÇÃO AQUI (Garantir que image está incluído) ---
+    const { image, ...otherUpdateData } = req.body; // Separa image
+    const updateData = { ...otherUpdateData };
+    if (image !== undefined) {
+      // Adiciona image apenas se foi enviado no body
+      updateData.image = image;
+    }
+    // ---------------------------------------------------------
+
+    // Remover campos indefinidos (se houver)
+    Object.keys(updateData).forEach((key) => updateData[key] === undefined && delete updateData[key]);
+
+    // Remover campos que não devem ser atualizados diretamente
     delete updateData.stock;
     delete updateData.barbershop;
 
-    const product = await Product.findOneAndUpdate({ _id: productId, barbershop: barbershopId }, updateData, {
-      new: true, // Retorna o documento modificado
-      runValidators: true,
-    }); // <--- REMOVA O .populate("name email") DAQUI
+    const product = await Product.findOneAndUpdate(
+      { _id: productId, barbershop: barbershopId },
+      { $set: updateData }, // Usa $set para atualizar apenas os campos fornecidos
+      { new: true, runValidators: true }
+    );
 
     if (!product) {
       return res.status(404).json({ error: "Produto não encontrado" });
     }
 
-    res.json(product); // O 'product' aqui já terá o 'name' atualizado
+    res.json(product); // Retorna o produto atualizado, incluindo a imagem
   } catch (error) {
+    // ... (mesmo tratamento de erro da resposta anterior) ...
     console.error("Erro ao atualizar produto:", error);
     if (error.code === 11000) {
-      // Código de erro para violação de índice único (ex: barcode duplicado)
       const field = Object.keys(error.keyValue)[0];
       return res.status(400).json({ error: `O campo '${field}' já está em uso.` });
     }
-    // Tratamento para erros de validação do Mongoose
     if (error.name === "ValidationError") {
       return res.status(400).json({ error: "Dados inválidos.", details: error.errors });
     }
@@ -246,16 +267,14 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
     const { barbershopId, productId } = req.params;
     const { type, quantity, reason, unitCost, notes } = req.body;
 
+    console.log(type);
+
     if (!["entrada", "saida", "ajuste", "perda"].includes(type)) {
       return res.status(400).json({ error: "Tipo de movimentação inválido" });
     }
 
     if (!quantity || quantity <= 0) {
       return res.status(400).json({ error: "Quantidade deve ser maior que zero" });
-    }
-
-    if (!reason) {
-      return res.status(400).json({ error: "Motivo é obrigatório" });
     }
 
     const product = await Product.findOne({
@@ -304,7 +323,7 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
 
     await stockMovement.save();
 
-    const updatedProduct = await Product.findById(productId).populate("name email");
+    const updatedProduct = await Product.findById(productId);
 
     res.json({
       product: updatedProduct,
