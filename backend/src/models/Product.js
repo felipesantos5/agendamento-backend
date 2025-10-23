@@ -15,28 +15,12 @@ const ProductSchema = new Schema(
     category: {
       type: String,
       required: true,
-      enum: [
-        "pomada",
-        "gel",
-        "shampoo",
-        "condicionador",
-        "minoxidil",
-        "oleo",
-        "cera",
-        "spray",
-        "outros",
-      ],
+      enum: ["pomada", "gel", "shampoo", "condicionador", "minoxidil", "oleo", "cera", "spray", "outros"],
       default: "outros",
     },
     brand: {
       type: String,
       trim: true,
-    },
-    barcode: {
-      type: String,
-      trim: true,
-      unique: true,
-      sparse: true, // Permite valores null/undefined únicos
     },
     price: {
       purchase: {
@@ -67,17 +51,6 @@ const ProductSchema = new Schema(
         type: Number,
         min: 0,
       },
-    },
-    unit: {
-      type: String,
-      required: true,
-      enum: ["unidade", "ml", "g", "kg", "litro"],
-      default: "unidade",
-    },
-    supplier: {
-      name: String,
-      contact: String,
-      phone: String,
     },
     image: {
       type: String, // URL da imagem do produto

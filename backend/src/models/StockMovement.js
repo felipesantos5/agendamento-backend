@@ -19,7 +19,6 @@ const StockMovementSchema = new Schema(
     },
     reason: {
       type: String,
-      required: true,
       trim: true,
     },
     previousStock: {

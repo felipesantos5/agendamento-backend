@@ -109,6 +109,43 @@ router.post(
   }
 );
 
+router.post(
+  "/product-image",
+  protectAdmin, // Protegido para admin/barbeiro logado
+  // requireRole("admin"), // Ou ajuste a permissão se barbeiros puderem adicionar produtos
+  upload.single("productImageFile"), // Espera um arquivo no campo 'productImageFile'
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "Nenhum arquivo de imagem foi enviado." });
+      }
+
+      // Envia o buffer do arquivo para o Cloudinary
+      cloudinary.uploader
+        .upload_stream(
+          {
+            folder: "product_images", // Salva em uma pasta separada
+            resource_type: "image",
+            // Opcional: Adicionar transformações (redimensionar, etc.)
+            // transformation: [{ width: 500, height: 500, crop: "limit" }]
+          },
+          (error, result) => {
+            if (error || !result) {
+              console.error("Cloudinary product upload error:", error);
+              return res.status(500).json({ error: "Falha no upload da imagem do produto." });
+            }
+            // Retorna a URL segura
+            res.status(200).json({ message: "Imagem do produto enviada com sucesso!", imageUrl: result.secure_url });
+          }
+        )
+        .end(req.file.buffer);
+    } catch (error) {
+      console.error("Erro na rota de upload de imagem de produto:", error);
+      res.status(500).json({ error: "Erro interno no servidor." });
+    }
+  }
+);
+
 // Middleware de tratamento de erro do Multer (genérico para todas as rotas neste arquivo)
 router.use((error, req, res, next) => {
   if (error instanceof multer.MulterError) {

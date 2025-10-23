@@ -1,10 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import Plan from "../models/Plan.js";
-import {
-  protectAdmin,
-  requireRole,
-} from "../middleware/authAdminMiddleware.js";
+import { protectAdmin, requireRole } from "../middleware/authAdminMiddleware.js";
 
 // Usamos mergeParams para acessar o :barbershopId da rota pai
 const router = express.Router({ mergeParams: true });
@@ -25,9 +22,7 @@ router.post("/", async (req, res) => {
 
     // --- 2. ATUALIZE A VALIDAÇÃO PARA INCLUIR O NOVO CAMPO ---
     if (!name || price === undefined || durationInDays === undefined) {
-      return res
-        .status(400)
-        .json({ error: "Nome, preço e duração em dias são obrigatórios." });
+      return res.status(400).json({ error: "Nome, preço e duração em dias são obrigatórios." });
     }
 
     // --- 3. INCLUA O NOVO CAMPO AO CRIAR O PLANO ---
@@ -88,12 +83,9 @@ router.put("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
     );
 
     if (!updatedPlan) {
-      return res
-        .status(404)
-        .json({
-          error:
-            "Plano não encontrado ou você não tem permissão para editá-lo.",
-        });
+      return res.status(404).json({
+        error: "Plano não encontrado ou você não tem permissão para editá-lo.",
+      });
     }
 
     res.status(200).json(updatedPlan);
@@ -107,40 +99,30 @@ router.put("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
  * ROTA PARA DELETAR UM PLANO
  * DELETE /api/barbershops/:barbershopId/plans/:planId
  */
-router.delete(
-  "/:planId",
-  protectAdmin,
-  requireRole("admin"),
-  async (req, res) => {
-    try {
-      const { barbershopId, planId } = req.params;
+router.delete("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
+  try {
+    const { barbershopId, planId } = req.params;
 
-      if (!mongoose.Types.ObjectId.isValid(planId)) {
-        return res.status(400).json({ error: "ID do plano inválido." });
-      }
-
-      const deletedPlan = await Plan.findOneAndDelete({
-        _id: planId,
-        barbershop: barbershopId,
-      });
-
-      if (!deletedPlan) {
-        return res
-          .status(404)
-          .json({
-            error:
-              "Plano não encontrado ou você não tem permissão para deletá-lo.",
-          });
-      }
-
-      res
-        .status(200)
-        .json({ success: true, message: "Plano deletado com sucesso." });
-    } catch (error) {
-      console.error("Erro ao deletar plano:", error);
-      res.status(500).json({ error: "Falha ao deletar o plano." });
+    if (!mongoose.Types.ObjectId.isValid(planId)) {
+      return res.status(400).json({ error: "ID do plano inválido." });
     }
+
+    const deletedPlan = await Plan.findOneAndDelete({
+      _id: planId,
+      barbershop: barbershopId,
+    });
+
+    if (!deletedPlan) {
+      return res.status(404).json({
+        error: "Plano não encontrado ou você não tem permissão para deletá-lo.",
+      });
+    }
+
+    res.status(200).json({ success: true, message: "Plano deletado com sucesso." });
+  } catch (error) {
+    console.error("Erro ao deletar plano:", error);
+    res.status(500).json({ error: "Falha ao deletar o plano." });
   }
-);
+});
 
 export default router;
