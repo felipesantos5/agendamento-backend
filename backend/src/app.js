@@ -36,6 +36,7 @@ import timeBlockRoutes from "./routes/admin/timeBlockRoutes.js";
 import customerAdminRoutes from "./routes/admin/customerRoutes.js";
 import productRoutes from "./routes/products.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
+import dashboardRoutes from "./routes/admin/dashboardRoutes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -121,6 +122,7 @@ app.use("/api/barbershops/:barbershopId/products", productRoutes);
 
 app.use("/api/barbershops/:barbershopId/time-blocks", timeBlockRoutes);
 app.use("/api/barbershops/:barbershopId/bookings", paymentRoutes);
+app.use("/api/barbershops/:barbershopId/dashboard-metrics", dashboardRoutes);
 
 // Exemplo de como você usaria o setBarbershopContext para as rotas da loja pública
 // import { setBarbershopContext } from './middlewares/barbershopContext.js';
