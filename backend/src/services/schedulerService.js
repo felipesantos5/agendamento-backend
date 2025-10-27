@@ -3,23 +3,20 @@ import Booking from "../models/Booking.js";
 import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
 import { startOfDay, endOfDay } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
-import { formatPhoneNumber } from "../utils/phoneFormater.js";
 import { format } from "date-fns";
 
 const BRAZIL_TZ = "America/Sao_Paulo";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Função para buscar agendamentos do dia e enviar lembretes
-const sendDailyReminders = async () => {
+const sendDailyReminders = async (triggerHour) => {
+  console.log(`[${new Date().toLocaleTimeString()}] Iniciando envio de lembretes para triggerHour: ${triggerHour}`);
   const now = new Date();
   const nowInBrazil = toZonedTime(now, BRAZIL_TZ);
 
-  // Obter início e fim do dia no fuso horário do Brasil
   const startOfDayBrazil = startOfDay(nowInBrazil);
   const endOfDayBrazil = endOfDay(nowInBrazil);
 
-  // Converter de volta para UTC para consulta no banco
   const start = fromZonedTime(startOfDayBrazil, BRAZIL_TZ);
   const end = fromZonedTime(endOfDayBrazil, BRAZIL_TZ);
 
@@ -36,54 +33,62 @@ const sendDailyReminders = async () => {
       .populate("barbershop");
 
     if (bookings.length === 0) {
+      console.log(`-> Nenhum agendamento encontrado para hoje.`);
       return;
     }
 
+    let sentCount = 0;
+
     for (const booking of bookings) {
-      // Verifica se os dados necessários existem para evitar erros
       if (!booking.customer || !booking.barbershop || !booking.barber) {
-        console.warn(
-          `Pulando agendamento ${booking._id} por falta de dados populados.`
-        );
+        console.warn(`Pulando agendamento ${booking._id} por falta de dados populados.`);
         continue;
       }
 
+      // Converte o horário do agendamento (UTC) para o fuso horário do Brasil
+      const appointmentDateInBrazil = toZonedTime(new Date(booking.time), BRAZIL_TZ);
+      // Extrai a hora do agendamento no fuso do Brasil
+      const appointmentHourInBrazil = getHours(appointmentDateInBrazil);
+
+      // Se o trigger é 8h, só envia se o agendamento for ANTES das 13h
+      if (triggerHour === 8 && appointmentHourInBrazil >= 13) {
+        continue;
+      }
+      // Se o trigger é 13h, só envia se o agendamento for a partir das 13h
+      if (triggerHour === 13 && appointmentHourInBrazil < 13) {
+        continue;
+      }
+      // --------------------------
+
       const customerPhone = booking.customer.phone;
-      const appointmentTime = format(
-        toZonedTime(new Date(booking.time), BRAZIL_TZ),
-        "HH:mm"
-      );
+      const appointmentTimeFormatted = format(appointmentDateInBrazil, "HH:mm");
 
       const barberShopAdress = booking.barbershop.address
         ? `${booking.barbershop.address.rua}, ${booking.barbershop.address.numero} - ${booking.barbershop.address.bairro}`
         : "";
 
-      const message = `Bom dia, ${booking.customer.name}! Lembrete do seu agendamento hoje na ${booking.barbershop.name} às ${appointmentTime} com ${booking.barber.name} ✅\n\nPara mais informações, entre em contato com a barbearia: ${booking.barbershop.contact} 📱\nEndereço: ${barberShopAdress}💈`;
+      const greeting = triggerHour === 8 ? "Bom dia" : "Olá";
+      const message = `${greeting}, ${booking.customer.name}! Lembrete do seu agendamento hoje na ${booking.barbershop.name} às ${appointmentTimeFormatted} com ${booking.barber.name} ✅\n\nPara mais informações, entre em contato com a barbearia: ${booking.barbershop.contact} 📱\nEndereço: ${barberShopAdress}💈`;
 
       await sendWhatsAppConfirmation(customerPhone, message);
+      sentCount++;
+      console.log(`-> Lembrete enviado para ${booking.customer.name} (${customerPhone}) - Agendamento às ${appointmentTimeFormatted}`);
 
-      // --- PASSO 3: ADICIONE A PAUSA ALEATÓRIA ---
-      // Define um tempo de espera mínimo e máximo em milissegundos
-      const MIN_DELAY = 5000; // 5 segundos
-      const MAX_DELAY = 15000; // 15 segundos
-
-      // Calcula um tempo de espera aleatório dentro do intervalo
-      const randomDelay =
-        Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY + 1)) + MIN_DELAY;
-
-      // Pausa a execução do loop pelo tempo calculado
+      // Pausa aleatória
+      const MIN_DELAY = 5000;
+      const MAX_DELAY = 15000;
+      const randomDelay = Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY + 1)) + MIN_DELAY;
       await delay(randomDelay);
     }
+    console.log(`✅ Envio de lembretes (trigger: ${triggerHour}) concluído. ${sentCount} mensagens enviadas.`);
   } catch (error) {
-    console.error("Erro ao enviar lembretes de agendamento:", error);
+    console.error(`❌ Erro ao enviar lembretes de agendamento (trigger: ${triggerHour}):`, error);
   }
 };
 
 const updateExpiredBookings = async () => {
   const now = new Date();
-  console.log(
-    `[${now.toLocaleTimeString()}] Executando verificação de agendamentos expirados...`
-  );
+  console.log(`[${now.toLocaleTimeString()}] Executando verificação de agendamentos expirados...`);
 
   try {
     // 1. Define a condição de busca:
@@ -103,25 +108,30 @@ const updateExpiredBookings = async () => {
     const result = await Booking.updateMany(filter, update);
 
     if (result.modifiedCount > 0) {
-      console.log(
-        `✅ ${result.modifiedCount} agendamento(s) atualizado(s) para 'completed'.`
-      );
+      console.log(`✅ ${result.modifiedCount} agendamento(s) atualizado(s) para 'completed'.`);
     } else {
       console.log("-> Nenhum agendamento expirado encontrado para atualizar.");
     }
   } catch (error) {
-    console.error(
-      "❌ Erro ao atualizar status de agendamentos expirados:",
-      error
-    );
+    console.error("❌ Erro ao atualizar status de agendamentos expirados:", error);
   }
 };
 
-// Agenda a tarefa para ser executada todos os dias às 8h da manhã
 cron.schedule(
   "0 8 * * *",
   () => {
-    sendDailyReminders();
+    sendDailyReminders(8);
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
+
+cron.schedule(
+  "0 13 * * *",
+  () => {
+    sendDailyReminders(13);
   },
   {
     scheduled: true,
@@ -138,10 +148,6 @@ cron.schedule(
     scheduled: true,
     timezone: "America/Sao_Paulo",
   }
-);
-
-console.log(
-  "✅ Serviço de atualização de status de agendamentos iniciado (executa a cada hora)."
 );
 
 updateExpiredBookings();
