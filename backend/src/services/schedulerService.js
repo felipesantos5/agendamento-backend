@@ -1,7 +1,7 @@
 import cron from "node-cron";
 import Booking from "../models/Booking.js";
 import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
-import { startOfDay, endOfDay } from "date-fns";
+import { startOfDay, endOfDay, getHours } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
 
