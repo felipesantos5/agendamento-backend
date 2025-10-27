@@ -88,8 +88,6 @@ const sendDailyReminders = async (triggerHour) => {
 
 const updateExpiredBookings = async () => {
   const now = new Date();
-  console.log(`[${now.toLocaleTimeString()}] Executando verificação de agendamentos expirados...`);
-
   try {
     // 1. Define a condição de busca:
     //    - A data/hora do agendamento é anterior a agora.
@@ -109,8 +107,6 @@ const updateExpiredBookings = async () => {
 
     if (result.modifiedCount > 0) {
       console.log(`✅ ${result.modifiedCount} agendamento(s) atualizado(s) para 'completed'.`);
-    } else {
-      console.log("-> Nenhum agendamento expirado encontrado para atualizar.");
     }
   } catch (error) {
     console.error("❌ Erro ao atualizar status de agendamentos expirados:", error);

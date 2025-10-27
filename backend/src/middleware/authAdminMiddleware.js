@@ -45,10 +45,11 @@ export const protectAdmin = (req, res, next) => {
   }
 };
 
-export const requireRole = (requiredRole) => {
+export const requireRole = (...allowedRoles) => {
   return (req, res, next) => {
-    if (req.adminUser && req.adminUser.role === requiredRole) {
-      next(); // Permite o acesso se a função for a correta
+    // Verifica se existe um usuário autenticado e se a role dele está na lista de roles permitidas
+    if (req.adminUser && allowedRoles.includes(req.adminUser.role)) {
+      next(); // Permite o acesso se a função do usuário for uma das permitidas
     } else {
       res.status(403).json({ error: "Acesso proibido: permissões insuficientes." });
     }
