@@ -12,76 +12,292 @@ const router = express.Router({ mergeParams: true });
 
 // ROTA PARA LISTAR TODOS OS CLIENTES DA BARBEARIA
 // GET /api/barbershops/:barbershopId/admin/customers
-router.get("/", async (req, res) => {
+router.get("/", protectAdmin, requireRole("admin", "barber"), async (req, res) => {
   try {
     const { barbershopId } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 15;
+    const skip = (page - 1) * limit;
+    const searchTerm = req.query.search || ""; // Pega o termo de busca da query
 
-    // Método alternativo: usar agregação
-    const customerData = await Booking.aggregate([
-      // 1. Filtrar bookings da barbearia
-      { $match: { barbershop: new mongoose.Types.ObjectId(barbershopId) } },
+    if (!mongoose.Types.ObjectId.isValid(barbershopId)) {
+      return res.status(400).json({ error: "ID da barbearia inválido." });
+    }
 
-      // 2. Agrupar por customer para obter IDs únicos
+    // --- Início da Pipeline de Agregação ---
+    // Começa com os estágios que sempre serão executados
+    const pipeline = [
+      // 1. Filtrar bookings apenas desta barbearia
+      {
+        $match: {
+          barbershop: new mongoose.Types.ObjectId(barbershopId),
+        },
+      },
+      // 2. Ordenar os bookings DE CADA cliente pelo mais recente primeiro
+      {
+        $sort: { time: -1 },
+      },
+      // 3. Agrupar por cliente para pegar a data do último booking e manter o ID
       {
         $group: {
           _id: "$customer",
-          count: { $sum: 1 },
+          lastBookingTime: { $first: "$time" },
         },
       },
-
-      // 3. Projetar apenas o ID do customer
+      // 4. Buscar os detalhes do cliente
       {
-        $project: {
-          customerId: "$_id",
-          _id: 0,
+        $lookup: {
+          from: "customers",
+          localField: "_id",
+          foreignField: "_id",
+          as: "customerDetails",
         },
       },
-    ]);
-    if (customerData.length === 0) {
-      return res.status(200).json([]);
+      // 5. Desconstrói o array (remove clientes sem detalhes, ex: deletados)
+      {
+        $unwind: "$customerDetails",
+      },
+    ];
+
+    // --- Adiciona o estágio $match de busca CONDICIONALMENTE ---
+    if (searchTerm) {
+      // Tenta buscar pelo nome diretamente (case-insensitive)
+      const nameSearchRegex = new RegExp(searchTerm, "i"); // Usar searchTerm diretamente
+
+      // Mantém a busca por telefone como estava
+      const phoneSearchRegex = searchTerm.replace(/\D/g, ""); // Apenas dígitos para telefone
+
+      pipeline.push({
+        $match: {
+          $or: [
+            { "customerDetails.name": nameSearchRegex }, // Aplica o regex simples no nome
+            // Busca apenas se o searchTerm parece ser um número de telefone (contém dígitos)
+            // Isso evita que a busca por "Joao" tente encontrar "Joao" no campo telefone.
+            ...(phoneSearchRegex.length > 0 ? [{ "customerDetails.phone": { $regex: phoneSearchRegex } }] : []),
+          ],
+        },
+      });
     }
 
-    // Extrair apenas os IDs válidos
-    const validCustomerIds = customerData.map((item) => item.customerId).filter((id) => id && mongoose.Types.ObjectId.isValid(id));
+    // --- Continua com os estágios restantes da pipeline ---
+    pipeline.push(
+      // 7. Ordenar os clientes (filtrados ou não) pelo último agendamento
+      {
+        $sort: { lastBookingTime: -1 },
+      },
+      // 8. Facet para Paginação e Contagem Total
+      {
+        $facet: {
+          metadata: [{ $count: "totalCustomers" }], // Conta o total APÓS o filtro de busca (se houver)
+          data: [
+            { $skip: skip },
+            { $limit: limit },
+            // Lookup das assinaturas
+            {
+              $lookup: {
+                from: "subscriptions",
+                let: { customerId: "$_id" }, // Usa _id que veio do $group original (é o customer ID)
+                pipeline: [
+                  {
+                    $match: {
+                      $expr: { $eq: ["$customer", "$$customerId"] },
+                      status: "active",
+                      barbershop: new mongoose.Types.ObjectId(barbershopId),
+                      endDate: { $gte: new Date() },
+                    },
+                  },
+                  { $lookup: { from: "plans", localField: "plan", foreignField: "_id", as: "planDetails" } },
+                  { $unwind: { path: "$planDetails", preserveNullAndEmptyArrays: true } },
+                ],
+                as: "activeSubscriptions",
+              },
+            },
+            // Project final
+            {
+              $project: {
+                _id: "$customerDetails._id",
+                name: "$customerDetails.name",
+                phone: "$customerDetails.phone",
+                imageUrl: "$customerDetails.imageUrl",
+                createdAt: "$customerDetails.createdAt",
+                lastBookingTime: "$lastBookingTime",
+                subscriptions: {
+                  // Formata as assinaturas
+                  $map: {
+                    input: "$activeSubscriptions",
+                    as: "sub",
+                    in: {
+                      _id: "$$sub._id",
+                      startDate: "$$sub.startDate",
+                      endDate: "$$sub.endDate",
+                      status: "$$sub.status",
+                      plan: {
+                        _id: "$$sub.planDetails._id",
+                        name: "$$sub.planDetails.name",
+                        price: "$$sub.planDetails.price",
+                        durationInDays: "$$sub.planDetails.durationInDays",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ], // Fim do sub-pipeline 'data'
+        }, // Fim do $facet
+      } // Fim do objeto $facet
+    ); // Fim do push
 
-    // Buscar clientes
-    const customers = await Customer.find({
-      _id: { $in: validCustomerIds },
+    // Executa a pipeline completa
+    const results = await Booking.aggregate(pipeline);
+
+    const customers = results[0]?.data || [];
+    const totalCustomers = results[0]?.metadata[0]?.totalCustomers || 0;
+    const totalPages = Math.ceil(totalCustomers / limit);
+
+    res.status(200).json({
+      customers,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalCustomers: totalCustomers,
+        limit: limit,
+        searchTerm: searchTerm, // Retorna o termo de busca usado
+      },
     });
-
-    // Buscar subscriptions para cada cliente
-    const customersWithSubscriptions = await Promise.all(
-      customers.map(async (customer) => {
-        // AQUI: Adicione o filtro barbershop
-        const now = new Date(); // Pega a data/hora atual
-        const activeSubscriptions = await Subscription.find({
-          customer: customer._id,
-          status: "active",
-          barbershop: barbershopId,
-          endDate: { $gte: now }, // <--- Adicione esta linha: Garante que a data final ainda não passou
-        }).populate({
-          path: "plan",
-          select: "name description price durationInDays",
-        });
-
-        return {
-          _id: customer._id,
-          name: customer.name,
-          phone: customer.phone,
-          imageUrl: customer.imageUrl,
-          createdAt: customer.createdAt,
-          subscriptions: activeSubscriptions,
-        };
-      })
-    );
-
-    res.status(200).json(customersWithSubscriptions);
   } catch (error) {
-    console.error("💥 Erro ao listar clientes:", error);
+    console.error("💥 Erro ao listar clientes com paginação/busca:", error);
     res.status(500).json({
       error: "Erro ao listar clientes.",
       details: process.env.NODE_ENV === "development" ? error.message : undefined,
     });
+  }
+});
+
+// --- As outras rotas (GET /:customerId, POST /:customerId/subscribe, GET /:customerId/bookings) ---
+// ... (coloque o código das suas outras rotas aqui) ...
+// GET /:customerId
+router.get("/:customerId", protectAdmin, requireRole("admin", "barber"), async (req, res) => {
+  try {
+    const { customerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      return res.status(400).json({ error: "ID do cliente inválido." });
+    }
+
+    const customer = await Customer.findById(customerId).populate({
+      path: "subscriptions",
+      match: { status: "active", endDate: { $gte: new Date() } },
+      populate: {
+        path: "plan",
+        select: "name description price durationInDays",
+      },
+    });
+
+    if (!customer) {
+      return res.status(404).json({ error: "Cliente não encontrado." });
+    }
+
+    res.status(200).json(customer);
+  } catch (error) {
+    console.error("Erro ao buscar cliente:", error);
+    if (error.name === "CastError") {
+      return res.status(400).json({ error: "ID do cliente inválido." });
+    }
+    res.status(500).json({ error: "Erro ao buscar cliente." });
+  }
+});
+
+// POST /:customerId/subscribe
+router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async (req, res) => {
+  try {
+    const { barbershopId, customerId } = req.params;
+    const { planId } = req.body;
+
+    if (!mongoose.Types.ObjectId.isValid(customerId) || !mongoose.Types.ObjectId.isValid(planId)) {
+      return res.status(400).json({ error: "ID do cliente ou plano inválido." });
+    }
+
+    const [customer, plan] = await Promise.all([Customer.findById(customerId), Plan.findById(planId)]);
+
+    if (!customer || !plan) {
+      return res.status(404).json({ error: "Cliente ou plano não encontrado." });
+    }
+    if (plan.barbershop.toString() !== barbershopId) {
+      return res.status(400).json({ error: "Este plano não pertence a esta barbearia." });
+    }
+    if (!plan.durationInDays || typeof plan.durationInDays !== "number" || plan.durationInDays <= 0) {
+      return res.status(400).json({
+        error: `O plano "${plan.name}" não possui uma duração válida definida.`,
+      });
+    }
+
+    const startDate = new Date();
+    const endDate = addDays(startDate, plan.durationInDays);
+
+    if (isNaN(endDate.getTime())) {
+      console.error("endDate resultou em Data Inválida. startDate:", startDate, "durationInDays:", plan.durationInDays);
+      return res.status(500).json({ error: "Falha ao calcular a data final da assinatura." });
+    }
+
+    const existingActiveSubscriptionForPlan = await Subscription.findOne({
+      customer: customerId,
+      plan: planId,
+      barbershop: barbershopId,
+      status: "active",
+      endDate: { $gte: new Date() },
+    });
+    if (existingActiveSubscriptionForPlan) {
+      return res.status(409).json({ error: `O cliente já possui uma assinatura ativa para o plano "${plan.name}".` });
+    }
+
+    const newSubscription = await Subscription.create({
+      customer: customerId,
+      plan: planId,
+      barbershop: barbershopId,
+      startDate,
+      endDate,
+      status: "active",
+    });
+
+    customer.subscriptions.push(newSubscription._id);
+    await customer.save();
+
+    const populatedSubscription = await Subscription.findById(newSubscription._id)
+      .populate("plan", "name price durationInDays")
+      .populate("customer", "name phone");
+
+    res.status(201).json(populatedSubscription || newSubscription);
+  } catch (error) {
+    console.error("Erro ao inscrever cliente no plano:", error);
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ error: "Dados inválidos para a assinatura.", details: error.errors });
+    }
+    res.status(500).json({ error: "Falha ao atrelar o plano." });
+  }
+});
+
+// GET /:customerId/bookings
+router.get("/:customerId/bookings", protectAdmin, requireRole("admin", "barber"), async (req, res) => {
+  try {
+    const { barbershopId, customerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(customerId)) {
+      return res.status(400).json({ error: "ID do cliente inválido." });
+    }
+
+    const bookings = await Booking.find({
+      customer: customerId,
+      barbershop: barbershopId,
+    })
+      .sort({ time: -1 })
+      .populate("service", "name price duration")
+      .populate("barber", "name image")
+      .populate("barbershop", "name");
+
+    res.status(200).json(bookings);
+  } catch (error) {
+    console.error("Erro ao buscar agendamentos do cliente:", error);
+    res.status(500).json({ error: "Erro ao buscar agendamentos do cliente." });
   }
 });
 
