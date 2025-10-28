@@ -72,7 +72,6 @@ const sendDailyReminders = async (triggerHour) => {
 
       await sendWhatsAppConfirmation(customerPhone, message);
       sentCount++;
-      console.log(`-> Lembrete enviado para ${booking.customer.name} (${customerPhone}) - Agendamento às ${appointmentTimeFormatted}`);
 
       // Pausa aleatória
       const MIN_DELAY = 5000;
