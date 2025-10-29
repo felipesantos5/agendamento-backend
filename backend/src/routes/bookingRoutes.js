@@ -14,7 +14,6 @@ import { checkHolidayAvailability } from "../middleware/holidayCheck.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
 import { startOfMonth, endOfMonth, format, eachDayOfInterval, isToday, isPast } from "date-fns";
-import { checkIsHoliday } from "../services/holidayService.js";
 import { z } from "zod";
 import { ptBR } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
@@ -321,13 +320,6 @@ router.get("/:barberId/monthly-availability", async (req, res) => {
         continue;
       }
 
-      // Causa #2: Feriado
-      const holidayCheck = await checkIsHoliday(day);
-      if (holidayCheck.isHoliday) {
-        unavailableDays.add(dayString);
-        continue;
-      }
-
       // Causa #3: Barbeiro não trabalha
       const workHours = availabilityMap.get(dayOfWeekName.toLowerCase());
       if (!workHours) {
@@ -539,18 +531,7 @@ router.patch("/:bookingId/reschedule", async (req, res) => {
       });
     }
 
-    // 3. Verificar disponibilidade do NOVO horário
-    //    (Lógica similar à verificação de criação e free-slots)
-
-    //    a) Verificar feriado
-    const holidayCheck = await checkIsHoliday(newBookingTime);
-    if (holidayCheck.isHoliday) {
-      return res.status(400).json({
-        error: `O novo horário (${holidayCheck.holidayName}) é um feriado.`,
-      });
-    }
-
-    //    b) Verificar disponibilidade do barbeiro (dia da semana e horário)
+    // Verificar disponibilidade do barbeiro (dia da semana e horário)
     const dayOfWeekName = format(newBookingTime, "EEEE", { locale: ptBR });
     const workHours = barber.availability.find((a) => a.day.toLowerCase() === dayOfWeekName.toLowerCase());
     if (!workHours) {
