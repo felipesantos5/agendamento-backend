@@ -10,7 +10,6 @@ import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
-import { checkHolidayAvailability } from "../middleware/holidayCheck.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
 import { startOfMonth, endOfMonth, format, eachDayOfInterval, isToday, isPast } from "date-fns";
@@ -26,7 +25,7 @@ const rescheduleSchema = z.object({
   newTime: z.string().datetime({ message: "Formato de data e hora inválido" }),
 });
 
-router.post("/", checkHolidayAvailability, appointmentLimiter, async (req, res) => {
+router.post("/", appointmentLimiter, async (req, res) => {
   try {
     const { barbershopId } = req.params;
     const data = BookingValidationSchema.parse(req.body);
