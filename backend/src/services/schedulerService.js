@@ -79,7 +79,6 @@ const sendDailyReminders = async (triggerHour) => {
       const randomDelay = Math.floor(Math.random() * (MAX_DELAY - MIN_DELAY + 1)) + MIN_DELAY;
       await delay(randomDelay);
     }
-    console.log(`✅ Envio de lembretes (trigger: ${triggerHour}) concluído. ${sentCount} mensagens enviadas.`);
   } catch (error) {
     console.error(`❌ Erro ao enviar lembretes de agendamento (trigger: ${triggerHour}):`, error);
   }
@@ -103,10 +102,6 @@ const updateExpiredBookings = async () => {
 
     // 3. Executa a atualização em massa no banco de dados
     const result = await Booking.updateMany(filter, update);
-
-    if (result.modifiedCount > 0) {
-      console.log(`✅ ${result.modifiedCount} agendamento(s) atualizado(s) para 'completed'.`);
-    }
   } catch (error) {
     console.error("❌ Erro ao atualizar status de agendamentos expirados:", error);
   }
