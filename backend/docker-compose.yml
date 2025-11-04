@@ -31,8 +31,12 @@ services:
       - redis
     networks:
       - app_network
+
+    sysctls:
+    net.ipv6.conf.all.disable_ipv6: 1
+    net.ipv6.conf.default.disable_ipv6: 1
+
     environment:
-      # - CONFIG_SESSION_PHONE_VERSION=2.3000.1029362725
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_REDIS_ENABLED=true
