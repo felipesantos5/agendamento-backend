@@ -32,7 +32,7 @@ services:
     networks:
       - app_network
     environment:
-      - CONFIG_SESSION_PHONE_VERSION=2.3000.1025212177
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1029362725
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_REDIS_ENABLED=true
