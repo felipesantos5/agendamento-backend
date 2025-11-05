@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 import Booking from "../models/Booking.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
+import Subscription from "../models/Subscription.js";
+import StockMovement from "../models/StockMovement.js";
 import "dotenv/config";
 
 const router = express.Router({ mergeParams: true });
@@ -118,70 +120,113 @@ router.get("/", protectAdmin, requireRole("admin"), async (req, res) => {
 // GET /api/barbershops/:barbershopId/analytics/commissions/summary
 router.get("/summary", protectAdmin, async (req, res) => {
   try {
-    const { barbershopId } = req.params; // Correção: Obter barbershopId de req.params
+    const { barbershopId } = req.params;
     if (!mongoose.Types.ObjectId.isValid(barbershopId)) {
       return res.status(400).json({ error: "ID da barbearia inválido." });
     }
 
     const { year } = req.query;
-
     const currentYear = year || new Date().getFullYear();
+    const barbershopMongoId = new mongoose.Types.ObjectId(barbershopId);
 
-    // Resumo mensal de comissões
-    const monthlySummary = await Booking.aggregate([
-      {
-        $match: {
-          barbershop: new mongoose.Types.ObjectId(barbershopId),
-          status: "completed",
-          time: {
-            $gte: new Date(currentYear, 0, 1),
-            $lte: new Date(currentYear, 11, 31, 23, 59, 59),
+    // Define o período do ano inteiro
+    const startDate = new Date(currentYear, 0, 1); // 1º de Janeiro
+    const endDate = new Date(currentYear, 11, 31, 23, 59, 59); // 31 de Dezembro
+
+    // 1. Vamos buscar as 3 fontes de receita em paralelo
+    const [serviceRevenue, planRevenue, productRevenue] = await Promise.all([
+      // Agregação 1: Receita de Serviços (Bookings)
+      Booking.aggregate([
+        {
+          $match: {
+            barbershop: barbershopMongoId,
+            status: "completed",
+            // IMPORTANTE: Ignora receita de planos e prêmios
+            paymentStatus: { $nin: ["plan_credit", "loyalty_reward"] },
+            time: { $gte: startDate, $lte: endDate },
           },
         },
-      },
-      {
-        $lookup: {
-          from: "barbers",
-          localField: "barber",
-          foreignField: "_id",
-          as: "barberInfo",
-        },
-      },
-      {
-        $lookup: {
-          from: "services",
-          localField: "service",
-          foreignField: "_id",
-          as: "serviceInfo",
-        },
-      },
-      { $unwind: "$barberInfo" },
-      { $unwind: "$serviceInfo" },
-      {
-        $group: {
-          _id: {
-            month: { $month: "$time" },
-            year: { $year: "$time" },
+        { $lookup: { from: "services", localField: "service", foreignField: "_id", as: "serviceInfo" } },
+        { $unwind: "$serviceInfo" },
+        {
+          $group: {
+            _id: { month: { $month: "$time" } },
+            totalRevenue: { $sum: "$serviceInfo.price" },
           },
-          totalRevenue: { $sum: "$serviceInfo.price" },
-          totalCommissions: {
-            $sum: {
-              $multiply: ["$serviceInfo.price", { $divide: ["$barberInfo.commission", 100] }],
-            },
-          },
-          totalServices: { $sum: 1 },
         },
-      },
-      { $sort: { "_id.month": 1 } },
+      ]),
+
+      // Agregação 2: Receita de Planos (Subscriptions)
+      Subscription.aggregate([
+        {
+          $match: {
+            barbershop: barbershopMongoId,
+            createdAt: { $gte: startDate, $lte: endDate }, // Data da VENDA do plano
+          },
+        },
+        { $lookup: { from: "plans", localField: "plan", foreignField: "_id", as: "planDetails" } },
+        { $unwind: "$planDetails" },
+        {
+          $group: {
+            _id: { month: { $month: "$createdAt" } },
+            totalRevenue: { $sum: "$planDetails.price" },
+          },
+        },
+      ]),
+
+      // Agregação 3: Receita de Produtos (StockMovements)
+      StockMovement.aggregate([
+        {
+          $match: {
+            barbershop: barbershopMongoId,
+            type: "venda", // Apenas vendas
+            createdAt: { $gte: startDate, $lte: endDate },
+          },
+        },
+        { $lookup: { from: "products", localField: "product", foreignField: "_id", as: "productDetails" } },
+        { $unwind: "$productDetails" },
+        {
+          $group: {
+            _id: { month: { $month: "$createdAt" } },
+            // Faturamento Bruto (Preço de Venda * Qtd)
+            totalRevenue: { $sum: { $multiply: ["$quantity", "$productDetails.price.sale"] } },
+          },
+        },
+      ]),
     ]);
+
+    // 2. Combinar os resultados em um array de 12 meses
+    const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+    // Inicializa o array do gráfico com 12 meses zerados
+    const monthlySummary = months.map((monthName, index) => ({
+      month: index + 1, // 1 para Jan, 2 para Fev...
+      name: monthName,
+      totalRevenue: 0,
+    }));
+
+    // Função auxiliar para somar os resultados no array 'monthlySummary'
+    const combineRevenue = (results) => {
+      results.forEach((item) => {
+        const monthIndex = item._id.month - 1; // Mês da agregação é 1-based
+        if (monthlySummary[monthIndex]) {
+          monthlySummary[monthIndex].totalRevenue += item.totalRevenue;
+        }
+      });
+    };
+
+    // Combina as 3 fontes de receita
+    combineRevenue(serviceRevenue);
+    combineRevenue(planRevenue);
+    combineRevenue(productRevenue);
 
     res.json({
       success: true,
-      data: monthlySummary,
+      data: monthlySummary, // Array final pronto para o gráfico
       year: currentYear,
     });
   } catch (error) {
-    console.error("Erro ao buscar resumo de comissões:", error);
+    console.error("Erro ao buscar resumo de faturamento mensal:", error);
     res.status(500).json({ error: "Erro ao buscar resumo" });
   }
 });

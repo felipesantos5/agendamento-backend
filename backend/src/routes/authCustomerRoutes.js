@@ -3,18 +3,17 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Customer from "../models/Customer.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
+import { otpLimiter, loginLimiter } from "../middleware/rateLimiting.js";
 
 const router = express.Router();
 
 // ROTA: POST /api/auth/customer/request-otp
 // O cliente solicita um código de acesso
-router.post("/request-otp", async (req, res) => {
+router.post("/request-otp", otpLimiter, async (req, res) => {
   try {
     const { phone, name } = req.body;
     if (!phone) {
-      return res
-        .status(400)
-        .json({ error: "O número de telefone é obrigatório." });
+      return res.status(400).json({ error: "O número de telefone é obrigatório." });
     }
 
     // Encontra ou cria o cliente
@@ -44,13 +43,11 @@ router.post("/request-otp", async (req, res) => {
 
 // ROTA: POST /api/auth/customer/verify-otp
 // O cliente envia o código para fazer o login
-router.post("/verify-otp", async (req, res) => {
+router.post("/verify-otp", loginLimiter, async (req, res) => {
   try {
     const { phone, otp } = req.body;
     if (!phone || !otp) {
-      return res
-        .status(400)
-        .json({ error: "Telefone e código são obrigatórios." });
+      return res.status(400).json({ error: "Telefone e código são obrigatórios." });
     }
 
     // Encontra o cliente e verifica se o token não expirou
@@ -60,17 +57,13 @@ router.post("/verify-otp", async (req, res) => {
     });
 
     if (!customer) {
-      return res
-        .status(401)
-        .json({ error: "Código inválido ou expirado. Tente novamente." });
+      return res.status(401).json({ error: "Código inválido ou expirado. Tente novamente." });
     }
 
     // Compara o código enviado com o código hasheado no banco
     const isMatch = await bcrypt.compare(otp, customer.otpCode);
     if (!isMatch) {
-      return res
-        .status(401)
-        .json({ error: "Código inválido ou expirado. Tente novamente." });
+      return res.status(401).json({ error: "Código inválido ou expirado. Tente novamente." });
     }
 
     // Limpa o OTP do banco para que não possa ser usado novamente
@@ -83,6 +76,18 @@ router.post("/verify-otp", async (req, res) => {
     const token = jwt.sign(payload, process.env.JWT_SECRET, {
       expiresIn: "90d", // Token de longa duração, como solicitado
     });
+
+    // --- INÍCIO DA MELHORIA: ADICIONAR COOKIE HttpOnly ---
+    const AUTH_COOKIE_NAME = "customerAuthToken"; // Nome diferente do cookie de admin
+
+    const cookieOptions = {
+      httpOnly: true, // Impede acesso via JavaScript no navegador
+      secure: process.env.NODE_ENV === "production", // Usa 'secure' (HTTPS) apenas em produção
+      sameSite: "Lax", // Proteção CSRF
+      maxAge: 90 * 24 * 60 * 60 * 1000, // 90 dias
+      path: "/", // Cookie acessível em todo o site
+    };
+    res.cookie(AUTH_COOKIE_NAME, token, cookieOptions);
 
     res.status(200).json({
       success: true,

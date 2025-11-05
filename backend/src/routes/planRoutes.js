@@ -70,7 +70,7 @@ router.get("/", async (req, res) => {
 router.put("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, planId } = req.params;
-    const { name, description, price } = req.body;
+    const { name, description, price, durationInDays } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(planId)) {
       return res.status(400).json({ error: "ID do plano inválido." });
@@ -78,7 +78,7 @@ router.put("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
 
     const updatedPlan = await Plan.findOneAndUpdate(
       { _id: planId, barbershop: barbershopId }, // Garante que o admin só pode editar planos da sua própria barbearia
-      { $set: { name, description, price } },
+      { $set: { name, description, price, durationInDays } },
       { new: true, runValidators: true }
     );
 

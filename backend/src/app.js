@@ -17,7 +17,7 @@ import { fileURLToPath } from "url";
 import path from "path";
 
 import connectDB from "./config/db.js";
-
+import helmet from "helmet";
 import barbershopRoutes from "./routes/barbershopRoutes.js";
 import barberRoutes from "./routes/barberRoutes.js";
 import serviceRoutes from "./routes/serviceRoutes.js";
@@ -37,6 +37,8 @@ import customerAdminRoutes from "./routes/admin/customerRoutes.js";
 import productRoutes from "./routes/products.js";
 import paymentRoutes from "./routes/paymentRoutes.js";
 import dashboardRoutes from "./routes/admin/dashboardRoutes.js";
+import barberPerformanceRoutes from "./routes/admin/barberPerformanceRoutes.js";
+import manualBookingRoutes from "./routes/admin/manualBookingRoute.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -86,6 +88,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 // app.use(cors({ origin: "*", credentials: true }));
 
+app.use(helmet());
 app.use(cookieParser());
 app.use(express.json());
 
@@ -123,6 +126,8 @@ app.use("/api/barbershops/:barbershopId/products", productRoutes);
 app.use("/api/barbershops/:barbershopId/time-blocks", timeBlockRoutes);
 app.use("/api/barbershops/:barbershopId/bookings", paymentRoutes);
 app.use("/api/barbershops/:barbershopId/dashboard-metrics", dashboardRoutes);
+app.use("/api/barbershops/:barbershopId/barber-performance", barberPerformanceRoutes);
+app.use("/api/barbershops/:barbershopId/admin/bookings", manualBookingRoutes);
 
 // Exemplo de como você usaria o setBarbershopContext para as rotas da loja pública
 // import { setBarbershopContext } from './middlewares/barbershopContext.js';

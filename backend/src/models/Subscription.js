@@ -31,6 +31,10 @@ const subscriptionSchema = new mongoose.Schema(
       enum: ["active", "expired", "canceled"],
       default: "active",
     },
+    creditsRemaining: {
+      type: Number,
+      required: true,
+    },
   },
   { timestamps: true }
 );
