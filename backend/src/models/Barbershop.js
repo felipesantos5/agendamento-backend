@@ -43,6 +43,25 @@ const BarbershopSchema = new mongoose.Schema(
     },
     mercadoPagoAccessToken: { type: String, trim: true },
     paymentsEnabled: { type: Boolean, default: false },
+
+    loyaltyProgram: {
+      enabled: {
+        type: Boolean,
+        default: false,
+      },
+      // O "X cortes"
+      targetCount: {
+        type: Number,
+        default: 5,
+        min: 1,
+      },
+      // A "recompensa"
+      rewardDescription: {
+        type: String,
+        trim: true,
+        default: "1 Corte Grátis",
+      },
+    },
   },
   { timestamps: true }
 );

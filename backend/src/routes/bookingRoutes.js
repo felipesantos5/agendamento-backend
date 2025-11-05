@@ -6,6 +6,7 @@ import Barber from "../models/Barber.js";
 import Service from "../models/Service.js";
 import BlockedDay from "../models/BlockedDay.js";
 import TimeBlock from "../models/TimeBlock.js";
+import Subscription from "../models/Subscription.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
@@ -63,17 +64,59 @@ router.post("/", appointmentLimiter, async (req, res) => {
       });
     }
 
+    const service = await Service.findById(data.service);
+    if (!service) {
+      return res.status(404).json({ error: "Serviço não encontrado." });
+    }
+
     const bookingPayload = {
       ...data,
       customer: customer._id,
       barbershop: barbershopId,
     };
 
-    if (barbershop.paymentsEnabled) {
-      bookingPayload.paymentStatus = "pending";
+    let activeSubscription = null;
+
+    if (service.isPlanService && service.plan) {
+      activeSubscription = await Subscription.findOne({
+        customer: customer._id,
+        plan: service.plan,
+        barbershop: barbershopId,
+        status: "active",
+        endDate: { $gte: new Date() },
+        creditsRemaining: { $gt: 0 },
+      });
+
+      if (activeSubscription) {
+        // Cliente tem créditos!
+        bookingPayload.paymentStatus = "plan_credit";
+        bookingPayload.status = "confirmed"; // Já entra como confirmado
+        bookingPayload.subscriptionUsed = activeSubscription._id;
+      } else {
+        // Cliente não tem créditos, e o serviço é SÓ de plano
+        return res.status(403).json({
+          error: "Este serviço é exclusivo para assinantes do plano e você não possui créditos válidos.",
+        });
+      }
+    } else {
+      // Serviço normal, segue fluxo de pagamento padrão
+      if (barbershop.paymentsEnabled) {
+        bookingPayload.paymentStatus = "pending";
+      } else {
+        bookingPayload.paymentStatus = "n/a"; // Ou 'approved' se o padrão for agendar sem pagar
+      }
     }
 
     const createdBooking = await Booking.create(bookingPayload);
+
+    if (activeSubscription) {
+      activeSubscription.creditsRemaining -= 1;
+      // Opcional: se os créditos chegarem a 0, poderia mudar o status
+      if (activeSubscription.creditsRemaining === 0) {
+        activeSubscription.status = "expired";
+      }
+      await activeSubscription.save();
+    }
 
     customer.bookings.push(createdBooking._id);
     await customer.save();
@@ -83,7 +126,7 @@ router.post("/", appointmentLimiter, async (req, res) => {
 
       // websocket para atualizar dashboard do barbeiro
       const populatedBooking = await Booking.findById(createdBooking._id)
-        .populate("customer", "name")
+        .populate("customer", "name phone")
         .populate("barber", "name")
         .populate("service", "name price duration")
         .lean();
@@ -132,10 +175,10 @@ router.get("/", async (req, res) => {
     }
 
     const bookings = await Booking.find({ barbershop: barbershopId })
-      .sort({ time: -1 }) // <-- ADICIONE ESTA LINHA
+      .sort({ time: -1 })
       .populate("barber", "name")
       .populate("service", "name price duration")
-      .populate("customer", "name phone");
+      .populate("customer", "name phone loyaltyData");
 
     res.json(bookings);
   } catch (error) {
@@ -151,6 +194,7 @@ router.put(
     try {
       const { barbershopId, bookingId } = req.params;
       const { status } = req.body;
+      const barbershopMongoId = new mongoose.Types.ObjectId(barbershopId);
 
       // 1. Validação dos IDs
       if (!mongoose.Types.ObjectId.isValid(bookingId)) {
@@ -160,7 +204,7 @@ router.put(
       const booking = await Booking.findOne({
         _id: bookingId,
         barbershop: barbershopId,
-      }).populate("customer", "name phone");
+      }).populate("customer");
 
       if (!booking) {
         return res.status(404).json({ error: "Agendamento não encontrado nesta barbearia." });
@@ -189,7 +233,44 @@ router.put(
         sendWhatsAppConfirmation(booking.customer.phone, message);
       }
 
-      // 3. Encontrar o agendamento
+      // --- LÓGICA DE FIDELIDADE (CORRIGIDA) ---
+      if (status === "completed" && barbershop.loyaltyProgram?.enabled && !booking.countedForLoyalty && !booking.isLoyaltyReward) {
+        const customer = booking.customer;
+
+        if (customer) {
+          // Procura a entrada de fidelidade para ESTA barbearia
+          let loyaltyEntry = customer.loyaltyData.find((entry) => entry.barbershop.equals(barbershopMongoId));
+
+          // Se o cliente não tem entrada para esta barbearia, cria uma
+          if (!loyaltyEntry) {
+            customer.loyaltyData.push({
+              barbershop: barbershopMongoId,
+              progress: 0,
+              rewards: 0,
+            });
+            loyaltyEntry = customer.loyaltyData[customer.loyaltyData.length - 1];
+          }
+
+          // Incrementa o progresso
+          loyaltyEntry.progress += 1;
+          booking.countedForLoyalty = true;
+
+          const target = barbershop.loyaltyProgram.targetCount;
+
+          // Atingiu o alvo?
+          if (loyaltyEntry.progress >= target) {
+            loyaltyEntry.rewards += 1; // Ganhou prêmio
+            loyaltyEntry.progress = 0; // Zera contador
+
+            // Notifica o cliente
+            const rewardMsg = barbershop.loyaltyProgram.rewardDescription;
+            const message = `Parabéns, ${customer.name}! 🎁\n\nVocê completou nosso cartão fidelidade e acaba de ganhar: *${rewardMsg}*!\n\nUse no seu próximo agendamento na ${barbershop.name}. 💈`;
+            sendWhatsAppConfirmation(customer.phone, message);
+          }
+
+          await customer.save(); // Salva o cliente com o array loyaltyData atualizado
+        }
+      }
 
       // 4. Atualizar o status e salvar
       booking.status = status;
@@ -257,6 +338,68 @@ router.put(
     } catch (error) {
       console.error("Erro ao cancelar agendamento pelo cliente:", error);
       res.status(500).json({ error: "Falha ao processar o cancelamento." });
+    }
+  }
+);
+
+router.put(
+  "/:bookingId/redeem-reward",
+  protectAdmin, // Apenas admin/barbeiro
+  async (req, res) => {
+    try {
+      const { barbershopId, bookingId } = req.params;
+      const barbershopMongoId = new mongoose.Types.ObjectId(barbershopId);
+
+      // 1. Busca o agendamento e o cliente associado
+      const booking = await Booking.findOne({
+        _id: bookingId,
+        barbershop: barbershopId,
+      }).populate("customer"); // Popula o cliente inteiro
+
+      if (!booking) {
+        return res.status(404).json({ error: "Agendamento não encontrado." });
+      }
+
+      // 2. Verifica se o agendamento já não foi um prêmio ou de plano
+      if (booking.isLoyaltyReward || booking.paymentStatus === "loyalty_reward") {
+        return res.status(400).json({ error: "Este agendamento já foi resgatado como um prêmio." });
+      }
+      if (booking.paymentStatus === "plan_credit") {
+        return res.status(400).json({ error: "Não é possível resgatar prêmio em um agendamento de plano." });
+      }
+
+      const customer = booking.customer;
+      if (!customer) {
+        return res.status(404).json({ error: "Cliente deste agendamento não encontrado." });
+      }
+
+      // 3. Encontra a entrada de fidelidade específica desta barbearia
+      let loyaltyEntry = customer.loyaltyData.find((entry) => entry.barbershop.equals(barbershopMongoId));
+
+      // 4. Verifica se o cliente tem prêmios para gastar
+      if (!loyaltyEntry || loyaltyEntry.rewards <= 0) {
+        return res.status(400).json({ error: "O cliente não possui prêmios de fidelidade para resgatar." });
+      }
+
+      // 5. GASTAR O PRÊMIO
+      loyaltyEntry.rewards -= 1;
+      await customer.save();
+
+      // 6. ATUALIZAR O AGENDAMENTO
+      booking.status = "completed"; // Marca como concluído
+      booking.isLoyaltyReward = true; // Marca como prêmio
+      booking.paymentStatus = "loyalty_reward"; // Novo status de pagamento
+      // (Não marca 'countedForLoyalty' pois não deve dar pontos)
+      await booking.save();
+
+      res.status(200).json({
+        success: true,
+        message: "Prêmio resgatado! O agendamento foi concluído como cortesia.",
+        data: booking,
+      });
+    } catch (error) {
+      console.error("Erro ao resgatar prêmio de fidelidade:", error);
+      res.status(500).json({ error: "Ocorreu um erro no servidor." });
     }
   }
 );

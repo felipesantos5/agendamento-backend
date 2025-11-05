@@ -4,6 +4,7 @@ import AdminUser from "../models/AdminUser.js";
 import "dotenv/config";
 import crypto from "crypto";
 import { sendPasswordResetEmail } from "../services/emailService.js";
+import { loginLimiter } from "../middleware/rateLimiting.js";
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ if (!JWT_SECRET) {
 const AUTH_COOKIE_NAME = "adminAuthToken";
 
 // Rota de Login do Admin: POST /api/auth/admin/login
-router.post("/login", async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -25,8 +26,23 @@ router.post("/login", async (req, res) => {
     }
 
     const user = await AdminUser.findOne({ email }).populate("barbershop", "slug name");
-    if (!user || !(await user.comparePassword(password))) {
-      // Combina as verificações
+
+    // Verificação 1: O usuário existe?
+    if (!user) {
+      return res.status(401).json({ error: "Credenciais inválidas." });
+    }
+
+    // Verificação 2 (A MAIS IMPORTANTE): O usuário TEM uma senha cadastrada?
+    // Se o campo 'password' não existir no documento (como em contas 'pending'),
+    // não podemos nem *tentar* comparar, pois isso causa o erro.
+    if (!user.password) {
+      return res.status(401).json({ error: "Conta pendente. Por favor, configure sua senha usando o link de convite." });
+    }
+
+    // Verificação 3: A senha está correta?
+    // Só chegamos aqui se user.password EXISTE.
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
       return res.status(401).json({ error: "Credenciais inválidas." });
     }
 

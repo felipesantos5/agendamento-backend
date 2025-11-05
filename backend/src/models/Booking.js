@@ -14,9 +14,14 @@ const BookingSchema = new Schema(
     status: { type: String, default: "booked" },
     paymentStatus: {
       type: String,
-      enum: ["pending", "approved", "failed", "canceled", "n/a"],
+      enum: ["pending", "approved", "failed", "canceled", "n/a", "plan_credit", "loyalty_reward"],
     },
     paymentId: { type: String },
+    subscriptionUsed: {
+      type: Schema.Types.ObjectId,
+      ref: "Subscription",
+      default: null,
+    },
   },
   {
     timestamps: true,
