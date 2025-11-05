@@ -105,52 +105,57 @@ async function findCustomersToRemind(barbershopId, cutoffDateUTC, startOfCurrent
  * JOB (Worker) que roda toda terça-feira para enviar lembretes de retorno.
  */
 export const sendAutomatedReturnReminders = async () => {
-  console.log(`[${new Date().toLocaleTimeString()}] Iniciando JOB: Lembretes de Retorno (Toda Terça).`);
-  const nowBrazil = toZonedTime(new Date(), BRAZIL_TZ);
-  const todayUTC = fromZonedTime(startOfDay(nowBrazil), BRAZIL_TZ);
-  const startOfCurrentMonthUTC = fromZonedTime(startOfMonth(nowBrazil), BRAZIL_TZ);
+  console.log(`[${new Date().toLocaleTimeString()}] Iniciando JOB: Lembretes de Retorno (Toda Terça).`); //
+  const nowBrazil = toZonedTime(new Date(), BRAZIL_TZ); //
+  const todayUTC = fromZonedTime(startOfDay(nowBrazil), BRAZIL_TZ); //
+  const startOfCurrentMonthUTC = fromZonedTime(startOfMonth(nowBrazil), BRAZIL_TZ); //
+
+  // --- 1. DEFINIR REGRAS FIXAS ---
+  const DAYS_SINCE_LAST_CUT = 30;
+  const BASE_URL = "https://www.barbeariagendamento.com.br";
 
   try {
-    // 1. Encontra barbearias que ativaram o lembrete automático
+    // 2. Encontra barbearias que ativaram o lembrete (e busca o slug)
     const barbershopsToNotify = await Barbershop.find({
       "returnReminder.enabled": true,
-    });
+    }).select("name slug"); // ✅ Busca o slug
 
-    console.log(`-> Encontradas ${barbershopsToNotify.length} barbearias com lembretes automáticos ativos.`);
+    console.log(`-> Encontradas ${barbershopsToNotify.length} barbearias com lembretes automáticos ativos.`); //
 
     for (const barbershop of barbershopsToNotify) {
-      const days = barbershop.returnReminder.daysSinceLastCut;
-      const cutoffDateUTC = fromZonedTime(subDays(nowBrazil, days), BRAZIL_TZ);
+      // --- 3. USA OS DIAS FIXOS ---
+      const cutoffDateUTC = fromZonedTime(subDays(nowBrazil, DAYS_SINCE_LAST_CUT), BRAZIL_TZ); //
 
-      // 2. Usa a lógica de agregação para achar os clientes
-      const customers = await findCustomersToRemind(barbershop._id, cutoffDateUTC, startOfCurrentMonthUTC, todayUTC);
+      // 4. Usa a lógica de agregação para achar os clientes
+      const customers = await findCustomersToRemind(barbershop._id, cutoffDateUTC, startOfCurrentMonthUTC, todayUTC); //
 
       if (customers.length > 0) {
-        console.log(`-> Enviando ${customers.length} lembretes para ${barbershop.name}...`);
+        console.log(`-> Enviando ${customers.length} lembretes para ${barbershop.name}...`); //
       } else {
-        console.log(`-> Nenhum cliente elegível para ${barbershop.name}.`);
-        continue;
+        console.log(`-> Nenhum cliente elegível para ${barbershop.name}.`); //
+        continue; //
       }
 
-      // 3. Envia as mensagens e atualiza o histórico do cliente
+      // 5. Envia as mensagens e atualiza o histórico do cliente
       for (const customer of customers) {
-        const customMessage = barbershop.returnReminder.message
-          .replace(/{name}/g, customer.name) // regex 'g' para substituir todas ocorrências
-          .replace(/{days}/g, days.toString());
+        // --- 6. CRIA A MENSAGEM E O LINK DINAMICAMENTE ---
+        const agendamentoLink = `${BASE_URL}/${barbershop.slug}`;
 
-        await sendWhatsAppConfirmation(customer.phone, customMessage);
+        const message = `Olá, ${customer.name}! Sentimos sua falta na ${barbershop.name}. Já faz ${DAYS_SINCE_LAST_CUT} dias desde seu último corte. 💈\n\nQue tal agendar seu retorno?\n${agendamentoLink}`;
 
-        // ATUALIZA O CLIENTE no banco para registrar o envio
+        await sendWhatsAppConfirmation(customer.phone, message); //
+
+        // ATUALIZA O CLIENTE no banco para registrar o envio (lógica anti-spam)
         await Customer.updateOne(
           { _id: customer._id },
-          { $push: { returnReminders: { sentAt: new Date() } } } // new Date() é sempre UTC, o que é perfeito
+          { $push: { returnReminders: { sentAt: new Date() } } } //
         );
 
-        await delay(5000 + Math.random() * 5000); // Pausa de 5 a 10s
+        await delay(5000 + Math.random() * 5000); //
       }
     }
   } catch (error) {
-    console.error(`❌ Erro no JOB de lembretes de retorno:`, error);
+    console.error(`❌ Erro no JOB de lembretes de retorno:`, error); //
   }
-  console.log(`[${new Date().toLocaleTimeString()}] JOB: Lembretes de Retorno finalizado.`);
+  console.log(`[${new Date().toLocaleTimeString()}] JOB: Lembretes de Retorno finalizado.`); //
 };
