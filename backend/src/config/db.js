@@ -9,7 +9,7 @@ const connectDB = () => {
     socketTimeoutMS: 45000, // Fecha sockets inativos após 45s
   };
 
-  mongoose
+  return mongoose
     .connect(process.env.MONGODB_URI, dbOptions)
     .then(() => console.log("✅ Conexão com MongoDB estabelecida com sucesso!"))
     .catch((err) => console.error("❌ Erro inicial de conexão com o MongoDB:", err.message));

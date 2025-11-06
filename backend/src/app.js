@@ -43,20 +43,13 @@ import manualBookingRoutes from "./routes/admin/manualBookingRoute.js";
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
 import "./services/schedulerService.js";
-
 import "./models/Barbershop.js";
 import "./models/Barber.js";
 import "./models/Service.js";
 import "./models/Booking.js";
 
-// Para obter o __dirname em projetos com ES Modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Importe seu middleware
-// import { setBarbershopContext } from './middlewares/barbershopContext.js'; // Se for usar globalmente
-
-connectDB();
 
 const app = express();
 
@@ -136,7 +129,23 @@ app.use("/api/barbershops/:barbershopId/admin/bookings", manualBookingRoutes);
 //   res.json({ id: req.barbershopIdContexto, name: req.barbershopNameContexto, outrosDados: "..." });
 // });
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`API rodando em http://localhost:${PORT}`);
-});
+const startServer = async () => {
+  try {
+    // 1. PRIMEIRO, espera a conexão com o banco de dados
+    await connectDB();
+    console.log("✅ Conexão com MongoDB estabelecida com sucesso!"); //
+
+    // 2. SÓ ENTÃO, inicia o servidor Express
+    const PORT = process.env.PORT || 3001; //
+    app.listen(PORT, () => {
+      //
+      console.log(`API rodando em http://localhost:${PORT}`); //
+    });
+  } catch (err) {
+    console.error("❌ Falha ao conectar ao MongoDB. Servidor não iniciado.", err.message); //
+    process.exit(1); // Encerra o processo se não conseguir conectar ao DB
+  }
+};
+
+// ✅ MODIFICAÇÃO: Chame a função de inicialização
+startServer();
