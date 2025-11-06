@@ -269,9 +269,13 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
 
     console.log(type);
 
-    if (!["entrada", "saida", "ajuste", "perda"].includes(type)) {
+    // --- 1. AJUSTE AQUI ---
+    // Adicionado "venda" à lista de tipos permitidos
+    if (!["entrada", "saida", "ajuste", "perda", "venda"].includes(type)) {
+      // <-- MUDANÇA AQUI
       return res.status(400).json({ error: "Tipo de movimentação inválido" });
     }
+    // ---------------------
 
     if (!quantity || quantity <= 0) {
       return res.status(400).json({ error: "Quantidade deve ser maior que zero" });
@@ -294,10 +298,21 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
       case "entrada":
         newStock = previousStock + quantity;
         break;
+
+      // --- 2. AJUSTE AQUI ---
+      // Adicionado "venda" ao caso de diminuição de estoque
       case "saida":
       case "perda":
+      case "venda": // <-- MUDANÇA AQUI
         newStock = Math.max(0, previousStock - quantity);
+        if (newStock === 0 && previousStock < quantity) {
+          console.warn(`[StockVenda] Venda de ${quantity} unidades, mas só havia ${previousStock} em estoque.`);
+          // (Opcional: você pode querer bloquear a venda se o estoque ficar negativo,
+          // mas por enquanto, apenas garantimos que não fique abaixo de 0)
+        }
         break;
+      // ---------------------
+
       case "ajuste":
         newStock = quantity; // Para ajuste, a quantidade é o valor final
         break;
@@ -311,11 +326,14 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
     const stockMovement = new StockMovement({
       product: productId,
       type,
+      // Se for 'ajuste', a quantidade real é a diferença
       quantity: type === "ajuste" ? newStock - previousStock : quantity,
-      reason,
+      reason: reason || (type === "venda" ? "Venda PDV" : "Ajuste manual"), // Adiciona um motivo padrão para venda
       previousStock,
       newStock,
+      // Para vendas, o unitCost (custo de compra) é crucial para o dashboard
       unitCost: unitCost || product.price.purchase,
+      // Custo total dos bens vendidos
       totalCost: (unitCost || product.price.purchase) * quantity,
       barbershop: barbershopId,
       notes,

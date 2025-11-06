@@ -20,6 +20,9 @@ router.get("/", protectAdmin, requireRole("admin", "barber"), async (req, res) =
     const skip = (page - 1) * limit;
     const searchTerm = req.query.search || ""; // Pega o termo de busca da query
 
+    // --- NOVO PARÂMETRO DE FILTRO ---
+    const { subscriptionStatus } = req.query; // "with-plan" ou "without-plan"
+
     if (!mongoose.Types.ObjectId.isValid(barbershopId)) {
       return res.status(400).json({ error: "ID da barbearia inválido." });
     }
@@ -59,7 +62,7 @@ router.get("/", protectAdmin, requireRole("admin", "barber"), async (req, res) =
       },
     ];
 
-    // --- Adiciona o estágio $match de busca CONDICIONALMENTE ---
+    // --- Adiciona o estágio $match de busca por NOME/TELEFONE (se houver) ---
     if (searchTerm) {
       // Tenta buscar pelo nome diretamente (case-insensitive)
       const nameSearchRegex = new RegExp(searchTerm, "i"); // Usar searchTerm diretamente
@@ -79,20 +82,61 @@ router.get("/", protectAdmin, requireRole("admin", "barber"), async (req, res) =
       });
     }
 
+    // --- ADIÇÃO DO NOVO FILTRO DE ASSINATURA ---
+    // Este lookup é feito ANTES da paginação para filtrar o total de clientes
+
+    // 6. Fazer o lookup das assinaturas ativas ANTES da paginação
+    pipeline.push({
+      $lookup: {
+        from: "subscriptions",
+        let: { customerId: "$_id" }, // Usa _id que veio do $group (é o customer ID)
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$customer", "$$customerId"] },
+              status: "active",
+              barbershop: new mongoose.Types.ObjectId(barbershopId),
+              endDate: { $gte: new Date() },
+            },
+          },
+          { $limit: 1 }, // Só precisamos saber se existe 1 ou mais
+        ],
+        as: "activeSubscriptionsCheck", // Usamos um nome diferente para esta verificação
+      },
+    });
+
+    // 7. Adicionar o filtro de status da assinatura (se fornecido)
+    if (subscriptionStatus === "with-plan") {
+      pipeline.push({
+        $match: {
+          // Garante que o array activeSubscriptionsCheck não está vazio
+          activeSubscriptionsCheck: { $ne: [] },
+        },
+      });
+    } else if (subscriptionStatus === "without-plan") {
+      pipeline.push({
+        $match: {
+          // Garante que o array activeSubscriptionsCheck está vazio
+          activeSubscriptionsCheck: { $eq: [] },
+        },
+      });
+    }
+    // Se subscriptionStatus não for fornecido, nenhum $match é adicionado e todos os clientes são retornados.
+
     // --- Continua com os estágios restantes da pipeline ---
     pipeline.push(
-      // 7. Ordenar os clientes (filtrados ou não) pelo último agendamento
+      // 8. Ordenar os clientes (filtrados ou não) pelo último agendamento
       {
         $sort: { lastBookingTime: -1 },
       },
-      // 8. Facet para Paginação e Contagem Total
+      // 9. Facet para Paginação e Contagem Total
       {
         $facet: {
-          metadata: [{ $count: "totalCustomers" }], // Conta o total APÓS o filtro de busca (se houver)
+          metadata: [{ $count: "totalCustomers" }], // Conta o total APÓS os filtros de busca e assinatura
           data: [
             { $skip: skip },
             { $limit: limit },
-            // Lookup das assinaturas
+            // Lookup das assinaturas (agora para popular os dados)
             {
               $lookup: {
                 from: "subscriptions",
@@ -109,7 +153,7 @@ router.get("/", protectAdmin, requireRole("admin", "barber"), async (req, res) =
                   { $lookup: { from: "plans", localField: "plan", foreignField: "_id", as: "planDetails" } },
                   { $unwind: { path: "$planDetails", preserveNullAndEmptyArrays: true } },
                 ],
-                as: "activeSubscriptions",
+                as: "activeSubscriptions", // Nome original para popular os dados
               },
             },
             // Project final
@@ -121,6 +165,7 @@ router.get("/", protectAdmin, requireRole("admin", "barber"), async (req, res) =
                 imageUrl: "$customerDetails.imageUrl",
                 createdAt: "$customerDetails.createdAt",
                 lastBookingTime: "$lastBookingTime",
+                loyaltyData: "$customerDetails.loyaltyData",
                 subscriptions: {
                   // Formata as assinaturas
                   $map: {
@@ -162,6 +207,7 @@ router.get("/", protectAdmin, requireRole("admin", "barber"), async (req, res) =
         totalCustomers: totalCustomers,
         limit: limit,
         searchTerm: searchTerm, // Retorna o termo de busca usado
+        subscriptionStatus: subscriptionStatus, // Retorna o filtro de assinatura usado
       },
     });
   } catch (error) {
@@ -217,7 +263,11 @@ router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async 
       return res.status(400).json({ error: "ID do cliente ou plano inválido." });
     }
 
-    const [customer, plan] = await Promise.all([Customer.findById(customerId), Plan.findById(planId)]);
+    // Busca o plano para pegar 'durationInDays' E 'totalCredits'
+    const [customer, plan] = await Promise.all([
+      Customer.findById(customerId),
+      Plan.findById(planId), // Buscamos o plano completo
+    ]);
 
     if (!customer || !plan) {
       return res.status(404).json({ error: "Cliente ou plano não encontrado." });
@@ -225,11 +275,21 @@ router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async 
     if (plan.barbershop.toString() !== barbershopId) {
       return res.status(400).json({ error: "Este plano não pertence a esta barbearia." });
     }
+
+    // Validação da Duração
     if (!plan.durationInDays || typeof plan.durationInDays !== "number" || plan.durationInDays <= 0) {
       return res.status(400).json({
         error: `O plano "${plan.name}" não possui uma duração válida definida.`,
       });
     }
+
+    // --- VALIDAÇÃO DOS CRÉDITOS ---
+    if (!plan.totalCredits || typeof plan.totalCredits !== "number" || plan.totalCredits <= 0) {
+      return res.status(400).json({
+        error: `O plano "${plan.name}" não possui um número de créditos válido.`,
+      });
+    }
+    // -----------------------------
 
     const startDate = new Date();
     const endDate = addDays(startDate, plan.durationInDays);
@@ -239,6 +299,7 @@ router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async 
       return res.status(500).json({ error: "Falha ao calcular a data final da assinatura." });
     }
 
+    // (Opcional) Verificar se já existe assinatura *ativa*
     const existingActiveSubscriptionForPlan = await Subscription.findOne({
       customer: customerId,
       plan: planId,
@@ -247,7 +308,9 @@ router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async 
       endDate: { $gte: new Date() },
     });
     if (existingActiveSubscriptionForPlan) {
-      return res.status(409).json({ error: `O cliente já possui uma assinatura ativa para o plano "${plan.name}".` });
+      return res.status(409).json({
+        error: `O cliente já possui uma assinatura ativa para o plano "${plan.name}".`,
+      });
     }
 
     const newSubscription = await Subscription.create({
@@ -257,13 +320,14 @@ router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async 
       startDate,
       endDate,
       status: "active",
+      creditsRemaining: plan.totalCredits, // <-- DEFININDO OS CRÉDITOS
     });
 
     customer.subscriptions.push(newSubscription._id);
     await customer.save();
 
     const populatedSubscription = await Subscription.findById(newSubscription._id)
-      .populate("plan", "name price durationInDays")
+      .populate("plan", "name price durationInDays totalCredits") // Adiciona totalCredits
       .populate("customer", "name phone");
 
     res.status(201).json(populatedSubscription || newSubscription);

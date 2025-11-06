@@ -1,6 +1,25 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
+const LoyaltySchema = new mongoose.Schema(
+  {
+    barbershop: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Barbershop",
+      required: true,
+    },
+    progress: {
+      type: Number,
+      default: 0,
+    },
+    rewards: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { _id: false } // Não cria _id para este subdocumento
+);
+
 const customerSchema = new mongoose.Schema(
   {
     name: {
@@ -33,6 +52,15 @@ const customerSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Subscription",
+      },
+    ],
+    loyaltyData: [LoyaltySchema],
+    returnReminders: [
+      {
+        sentAt: {
+          type: Date,
+          required: true,
+        },
       },
     ],
   },

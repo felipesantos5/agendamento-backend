@@ -27,27 +27,25 @@ export const BarbershopSchema = z.object({
   contact: z.string().min(8, "Contato obrigatório"),
   instagram: z.string().optional(),
   slug: z.string().max(50, "Descrição muito longa"),
-  workingHours: z
-    .array(WorkingHourSchema)
-    .min(1, "Informe pelo menos um horário de funcionamento"),
-  themeColor: z
-    .string()
-    .regex(
-      hexColorRegex,
-      "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)"
-    )
-    .optional()
-    .default("#D10000"),
+  workingHours: z.array(WorkingHourSchema).min(1, "Informe pelo menos um horário de funcionamento"),
+  // style
+  themeColor: z.string().regex(hexColorRegex, "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)").optional().default("#D10000"),
   LogoBackgroundColor: z
     .string()
-    .regex(
-      hexColorRegex,
-      "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)"
-    )
+    .regex(hexColorRegex, "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)")
     .optional()
     .default("#000000"),
+  // checkout
   mercadoPagoAccessToken: z.string().optional().or(z.literal("")),
   paymentsEnabled: z.boolean().optional(),
+  // recorrencia
+  loyaltyProgram: z
+    .object({
+      enabled: z.boolean().optional(),
+      targetCount: z.number().min(1, "O alvo deve ser pelo menos 1").optional(),
+      rewardDescription: z.string().trim().optional(),
+    })
+    .optional(),
 });
 
 export const BarbershopUpdateSchema = BarbershopSchema.partial();

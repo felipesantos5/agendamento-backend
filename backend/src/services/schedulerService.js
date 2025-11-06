@@ -4,6 +4,7 @@ import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
 import { startOfDay, endOfDay, getHours } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
+import { sendAutomatedReturnReminders } from "./returnReminderService.js";
 
 const BRAZIL_TZ = "America/Sao_Paulo";
 
@@ -111,6 +112,17 @@ cron.schedule(
   "0 8 * * *",
   () => {
     sendDailyReminders(8);
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
+
+cron.schedule(
+  "0 11 * * 2", // "Às 11:00, toda Terça-feira"
+  () => {
+    sendAutomatedReturnReminders();
   },
   {
     scheduled: true,

@@ -15,17 +15,16 @@ const planSchema = new mongoose.Schema(
       type: Number,
       required: [true, "O preço do plano é obrigatório."],
     },
-
-    // --- CAMPO ESSENCIAL QUE FALTAVA ---
     durationInDays: {
       type: Number,
-      required: [
-        true,
-        "A duração do plano em dias é obrigatória (ex: 30 para mensal).",
-      ],
+      required: [true, "A duração do plano em dias é obrigatória (ex: 30 para mensal)."],
     },
-
-    // Essencial para ligar o plano à barbearia correta
+    totalCredits: {
+      type: Number,
+      required: [true, "O número de créditos (usos) do plano é obrigatório (ex: 4)."],
+      min: [1, "O plano deve ter pelo menos 1 crédito."],
+      default: 1,
+    },
     barbershop: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Barbershop",

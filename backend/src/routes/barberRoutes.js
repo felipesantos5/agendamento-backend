@@ -378,7 +378,7 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 
-    // 1. Validação de Autorização: O admin está tentando editar um funcionário da sua própria barbearia?
+    // 1. Validação de Autorização
     if (req.adminUser.barbershopId !== barbershopId) {
       return res.status(403).json({
         error: "Não autorizado a modificar funcionários desta barbearia.",
@@ -389,13 +389,16 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
       return res.status(400).json({ error: "ID do funcionário inválido." });
     }
 
-    // 2. Validação dos Dados Recebidos
-    const dataToUpdate = barberUpdateSchema.parse(req.body);
+    // 2. Validação dos Dados Recebidos (agora inclui 'email')
+    const validatedData = barberUpdateSchema.parse(req.body);
 
-    // 3. Atualização Segura no Banco
+    // Separa o email dos outros dados do barbeiro
+    const { email, ...barberData } = validatedData;
+
+    // 3. Atualização do Modelo Barber (nome, comissão, horários, etc.)
     const updatedBarber = await Barber.findOneAndUpdate(
-      { _id: barberId, barbershop: barbershopId }, // Condição garante que o barbeiro pertence à barbearia correta
-      dataToUpdate, // Novos dados (nome, availability, image)
+      { _id: barberId, barbershop: barbershopId }, // Condição
+      barberData, // Atualiza apenas dados do barbeiro
       { new: true, runValidators: true }
     );
 
@@ -403,7 +406,48 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
       return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
     }
 
-    res.json(updatedBarber);
+    let updatedEmail = undefined;
+
+    // 4. Se um 'email' foi enviado no body, atualiza o AdminUser
+    if (email) {
+      // 4a. Verifica se o novo email já está em uso por OUTRO usuário
+      const existingUser = await AdminUser.findOne({
+        email: email,
+        barberProfile: { $ne: barberId }, // $ne = "diferente de"
+      });
+
+      if (existingUser) {
+        return res.status(409).json({ error: "Este email já está em uso por outra conta." });
+      }
+
+      // 4b. Atualiza o email na conta de login (AdminUser)
+      const updatedAdminUser = await AdminUser.findOneAndUpdate(
+        { barberProfile: barberId, barbershop: barbershopId },
+        { $set: { email: email } },
+        { new: true }
+      );
+
+      if (updatedAdminUser) {
+        updatedEmail = updatedAdminUser.email;
+      } else {
+        // Isso é um estado inesperado (Barbeiro existe mas AdminUser não)
+        console.warn(`[PUT /barberId] Barbeiro ${barberId} encontrado, mas AdminUser associado não.`);
+      }
+    }
+
+    // 5. Busca o email final (seja o novo ou o antigo) para retornar ao frontend
+    if (!updatedEmail) {
+      const adminUser = await AdminUser.findOne({ barberProfile: barberId }).select("email").lean();
+      updatedEmail = adminUser ? adminUser.email : undefined;
+    }
+
+    // Combina os dados atualizados do barbeiro com o email
+    const response = {
+      ...updatedBarber.toObject(),
+      email: updatedEmail,
+    };
+
+    res.json(response);
   } catch (e) {
     if (e instanceof z.ZodError) {
       return res.status(400).json({
