@@ -5,6 +5,8 @@ import Booking from "../models/Booking.js";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
 import Barbershop from "../models/Barbershop.js";
 import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
+import { sendEventToBarbershop } from "../services/sseService.js";
+
 const router = express.Router({ mergeParams: true });
 
 // ROTA: POST /barbershops/:barbershopId/bookings/:bookingId/create-payment
@@ -91,46 +93,51 @@ router.post("/:bookingId/create-payment", async (req, res) => {
 // Rota para Webhook (receber notificações do Mercado Pago)
 router.post("/webhook", async (req, res) => {
   const notification = req.body;
+
+  // O ID da barbearia é essencial para buscar o Access Token correto
   const { barbershopId } = req.query;
 
-  console.log("cheguei", notification);
-
   try {
-    // A lógica principal SÓ RODA se for a notificação de atualização de pagamento
+    // 1. Filtra APENAS o evento que importa ('payment.updated')
     if (notification.type === "payment" && notification.action === "payment.updated") {
-      // Validação movida para DENTRO do IF
       if (!barbershopId) {
-        throw new Error("barbershopId não foi fornecido na notificação de pagamento.");
+        throw new Error("Webhook: barbershopId não foi fornecido na URL.");
       }
 
+      // 2. Pega o ID do pagamento (ex: 132713009869)
       const paymentId = notification.data.id;
 
       const barbershop = await Barbershop.findById(barbershopId);
       if (!barbershop || !barbershop.mercadoPagoAccessToken) {
-        throw new Error(`Barbearia ${barbershopId} não encontrada ou sem token de acesso.`);
+        throw new Error(`Webhook: Barbearia ${barbershopId} não encontrada ou sem token.`);
       }
 
-      const client = new MercadoPagoConfig({
-        accessToken: barbershop.mercadoPagoAccessToken,
-      });
-
+      // 3. Busca os detalhes completos do pagamento no MP
+      const client = new MercadoPagoConfig({ accessToken: barbershop.mercadoPagoAccessToken });
       const payment = await new Payment(client).get({ id: paymentId });
 
+      // 4. A MÁGICA: Conecta o pagamento ao agendamento via external_reference
       if (payment && payment.external_reference) {
         const bookingId = payment.external_reference;
         const paymentStatus = payment.status;
 
+        // 5. Busca o agendamento no NOSSO banco
         const booking = await Booking.findById(bookingId);
 
         if (booking) {
-          // Atualiza o status do pagamento
           booking.paymentStatus = paymentStatus;
 
-          // ✅ LÓGICA DE NOTIFICAÇÃO
-          // Só notifica se o pagamento for APROVADO e se era um pagamento OBRIGATÓRIO
-          // (Se não fosse obrigatório, a notificação já foi na bookingRoutes)
+          // 6. LÓGICA DE CONFIRMAÇÃO
+          // Esta é a sua regra de negócio:
+          // Se o pagamento foi APROVADO e era OBRIGATÓRIO...
           if (paymentStatus === "approved" && booking.isPaymentMandatory) {
-            // Popula todos os dados necessários para as notificações
+            // ...e ainda estava pendente...
+            if (booking.status === "pending_payment") {
+              // ...CONFIRMA o agendamento.
+              booking.status = "confirmed";
+            }
+
+            // Popula os dados para enviar as notificações
             await booking.populate([
               { path: "customer", select: "name phone" },
               { path: "barber", select: "name" },
@@ -138,29 +145,27 @@ router.post("/webhook", async (req, res) => {
               { path: "service", select: "name" },
             ]);
 
-            // 1. Envia WhatsApp de confirmação
+            // 7. Envia as notificações que foram "seguradas"
             const formattedTime = formatBookingTime(booking.time, true);
             const cleanPhoneNumber = booking.barbershop.contact.replace(/\D/g, "");
             const whatsappLink = `https://wa.me/55${cleanPhoneNumber}`;
             const message = `Olá, ${booking.customer.name}! Seu pagamento foi aprovado e seu agendamento na ${booking.barbershop.name} está confirmado para ${formattedTime} ✅\n\nNos vemos lá! 💈\n\nFale com a barbearia: ${whatsappLink}`;
 
             sendWhatsAppConfirmation(booking.customer.phone, message);
-
-            // 2. Envia SSE para atualizar a agenda do admin
             sendEventToBarbershop(barbershopId, "new_booking", booking.toObject());
           }
 
           await booking.save();
-          console.log(`✅ Agendamento ${bookingId} atualizado para status: ${paymentStatus}`);
+          console.log(`✅ Webhook: Agendamento ${bookingId} atualizado para status: ${paymentStatus}`);
         }
       }
     }
 
+    // 8. Responde 200 para o Mercado Pago parar de enviar este evento.
     res.sendStatus(200);
   } catch (error) {
     console.error("❌ Erro ao processar webhook:", error);
-    // Informa ao Mercado Pago que algo deu errado para que ele tente reenviar depois
-    res.sendStatus(500);
+    res.sendStatus(500); // Responde 500 para o MP tentar de novo
   }
 });
 
