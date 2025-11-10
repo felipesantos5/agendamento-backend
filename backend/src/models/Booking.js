@@ -18,7 +18,7 @@ const BookingSchema = new Schema(
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "approved", "failed", "canceled", "n/a", "plan_credit", "loyalty_reward"],
+      enum: ["pending", "approved", "failed", "canceled", "no-payment", "plan_credit", "loyalty_reward"],
     },
     paymentId: { type: String },
     subscriptionUsed: {

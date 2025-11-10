@@ -111,7 +111,7 @@ router.post("/", appointmentLimiter, async (req, res) => {
           bookingPayload.status = "pending_payment"; // Define o novo status
         }
       } else {
-        bookingPayload.paymentStatus = "n/a"; // Ou 'approved' se o padrão for agendar sem pagar
+        bookingPayload.paymentStatus = "no-payment"; // Ou 'approved' se o padrão for agendar sem pagar
       }
     }
 

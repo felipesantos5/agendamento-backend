@@ -125,7 +125,7 @@ router.post("/", async (req, res) => {
       } else {
         // Se o admin está forçando um serviço de plano sem créditos
         if (data.force) {
-          bookingPayload.paymentStatus = "n/a"; // Marcar como "não aplicável"
+          bookingPayload.paymentStatus = "no-payment"; // Marcar como "não aplicável"
           bookingPayload.status = "confirmed";
         } else {
           return res.status(403).json({
@@ -136,7 +136,7 @@ router.post("/", async (req, res) => {
       }
     } else {
       // Serviço normal (não é de plano)
-      bookingPayload.paymentStatus = "n/a"; // Padrão para admin
+      bookingPayload.paymentStatus = "no-payment"; // Padrão para admin
     }
 
     // 5. Lógica de Status (Aprimorada)
