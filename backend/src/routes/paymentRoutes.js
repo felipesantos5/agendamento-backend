@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import { MercadoPagoConfig, Preference, Payment } from "mercadopago";
 import Booking from "../models/Booking.js";
+import { formatBookingTime } from "../utils/formatBookingTime.js";
 import Barbershop from "../models/Barbershop.js";
 
 const router = express.Router({ mergeParams: true });
