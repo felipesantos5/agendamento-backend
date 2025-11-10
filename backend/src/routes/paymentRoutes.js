@@ -94,6 +94,8 @@ router.post("/:bookingId/create-payment", async (req, res) => {
 router.post("/webhook", async (req, res) => {
   const notification = req.body;
 
+  console.log(`notification`, notification);
+
   // O ID da barbearia é essencial para buscar o Access Token correto
   const { barbershopId } = req.query;
 
