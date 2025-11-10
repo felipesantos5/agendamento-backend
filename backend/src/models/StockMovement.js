@@ -42,6 +42,11 @@ const StockMovementSchema = new Schema(
       ref: "Barbershop",
       required: true,
     },
+    barber: {
+      type: Schema.Types.ObjectId,
+      ref: "Barber",
+      required: false,
+    },
     notes: {
       type: String,
       trim: true,

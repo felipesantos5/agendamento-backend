@@ -35,6 +35,11 @@ const subscriptionSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    barber: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Barber",
+      required: false,
+    },
   },
   { timestamps: true }
 );

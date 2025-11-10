@@ -265,9 +265,7 @@ router.delete("/:productId", protectAdmin, requireRole("admin"), async (req, res
 router.post("/:productId/stock", protectAdmin, async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
-    const { type, quantity, reason, unitCost, notes } = req.body;
-
-    console.log(type);
+    const { type, quantity, reason, unitCost, notes, barberId } = req.body;
 
     // --- 1. AJUSTE AQUI ---
     // Adicionado "venda" à lista de tipos permitidos
@@ -336,6 +334,7 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
       // Custo total dos bens vendidos
       totalCost: (unitCost || product.price.purchase) * quantity,
       barbershop: barbershopId,
+      barber: type === "venda" && barberId ? barberId : null,
       notes,
     });
 

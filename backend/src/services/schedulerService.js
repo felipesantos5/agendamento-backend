@@ -108,6 +108,44 @@ const updateExpiredBookings = async () => {
   }
 };
 
+const cleanupPendingPayments = async () => {
+  const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000); // 15 minutos atrás
+
+  try {
+    const result = await Booking.updateMany(
+      {
+        isPaymentMandatory: true, // Era obrigatório
+        status: "pending_payment", // Ainda está reservado
+        paymentStatus: "pending", // O pagamento está pendente
+        createdAt: { $lt: fifteenMinutesAgo }, // E foi criado há mais de 15 min
+      },
+      {
+        $set: {
+          status: "canceled", // Cancela o agendamento
+          paymentStatus: "canceled", // Marca o pagamento como cancelado
+        },
+      }
+    );
+
+    if (result.modifiedCount > 0) {
+      console.log(`[CRON] Limpeza: ${result.modifiedCount} agendamentos pendentes foram cancelados.`);
+    }
+  } catch (error) {
+    console.error("❌ Erro ao limpar agendamentos pendentes:", error);
+  }
+};
+
+cron.schedule(
+  "*/5 * * * *",
+  () => {
+    cleanupPendingPayments();
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
+
 cron.schedule(
   "0 8 * * *",
   () => {

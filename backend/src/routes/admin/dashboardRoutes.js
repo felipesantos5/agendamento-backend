@@ -4,6 +4,7 @@ import { protectAdmin, requireRole } from "../../middleware/authAdminMiddleware.
 import Booking from "../../models/Booking.js";
 import Barber from "../../models/Barber.js";
 import Customer from "../../models/Customer.js";
+// ✅ CORREÇÃO: Corrigido o caminho da importação
 import StockMovement from "../../models/StockMovement.js";
 import Subscription from "../../models/Subscription.js";
 import { startOfMonth, endOfMonth, startOfDay, endOfDay, parseISO, isValid } from "date-fns";
@@ -26,7 +27,7 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "ID da barbearia inválido." });
     }
 
-    // --- Tratamento de Datas ---
+    // --- 1. Tratamento de Datas ---
     let { startDate: startDateQuery, endDate: endDateQuery } = req.query;
     let startDate, endDate;
     const nowInBrazil = toZonedTime(new Date(), BRAZIL_TZ);
@@ -47,28 +48,25 @@ router.get("/", async (req, res) => {
       return res.status(400).json({ error: "A data final deve ser posterior à data inicial." });
     }
 
-    // --- Agregação Principal ---
-    const [bookingResults, planRevenueResults, productSaleResults] = await Promise.all([
+    // --- 2. Agregações Principais (em Paralelo) ---
+    const [bookingResults, planResults, productResults] = await Promise.all([
+      // Agregação 1: Bookings (Serviços)
       Booking.aggregate([
-        // 1. Filtro inicial
         {
           $match: {
             barbershop: barbershopMongoId,
             time: { $gte: startDate, $lte: endDate },
           },
         },
-        // 2. Lookups
         { $lookup: { from: "services", localField: "service", foreignField: "_id", as: "serviceDetails" } },
         { $lookup: { from: "barbers", localField: "barber", foreignField: "_id", as: "barberDetails" } },
         { $lookup: { from: "customers", localField: "customer", foreignField: "_id", as: "customerDetails" } },
-        // 3. Unwinds
         { $unwind: { path: "$serviceDetails", preserveNullAndEmptyArrays: true } },
         { $unwind: { path: "$barberDetails", preserveNullAndEmptyArrays: true } },
         { $unwind: { path: "$customerDetails", preserveNullAndEmptyArrays: true } },
         {
-          // 4. Facet
           $facet: {
-            // --- Métricas Gerais ---
+            // --- Facet 1: Métricas Gerais (Receita de Serviços, Contagens Globais) ---
             generalMetrics: [
               {
                 $group: {
@@ -76,36 +74,23 @@ router.get("/", async (req, res) => {
                   totalBookings: { $sum: 1 },
                   completedBookings: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
                   canceledBookings: { $sum: { $cond: [{ $eq: ["$status", "canceled"] }, 1, 0] } },
-                  pendingBookings: { $sum: { $cond: [{ $in: ["$status", ["booked", "confirmed"]] }, 1, 0] } },
-                  totalRewardsRedeemed: {
-                    $sum: { $cond: [{ $and: [{ $eq: ["$status", "completed"] }, { $eq: ["$paymentStatus", "loyalty_reward"] }] }, 1, 0] },
-                  },
-                  // A receita só soma se for concluído E NÃO for plano E NÃO for prêmio
-                  totalRevenue: {
+
+                  // ✅ ADIÇÃO: Contagem de agendamentos pendentes
+                  pendingBookings: {
                     $sum: {
-                      $cond: [
-                        {
-                          $and: [
-                            { $eq: ["$status", "completed"] },
-                            // --- CORREÇÃO 1 AQUI ---
-                            { $not: { $in: ["$paymentStatus", ["plan_credit", "loyalty_reward"]] } },
-                          ],
-                        },
-                        { $ifNull: ["$serviceDetails.price", 0] }, // Valor
-                        0, // Else
-                      ],
+                      $cond: [{ $in: ["$status", ["booked", "confirmed", "pending_payment"]] }, 1, 0],
                     },
                   },
-                  onlineRevenue: {
+
+                  totalServiceRevenue: {
                     $sum: {
                       $cond: [
-                        { $and: [{ $eq: ["$status", "completed"] }, { $eq: ["$paymentStatus", "approved"] }] },
+                        { $and: [{ $eq: ["$status", "completed"] }, { $not: { $in: ["$paymentStatus", ["plan_credit", "loyalty_reward"]] } }] },
                         { $ifNull: ["$serviceDetails.price", 0] },
                         0,
                       ],
                     },
                   },
-                  onlinePaymentsCount: { $sum: { $cond: [{ $eq: ["$paymentStatus", "approved"] }, 1, 0] } },
                   uniqueCustomers: { $addToSet: "$customer" },
                 },
               },
@@ -115,162 +100,66 @@ router.get("/", async (req, res) => {
                   totalBookings: 1,
                   completedBookings: 1,
                   canceledBookings: 1,
-                  pendingBookings: 1,
-                  totalRewardsRedeemed: { $ifNull: ["$totalRewardsRedeemed", 0] },
-                  totalRevenue: { $ifNull: ["$totalRevenue", 0] },
-                  onlineRevenue: { $ifNull: ["$onlineRevenue", 0] },
-                  onlinePaymentsCount: { $ifNull: ["$onlinePaymentsCount", 0] },
+                  pendingBookings: 1, // ✅ ADIÇÃO: Passa a métrica para a saída
+                  totalRevenue: { $ifNull: ["$totalServiceRevenue", 0] }, // Renomeado para clareza
                   cancellationRate: {
                     $cond: [{ $gt: ["$totalBookings", 0] }, { $multiply: [{ $divide: ["$canceledBookings", "$totalBookings"] }, 100] }, 0],
-                  },
-                  averageTicket: {
-                    $cond: [
-                      { $gt: [{ $subtract: ["$completedBookings", "$totalRewardsRedeemed"] }, 0] },
-                      { $divide: ["$totalRevenue", { $subtract: ["$completedBookings", "$totalRewardsRedeemed"] }] },
-                      0,
-                    ],
                   },
                   totalUniqueCustomers: { $size: { $ifNull: ["$uniqueCustomers", []] } },
                 },
               },
             ],
-            // --- Métricas por Barbeiro ---
+            // --- Facet 2: Breakdown por Barbeiro (APENAS SERVIÇOS) ---
             barberMetrics: [
               {
                 $group: {
                   _id: "$barberDetails._id",
                   name: { $first: "$barberDetails.name" },
                   commissionRate: { $first: { $ifNull: ["$barberDetails.commission", 0] } },
-                  // Receita (exclui prêmios/planos)
-                  totalRevenue: {
+                  totalServiceRevenue: {
                     $sum: {
                       $cond: [
-                        // --- CORREÇÃO 2 AQUI ---
                         { $and: [{ $eq: ["$status", "completed"] }, { $not: { $in: ["$paymentStatus", ["plan_credit", "loyalty_reward"]] } }] },
                         { $ifNull: ["$serviceDetails.price", 0] },
                         0,
                       ],
                     },
                   },
-                  // Contagem (inclui prêmios/planos)
                   completedBookings: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } },
-                  canceledBookings: { $sum: { $cond: [{ $eq: ["$status", "canceled"] }, 1, 0] } },
-                  totalRewardsRedeemed: {
-                    $sum: {
-                      $cond: [{ $and: [{ $eq: ["$status", "completed"] }, { $eq: ["$paymentStatus", "loyalty_reward"] }] }, 1, 0],
-                    },
-                  },
                 },
               },
-              // PRIMEIRO $project: SANITIZAÇÃO
               {
                 $project: {
                   _id: 1,
-                  name: 1,
-                  commissionRateNum: { $ifNull: ["$commissionRate", 0] },
-                  totalRevenueNum: { $ifNull: ["$totalRevenue", 0] },
-                  completedBookingsNum: { $ifNull: ["$completedBookings", 0] },
-                  canceledBookingsNum: { $ifNull: ["$canceledBookings", 0] },
-                  totalRewardsRedeemedNum: { $ifNull: ["$totalRewardsRedeemed", 0] },
-                },
-              },
-              // SEGUNDO $project: CÁLCULOS E SAÍDA FINAL
-              {
-                $project: {
-                  _id: 0,
-                  barberId: "$_id",
                   name: { $ifNull: ["$name", "Barbeiro Removido"] },
-                  commissionRate: "$commissionRateNum",
-                  totalRevenue: "$totalRevenueNum",
-                  completedBookings: "$completedBookingsNum",
-                  canceledBookings: "$canceledBookingsNum",
-                  totalRewardsRedeemed: "$totalRewardsRedeemedNum",
-                  totalCommission: { $multiply: ["$totalRevenueNum", { $divide: ["$commissionRateNum", 100] }] },
-                  averageTicket: {
-                    $cond: [
-                      { $gt: [{ $subtract: ["$completedBookingsNum", "$totalRewardsRedeemedNum"] }, 0] },
-                      { $divide: ["$totalRevenueNum", { $subtract: ["$completedBookingsNum", "$totalRewardsRedeemedNum"] }] },
-                      0,
-                    ],
+                  commissionRate: 1,
+                  totalServiceRevenue: 1,
+                  completedBookings: 1,
+                  totalServiceCommission: {
+                    $multiply: ["$totalServiceRevenue", { $divide: ["$commissionRate", 100] }],
                   },
                 },
               },
-              { $sort: { totalRevenue: -1 } },
             ],
-            // --- Métricas por Serviço ---
+            // --- Facet 3: Métricas por Serviço (Top Serviços) ---
             serviceMetrics: [
               { $match: { status: "completed" } },
               {
                 $group: {
                   _id: "$serviceDetails._id",
                   name: { $first: "$serviceDetails.name" },
-                  // Receita (exclui prêmios/planos)
                   totalRevenue: {
-                    // --- CORREÇÃO 3 AQUI ---
                     $sum: {
                       $cond: [{ $not: { $in: ["$paymentStatus", ["plan_credit", "loyalty_reward"]] } }, { $ifNull: ["$serviceDetails.price", 0] }, 0],
                     },
                   },
-                  count: { $sum: 1 }, // Contagem total (inclui prêmios)
-                  redeemedAsReward: {
-                    $sum: {
-                      $cond: [{ $eq: ["$paymentStatus", "loyalty_reward"] }, 1, 0],
-                    },
-                  },
+                  count: { $sum: 1 },
                 },
               },
-              {
-                // $project
-                $project: {
-                  _id: 0,
-                  serviceId: "$_id",
-                  name: { $ifNull: ["$name", "Serviço Removido"] },
-                  totalRevenue: 1,
-                  count: 1,
-                  redeemedAsReward: 1,
-                },
-              },
+              { $project: { _id: 0, serviceId: "$_id", name: { $ifNull: ["$name", "Serviço Removido"] }, totalRevenue: 1, count: 1 } },
               { $sort: { totalRevenue: -1 } },
             ],
-            // --- Métricas por Serviço ---
-            serviceMetrics: [
-              { $match: { status: "completed" } },
-              {
-                $group: {
-                  _id: "$serviceDetails._id",
-                  name: { $first: "$serviceDetails.name" },
-                  // Receita (exclui prêmios/planos)
-                  totalRevenue: {
-                    $sum: {
-                      $cond: [
-                        // --- CORREÇÃO FINAL AQUI ---
-                        { $not: { $in: ["$paymentStatus", ["plan_credit", "loyalty_reward"]] } },
-                        { $ifNull: ["$serviceDetails.price", 0] },
-                        0,
-                      ],
-                    },
-                  },
-                  count: { $sum: 1 }, // Contagem total (inclui prêmios)
-                  redeemedAsReward: {
-                    $sum: {
-                      $cond: [{ $eq: ["$paymentStatus", "loyalty_reward"] }, 1, 0],
-                    },
-                  },
-                },
-              },
-              {
-                $project: {
-                  _id: 0,
-                  serviceId: "$_id",
-                  name: { $ifNull: ["$name", "Serviço Removido"] },
-                  totalRevenue: 1,
-                  count: 1,
-                  redeemedAsReward: 1,
-                },
-              },
-              { $sort: { totalRevenue: -1 } },
-            ],
-            // --- Análise de Novos x Recorrentes ---
+            // --- Facet 4: Análise de Novos x Recorrentes ---
             customerAnalysis: [
               { $group: { _id: "$customer", firstVisitDate: { $min: "$customerDetails.createdAt" } } },
               {
@@ -285,142 +174,254 @@ router.get("/", async (req, res) => {
             ],
           },
         },
-      ]),
+      ]), // Fim Agregação 1 (Bookings)
 
+      // Agregação 2: Planos (Subscriptions) - Agrupado por barbeiro
       Subscription.aggregate([
         {
           $match: {
-            barbershop: new mongoose.Types.ObjectId(barbershopId),
-            // Filtra planos VENDIDOS (criados) dentro do período
+            barbershop: barbershopMongoId,
             createdAt: { $gte: startDate, $lte: endDate },
           },
         },
-        {
-          $lookup: {
-            from: "plans", // Coleção de Planos
-            localField: "plan",
-            foreignField: "_id",
-            as: "planDetails",
-          },
-        },
+        { $lookup: { from: "plans", localField: "plan", foreignField: "_id", as: "planDetails" } },
+        { $lookup: { from: "barbers", localField: "barber", foreignField: "_id", as: "barberDetails" } },
         { $unwind: "$planDetails" },
+        { $unwind: { path: "$barberDetails", preserveNullAndEmptyArrays: true } },
         {
           $group: {
-            _id: null,
-            totalPlanRevenue: { $sum: "$planDetails.price" }, // Soma o PREÇO do plano
+            _id: "$barber", // Agrupa por barbeiro (pode ser null)
+            totalPlanRevenue: { $sum: "$planDetails.price" },
             totalPlansSold: { $sum: 1 },
+            totalPlanCommission: {
+              $sum: {
+                $multiply: ["$planDetails.price", { $divide: [{ $ifNull: ["$barberDetails.commission", 0] }, 100] }],
+              },
+            },
           },
         },
-      ]),
+      ]), // Fim Agregação 2 (Planos)
 
+      // Agregação 3: Produtos (StockMovements) - Agrupado por barbeiro
       StockMovement.aggregate([
         {
           $match: {
-            barbershop: new mongoose.Types.ObjectId(barbershopId),
-            type: "venda", // Filtra APENAS movimentações do tipo "venda"
+            barbershop: barbershopMongoId,
+            type: "venda",
             createdAt: { $gte: startDate, $lte: endDate },
           },
         },
-        // Precisamos buscar o preço de VENDA do produto
-        {
-          $lookup: {
-            from: "products",
-            localField: "product",
-            foreignField: "_id",
-            as: "productDetails",
-          },
-        },
+        { $lookup: { from: "products", localField: "product", foreignField: "_id", as: "productDetails" } },
         { $unwind: "$productDetails" },
         {
           $group: {
-            _id: null,
+            _id: "$barber", // Agrupa por barbeiro (pode ser null)
             totalItemsSold: { $sum: "$quantity" },
-            // Lucro Bruto = Receita Total (Preço de Venda * Qtd)
             totalGrossRevenue: { $sum: { $multiply: ["$quantity", "$productDetails.price.sale"] } },
-            // Custo Total = Custo de Compra * Qtd (já está em totalCost)
             totalCostOfGoods: { $sum: "$totalCost" },
+            totalProductCommission: {
+              $sum: {
+                $multiply: [
+                  { $multiply: ["$quantity", "$productDetails.price.sale"] },
+                  { $divide: [{ $ifNull: ["$productDetails.commissionRate", 0] }, 100] },
+                ],
+              },
+            },
           },
         },
-        {
-          $project: {
-            _id: 0,
-            totalItemsSold: 1,
-            totalGrossRevenue: 1, // <- Lucro Bruto (Faturamento)
-            totalCostOfGoods: 1,
-            // Lucro Líquido = Faturamento - Custo
-            totalNetProfit: { $subtract: ["$totalGrossRevenue", "$totalCostOfGoods"] }, // <- Lucro Líquido
-          },
-        },
-      ]),
+      ]), // Fim Agregação 3 (Produtos)
     ]); // Fim do Promise.all
 
     // --- 3. COMBINAR OS RESULTADOS ---
 
-    const results = bookingResults[0];
-    const planRevenueData = planRevenueResults[0] || { totalPlanRevenue: 0, totalPlansSold: 0 };
-    const productMetricsData = productSaleResults[0] || {
-      totalItemsSold: 0,
-      totalGrossRevenue: 0,
-      totalCostOfGoods: 0,
-      totalNetProfit: 0,
-    };
+    const bookingData = bookingResults[0];
+    const planDataByBarber = planResults;
+    const productDataByBarber = productResults;
 
-    // Pega os dados de generalMetrics (agora corrigidos)
-    const overviewData = results?.generalMetrics[0] || {
+    // --- 4. COMBINAR A TABELA 'barberPerformance' ---
+
+    const masterBarberMap = new Map();
+    const barberInfoCache = new Map();
+
+    // Passo 1: Adicionar dados de Serviços (Bookings)
+    const barberServiceData = bookingData?.barberMetrics || [];
+    for (const serviceMetric of barberServiceData) {
+      const barberId = serviceMetric._id?.toString();
+      if (!barberId) continue;
+
+      barberInfoCache.set(barberId, { name: serviceMetric.name, commissionRate: serviceMetric.commissionRate });
+
+      masterBarberMap.set(barberId, {
+        _id: serviceMetric._id,
+        name: serviceMetric.name,
+        commissionRate: serviceMetric.commissionRate,
+
+        totalServiceRevenue: serviceMetric.totalServiceRevenue,
+        totalServiceCommission: serviceMetric.totalServiceCommission,
+        completedBookings: serviceMetric.completedBookings,
+
+        totalPlanRevenue: 0,
+        totalPlanCommission: 0,
+        totalPlansSold: 0,
+        totalProductRevenue: 0,
+        totalProductCommission: 0,
+        totalProductsSold: 0,
+        totalCommission: serviceMetric.totalServiceCommission,
+      });
+    }
+
+    // Passo 2: Adicionar dados de Planos
+    for (const planMetric of planDataByBarber) {
+      const barberId = planMetric._id?.toString();
+      if (!barberId) continue;
+
+      if (!masterBarberMap.has(barberId)) {
+        let info = barberInfoCache.get(barberId);
+        if (!info) {
+          const barber = await Barber.findById(barberId).select("name commission").lean();
+          info = barber || { name: "Barbeiro Removido", commission: 0 };
+          barberInfoCache.set(barberId, info);
+        }
+
+        masterBarberMap.set(barberId, {
+          _id: planMetric._id,
+          name: info.name,
+          commissionRate: info.commission,
+          totalServiceRevenue: 0,
+          totalServiceCommission: 0,
+          completedBookings: 0,
+          totalProductRevenue: 0,
+          totalProductCommission: 0,
+          totalProductsSold: 0,
+          totalPlanRevenue: 0,
+          totalPlanCommission: 0,
+          totalPlansSold: 0,
+          totalCommission: 0,
+        });
+      }
+
+      const entry = masterBarberMap.get(barberId);
+      entry.totalPlanRevenue = planMetric.totalPlanRevenue;
+      entry.totalPlanCommission = planMetric.totalPlanCommission;
+      entry.totalPlansSold = planMetric.totalPlansSold;
+      entry.totalCommission += planMetric.totalPlanCommission;
+    }
+
+    // Passo 3: Adicionar dados de Produtos
+    for (const productMetric of productDataByBarber) {
+      const barberId = productMetric._id?.toString();
+      if (!barberId) continue;
+
+      if (!masterBarberMap.has(barberId)) {
+        let info = barberInfoCache.get(barberId);
+        if (!info) {
+          const barber = await Barber.findById(barberId).select("name commission").lean();
+          info = barber || { name: "Barbeiro Removido", commission: 0 };
+          barberInfoCache.set(barberId, info);
+        }
+
+        masterBarberMap.set(barberId, {
+          _id: productMetric._id,
+          name: info.name,
+          commissionRate: info.commission,
+          totalServiceRevenue: 0,
+          totalServiceCommission: 0,
+          completedBookings: 0,
+          totalProductRevenue: 0,
+          totalProductCommission: 0,
+          totalProductsSold: 0,
+          totalPlanRevenue: 0,
+          totalPlanCommission: 0,
+          totalPlansSold: 0,
+          totalCommission: 0,
+        });
+      }
+
+      const entry = masterBarberMap.get(barberId);
+      entry.totalProductRevenue = productMetric.totalGrossRevenue;
+      entry.totalProductCommission = productMetric.totalProductCommission;
+      entry.totalProductsSold = productMetric.totalItemsSold;
+      entry.totalCommission += productMetric.totalProductCommission;
+    }
+
+    const combinedBarberPerformance = Array.from(masterBarberMap.values()).sort((a, b) => b.totalCommission - a.totalCommission);
+
+    // --- 5. CÁLCULOS FINANCEIROS GLOBAIS (OVERVIEW) ---
+
+    // ✅ ADIÇÃO: Inclui o novo campo "pendingBookings" no objeto default
+    const overviewData = bookingData?.generalMetrics[0] || {
       totalBookings: 0,
       completedBookings: 0,
       canceledBookings: 0,
-      pendingBookings: 0,
-      totalRewardsRedeemed: 0, // <-- Inclui o novo campo no default
+      pendingBookings: 0, // ✅ Default
       totalRevenue: 0,
-      onlineRevenue: 0,
-      onlinePaymentsCount: 0,
       cancellationRate: 0,
-      averageTicket: 0,
       totalUniqueCustomers: 0,
     };
 
-    // Cálculo da Receita Total (sem alteração)
-    const totalRevenueCombined =
-      overviewData.totalRevenue + // (Já é R$ 0 para prêmios)
-      planRevenueData.totalPlanRevenue +
-      productMetricsData.totalGrossRevenue;
+    const globalPlanData = planDataByBarber.reduce(
+      (acc, cur) => {
+        acc.totalPlanRevenue += cur.totalPlanRevenue;
+        acc.totalPlanCommission += cur.totalPlanCommission;
+        acc.totalPlansSold += cur.totalPlansSold;
+        return acc;
+      },
+      { totalPlanRevenue: 0, totalPlanCommission: 0, totalPlansSold: 0 }
+    );
 
-    // --- 4. Organização da Resposta ---
+    const globalProductData = productDataByBarber.reduce(
+      (acc, cur) => {
+        acc.totalGrossRevenue += cur.totalGrossRevenue;
+        acc.totalProductCommission += cur.totalProductCommission;
+        acc.totalCostOfGoods += cur.totalCostOfGoods;
+        acc.totalItemsSold += cur.totalItemsSold;
+        return acc;
+      },
+      { totalGrossRevenue: 0, totalProductCommission: 0, totalCostOfGoods: 0, totalItemsSold: 0 }
+    );
+
+    const totalServiceCommission = combinedBarberPerformance.reduce((sum, barber) => sum + (barber.totalServiceCommission || 0), 0);
+    const totalGrossRevenue = overviewData.totalRevenue + globalPlanData.totalPlanRevenue + globalProductData.totalGrossRevenue;
+    const totalCommissionsPaid = totalServiceCommission + globalPlanData.totalPlanCommission + globalProductData.totalProductCommission;
+    const totalCostOfGoods = globalProductData.totalCostOfGoods;
+    const totalNetRevenue = totalGrossRevenue - totalCommissionsPaid - totalCostOfGoods;
+
+    // --- 6. Organização da Resposta ---
     const dashboardData = {
       period: {
         startDate: toZonedTime(startDate, BRAZIL_TZ).toISOString().split("T")[0],
         endDate: toZonedTime(endDate, BRAZIL_TZ).toISOString().split("T")[0],
       },
-      // Visão Geral (Soma de tudo)
-      overview: {
-        ...overviewData, // Pega (totalBookings, canceledBookings, etc)
 
-        // --- CAMPOS ATUALIZADOS/ADICIONADOS ---
-        totalRevenue: totalRevenueCombined, // Receita total (Serviços + Planos + Produtos)
-
-        revenueFromServices: overviewData.totalRevenue, // Receita apenas de serviços avulsos
-        revenueFromPlans: planRevenueData.totalPlanRevenue, // Receita apenas de planos
-        revenueFromProducts: productMetricsData.totalGrossRevenue, // Receita apenas de produtos
-
-        totalPlansSold: planRevenueData.totalPlansSold,
-        totalProductsSold: productMetricsData.totalItemsSold, // Total de itens vendidos
-        // ------------------------------------
+      generalMetrics: {
+        totalBookings: overviewData.totalBookings,
+        completedBookings: overviewData.completedBookings,
+        canceledBookings: overviewData.canceledBookings,
+        pendingBookings: overviewData.pendingBookings, // ✅ ADIÇÃO: Métrica finalizada
+        cancellationRate: overviewData.cancellationRate,
+        totalUniqueCustomers: overviewData.totalUniqueCustomers,
+        totalPlansSold: globalPlanData.totalPlansSold,
+        totalProductsSold: globalProductData.totalItemsSold,
       },
 
-      // --- NOVO BLOCO: Métricas detalhadas de Produtos ---
-      productMetrics: {
-        totalItemsSold: productMetricsData.totalItemsSold,
-        totalGrossRevenue: productMetricsData.totalGrossRevenue, // Lucro Bruto (Faturamento)
-        totalCostOfGoods: productMetricsData.totalCostOfGoods, // Custo
-        totalNetProfit: productMetricsData.totalNetProfit, // Lucro Líquido
-      },
-      // --------------------------------------------------
+      financialOverview: {
+        totalGrossRevenue: totalGrossRevenue,
+        revenueFromServices: overviewData.totalRevenue,
+        revenueFromPlans: globalPlanData.totalPlanRevenue,
+        revenueFromProducts: globalProductData.totalGrossRevenue,
 
-      // Blocos existentes
-      barberPerformance: results?.barberMetrics || [],
-      servicePerformance: results?.serviceMetrics || [],
-      customerStats: (results?.customerAnalysis || []).reduce(
+        totalCommissionsPaid: totalCommissionsPaid,
+        commissionFromServices: totalServiceCommission,
+        commissionFromPlans: globalPlanData.totalPlanCommission,
+        commissionFromProducts: globalProductData.totalProductCommission,
+
+        totalCostOfGoods: totalCostOfGoods,
+        totalNetRevenue: totalNetRevenue,
+      },
+
+      barberPerformance: combinedBarberPerformance,
+      servicePerformance: bookingData?.serviceMetrics || [],
+      customerStats: (bookingData?.customerAnalysis || []).reduce(
         (acc, curr) => {
           acc[curr.type] = curr.count;
           return acc;
@@ -432,11 +433,8 @@ router.get("/", async (req, res) => {
     res.status(200).json(dashboardData);
   } catch (error) {
     console.error("Erro ao gerar métricas do dashboard:", error);
-    const detailedError = error.message || "Erro interno ao processar as métricas.";
     res.status(500).json({
-      error: detailedError,
-      mongoErrorCode: error.code,
-      mongoErrorCodeName: error.codeName,
+      error: error.message || "Erro interno ao processar as métricas.",
     });
   }
 });
