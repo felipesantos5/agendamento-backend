@@ -1,19 +1,56 @@
 import express from "express";
 import Barbershop from "../models/Barbershop.js";
-import { BarbershopSchema as BarbershopValidationSchema, BarbershopUpdateSchema } from "../validations/barbershopValidation.js"; // Renomeado para evitar conflito com o modelo Mongoose
+import { BarbershopCreationSchema, BarbershopUpdateSchema } from "../validations/barbershopValidation.js";
+import AdminUser from "../models/AdminUser.js";
 import { requireRole } from "../middleware/authAdminMiddleware.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import qrcode from "qrcode";
+import { z } from "zod";
 
 const router = express.Router();
 
 // CRIAÇÃO
 router.post("/", async (req, res) => {
   try {
-    const data = BarbershopValidationSchema.parse(req.body);
-    const created = await Barbershop.create(data);
-    res.status(201).json(created);
+    // 1. Usa o novo schema que valida os dados do admin
+    const data = BarbershopCreationSchema.parse(req.body);
+
+    // 2. Separa os dados do admin dos dados da barbearia
+    const { adminEmail, adminPassword, ...barbershopData } = data;
+
+    // 3. Verifica se o email do admin já não está em uso
+    const existingAdmin = await AdminUser.findOne({ email: adminEmail });
+    if (existingAdmin) {
+      return res.status(409).json({ error: "O email fornecido para o admin já está em uso." });
+    }
+
+    // 4. Cria a barbearia
+    const newBarbershop = await Barbershop.create(barbershopData);
+
+    // 5. Cria o usuário Admin (dono)
+    const newAdmin = await AdminUser.create({
+      email: adminEmail,
+      password: adminPassword, // A senha será hasheada pelo hook 'pre-save' do modelo
+      barbershop: newBarbershop._id, // Associa o admin à barbearia
+      role: "admin", // Define a permissão
+      status: "active", // Já define como ativo, pois a senha foi criada
+    });
+
+    // 6. Responde com sucesso (omitindo dados sensíveis)
+    res.status(201).json({
+      barbershop: newBarbershop,
+      admin: {
+        _id: newAdmin._id,
+        email: newAdmin.email,
+        role: newAdmin.role,
+      },
+    });
   } catch (e) {
+    // Trata erros de validação do Zod
+    if (e instanceof z.ZodError) {
+      return res.status(400).json({ error: "Dados inválidos.", details: e.errors });
+    }
+    // Trata outros erros (ex: slug duplicado)
     res.status(400).json({ error: e.errors || e.message });
   }
 });

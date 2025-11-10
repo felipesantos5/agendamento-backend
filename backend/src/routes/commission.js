@@ -19,55 +19,46 @@ router.get("/", protectAdmin, requireRole("admin"), async (req, res) => {
     const { role, barberProfileId } = req.adminUser;
     const { barberId, startDate, endDate, month, year } = req.query;
 
-    // Validação de permissões
     if (role === "barber" && barberId && barberId !== barberProfileId) {
       return res.status(403).json({ error: "Barbeiro não pode visualizar comissões de outros barbeiros" });
     }
 
-    // Construir query base
-    let query = {
-      barbershop: new mongoose.Types.ObjectId(barbershopId),
-      status: "completed", // Apenas agendamentos concluídos
-    };
+    // --- 1. Definir Filtros de Data e Barbeiro ---
+    const barbershopMongoId = new mongoose.Types.ObjectId(barbershopId);
 
-    // Filtro por barbeiro
-    if (role === "barber") {
-      query.barber = new mongoose.Types.ObjectId(barberProfileId);
-    } else if (barberId) {
-      query.barber = new mongoose.Types.ObjectId(barberId);
-    }
-
-    // Filtro por período
+    // Filtro de Data
+    let timeQuery = {};
     if (month && year) {
       const startOfMonth = new Date(year, month - 1, 1);
       const endOfMonth = new Date(year, month, 0, 23, 59, 59);
-      query.time = { $gte: startOfMonth, $lte: endOfMonth };
+      timeQuery = { $gte: startOfMonth, $lte: endOfMonth };
     } else if (startDate && endDate) {
-      query.time = {
+      timeQuery = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
     }
 
-    // Agregação para calcular comissões
-    const commissions = await Booking.aggregate([
-      { $match: query },
+    // Filtro de Barbeiro
+    let barberQuery = {};
+    if (role === "barber") {
+      barberQuery.barber = new mongoose.Types.ObjectId(barberProfileId);
+    } else if (barberId) {
+      barberQuery.barber = new mongoose.Types.ObjectId(barberId);
+    }
+
+    // --- 2. Buscar Comissões de Serviços (Bookings) ---
+    const serviceCommissions = await Booking.aggregate([
       {
-        $lookup: {
-          from: "barbers",
-          localField: "barber",
-          foreignField: "_id",
-          as: "barberInfo",
+        $match: {
+          barbershop: barbershopMongoId,
+          status: "completed",
+          time: timeQuery,
+          ...barberQuery, // Aplica filtro de barbeiro se houver
         },
       },
-      {
-        $lookup: {
-          from: "services",
-          localField: "service",
-          foreignField: "_id",
-          as: "serviceInfo",
-        },
-      },
+      { $lookup: { from: "barbers", localField: "barber", foreignField: "_id", as: "barberInfo" } },
+      { $lookup: { from: "services", localField: "service", foreignField: "_id", as: "serviceInfo" } },
       { $unwind: "$barberInfo" },
       { $unwind: "$serviceInfo" },
       {
@@ -75,16 +66,15 @@ router.get("/", protectAdmin, requireRole("admin"), async (req, res) => {
           _id: "$barber",
           barberName: { $first: "$barberInfo.name" },
           barberImage: { $first: "$barberInfo.image" },
-          commissionRate: { $first: "$barberInfo.commission" },
+          serviceCommissionRate: { $first: "$barberInfo.commission" },
+          totalServiceRevenue: { $sum: "$serviceInfo.price" },
           totalServices: { $sum: 1 },
-          totalRevenue: { $sum: "$serviceInfo.price" },
           services: {
             $push: {
               bookingId: "$_id",
               serviceName: "$serviceInfo.name",
               servicePrice: "$serviceInfo.price",
               date: "$time",
-              customerName: "$customer.name",
             },
           },
         },
@@ -94,21 +84,153 @@ router.get("/", protectAdmin, requireRole("admin"), async (req, res) => {
           _id: 1,
           barberName: 1,
           barberImage: 1,
-          commissionRate: 1,
+          serviceCommissionRate: 1,
+          totalServiceRevenue: 1,
           totalServices: 1,
-          totalRevenue: 1,
-          totalCommission: {
-            $multiply: ["$totalRevenue", { $divide: ["$commissionRate", 100] }],
-          },
           services: 1,
+          totalServiceCommission: {
+            $multiply: ["$totalServiceRevenue", { $divide: ["$serviceCommissionRate", 100] }],
+          },
         },
       },
-      { $sort: { totalCommission: -1 } },
     ]);
+
+    // --- 3. Buscar Comissões de Produtos (StockMovements) ---
+    const productCommissions = await StockMovement.aggregate([
+      {
+        $match: {
+          barbershop: barbershopMongoId,
+          type: "venda",
+          createdAt: timeQuery,
+          barber: { $exists: true, $ne: null },
+          ...barberQuery,
+        },
+      },
+      { $lookup: { from: "products", localField: "product", foreignField: "_id", as: "productInfo" } },
+      { $lookup: { from: "barbers", localField: "barber", foreignField: "_id", as: "barberInfo" } },
+      { $unwind: "$productInfo" },
+      { $unwind: "$barberInfo" },
+      {
+        // Pré-calcula a receita e a comissão de CADA venda
+        $project: {
+          barber: 1, // Mantém o ID do barbeiro
+          barberInfo: 1, // Mantém os dados do barbeiro
+          quantity: 1,
+          createdAt: 1,
+          productInfo: 1,
+          // Calcula a receita desta venda específica
+          saleRevenue: { $multiply: ["$quantity", "$productInfo.price.sale"] },
+          // Calcula a comissão desta venda, usando a taxa do PRODUTO
+          commissionAmount: {
+            $multiply: [{ $multiply: ["$quantity", "$productInfo.price.sale"] }, { $divide: [{ $ifNull: ["$productInfo.commissionRate", 0] }, 100] }],
+          },
+        },
+      },
+      {
+        // Agrupa por barbeiro
+        $group: {
+          _id: "$barber",
+          barberName: { $first: "$barberInfo.name" },
+          barberImage: { $first: "$barberInfo.image" },
+          // Soma a receita total de produtos vendidos
+          totalProductRevenue: { $sum: "$saleRevenue" },
+          // Soma a comissão total de produtos
+          totalProductCommission: { $sum: "$commissionAmount" },
+          totalProductsSold: { $sum: "$quantity" },
+          products: {
+            $push: {
+              movementId: "$_id",
+              productName: "$productInfo.name",
+              quantity: "$quantity",
+              salePrice: "$productInfo.price.sale",
+              commissionRate: "$productInfo.commissionRate", // Opcional: mostra a % no detalhe
+              date: "$createdAt",
+            },
+          },
+        },
+      },
+      {
+        // Limpa o projeto final
+        $project: {
+          _id: 1,
+          barberName: 1,
+          barberImage: 1,
+          totalProductRevenue: 1,
+          totalProductCommission: 1,
+          totalProductsSold: 1,
+          products: 1,
+        },
+      },
+    ]);
+
+    // --- 4. Unificar os resultados ---
+    const commissionMap = new Map();
+
+    // Adiciona comissões de serviço
+    serviceCommissions.forEach((sc) => {
+      commissionMap.set(sc._id.toString(), {
+        _id: sc._id,
+        barberName: sc.barberName,
+        barberImage: sc.barberImage,
+        serviceCommissionRate: sc.serviceCommissionRate,
+        totalServiceRevenue: sc.totalServiceRevenue,
+        totalServiceCommission: sc.totalServiceCommission,
+        totalServices: sc.totalServices,
+        services: sc.services,
+        // Inicia produtos como zero
+        totalProductRevenue: 0,
+        totalProductCommission: 0,
+        totalProductsSold: 0,
+        products: [],
+      });
+    });
+
+    // Adiciona (ou soma) comissões de produto
+    productCommissions.forEach((pc) => {
+      const barberId = pc._id.toString();
+      if (commissionMap.has(barberId)) {
+        // Barbeiro já existe (vendeu serviços), apenas adiciona os dados do produto
+        const entry = commissionMap.get(barberId);
+        entry.totalProductRevenue = pc.totalProductRevenue;
+        entry.totalProductCommission = pc.totalProductCommission;
+        entry.totalProductsSold = pc.totalProductsSold;
+        entry.products = pc.products;
+      } else {
+        // Barbeiro só vendeu produtos (não prestou serviços)
+        commissionMap.set(barberId, {
+          _id: pc._id,
+          barberName: pc.barberName,
+          barberImage: pc.barberImage,
+          // Inicia serviços como zero
+          serviceCommissionRate: 0,
+          totalServiceRevenue: 0,
+          totalServiceCommission: 0,
+          totalServices: 0,
+          services: [],
+          // Adiciona dados do produto
+          totalProductRevenue: pc.totalProductRevenue,
+          totalProductCommission: pc.totalProductCommission,
+          totalProductsSold: pc.totalProductsSold,
+          products: pc.products,
+        });
+      }
+    });
+
+    // --- 5. Calcular totais e formatar saída ---
+    const finalCommissions = Array.from(commissionMap.values()).map((entry) => {
+      const totalCommission = entry.totalServiceCommission + entry.totalProductCommission;
+      return {
+        ...entry,
+        totalCommission, // Soma final
+      };
+    });
+
+    // Ordena pelo total de comissão (maior primeiro)
+    finalCommissions.sort((a, b) => b.totalCommission - a.totalCommission);
 
     res.json({
       success: true,
-      data: commissions,
+      data: finalCommissions,
       period: { month, year, startDate, endDate },
     });
   } catch (error) {

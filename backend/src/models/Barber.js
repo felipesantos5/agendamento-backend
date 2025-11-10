@@ -29,15 +29,7 @@ const BarberSchema = new Schema({
     days: [
       {
         type: String, // ["monday", "tuesday", etc] ou dias específicos
-        enum: [
-          "Domingo",
-          "Segunda-feira",
-          "Terça-feira",
-          "Quarta-feira",
-          "Quinta-feira",
-          "Sexta-feira",
-          "Sábado",
-        ],
+        enum: ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"],
       },
     ],
   },
