@@ -19,6 +19,7 @@ import { ptBR } from "date-fns/locale";
 import { toZonedTime } from "date-fns-tz";
 import { appointmentLimiter } from "../middleware/rateLimiting.js";
 import { addClient, removeClient, sendEventToBarbershop } from "../services/sseService.js";
+import { MercadoPagoConfig, Preference } from "mercadopago";
 
 const router = express.Router({ mergeParams: true });
 
@@ -73,6 +74,7 @@ router.post("/", appointmentLimiter, async (req, res) => {
       ...data,
       customer: customer._id,
       barbershop: barbershopId,
+      isPaymentMandatory: barbershop.paymentsEnabled && barbershop.requireOnlinePayment,
     };
 
     let activeSubscription = null;
@@ -92,6 +94,7 @@ router.post("/", appointmentLimiter, async (req, res) => {
         bookingPayload.paymentStatus = "plan_credit";
         bookingPayload.status = "confirmed"; // Já entra como confirmado
         bookingPayload.subscriptionUsed = activeSubscription._id;
+        bookingPayload.isPaymentMandatory = false;
       } else {
         // Cliente não tem créditos, e o serviço é SÓ de plano
         return res.status(403).json({
@@ -102,6 +105,11 @@ router.post("/", appointmentLimiter, async (req, res) => {
       // Serviço normal, segue fluxo de pagamento padrão
       if (barbershop.paymentsEnabled) {
         bookingPayload.paymentStatus = "pending";
+
+        // ✅ AQUI É A MUDANÇA
+        if (bookingPayload.isPaymentMandatory) {
+          bookingPayload.status = "pending_payment"; // Define o novo status
+        }
       } else {
         bookingPayload.paymentStatus = "n/a"; // Ou 'approved' se o padrão for agendar sem pagar
       }
@@ -121,10 +129,63 @@ router.post("/", appointmentLimiter, async (req, res) => {
     customer.bookings.push(createdBooking._id);
     await customer.save();
 
-    if (createdBooking) {
-      const barbershop = await Barbershop.findById(req.params.barbershopId);
+    if (createdBooking.isPaymentMandatory) {
+      // FLUXO OBRIGATÓRIO: Gerar link de pagamento imediatamente
 
-      // websocket para atualizar dashboard do barbeiro
+      if (!barbershop.mercadoPagoAccessToken) {
+        return res.status(400).json({
+          error: "Pagamento online não está habilitado para esta barbearia.",
+        });
+      }
+
+      const client = new MercadoPagoConfig({
+        accessToken: barbershop.mercadoPagoAccessToken,
+      });
+      const preference = new Preference(client);
+
+      const preferenceData = {
+        body: {
+          items: [
+            {
+              id: createdBooking._id.toString(),
+              title: `Agendamento: ${service.name}`,
+              description: "serviço de barbearia",
+              quantity: 1,
+              currency_id: "BRL",
+              unit_price: service.price,
+            },
+          ],
+          payer: {
+            name: customer.name,
+            email: `cliente_${customer._id}@email.com`,
+            phone: {
+              area_code: customer.phone.substring(0, 2),
+              number: customer.phone.substring(2, 11),
+            },
+          },
+          back_urls: {
+            success: `https://barbeariagendamento.com.br/${barbershop.slug}/pagamento-sucesso`,
+            failure: `https://barbeariagendamento.com.br/${barbershop.slug}`,
+            pending: `https://barbeariagendamento.com.br/${barbershop.slug}`,
+          },
+          auto_return: "approved",
+          notification_url: `https://api.barbeariagendamento.com.br/api/barbershops/${barbershopId}/bookings/webhook?barbershopId=${barbershopId}`,
+          external_reference: createdBooking._id.toString(),
+        },
+      };
+
+      const result = await preference.create(preferenceData);
+
+      createdBooking.paymentId = result.id;
+      await createdBooking.save();
+
+      // Retorna o link de pagamento. NENHUMA notificação é enviada ainda.
+      res.status(201).json({ payment_url: result.init_point });
+    } else {
+      // FLUXO OPCIONAL (ou pagamento desabilitado)
+      // Envia notificações imediatamente
+
+      // websocket
       const populatedBooking = await Booking.findById(createdBooking._id)
         .populate("customer", "name phone")
         .populate("barber", "name")
@@ -133,20 +194,18 @@ router.post("/", appointmentLimiter, async (req, res) => {
 
       if (populatedBooking) {
         sendEventToBarbershop(barbershopId, "new_booking", populatedBooking);
-      } else {
-        console.warn(`[SSE] Não foi possível encontrar o booking ${createdBooking._id} para popular e enviar via SSE.`);
       }
 
-      // envio de mensagem ao marcar um horario
+      // envio de mensagem
       const formattedTime = formatBookingTime(bookingTime, true);
       const cleanPhoneNumber = barbershop.contact.replace(/\D/g, "");
       const whatsappLink = `https://wa.me/55${cleanPhoneNumber}`;
       const locationLink = `https://barbeariagendamento.com.br/localizacao/${barbershop._id}`;
       const message = `Olá, ${customer.name}! Seu agendamento na ${barbershop.name} foi confirmado com sucesso para ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia:\n${whatsappLink}\n\n📍 Ver no mapa:\n${locationLink}\n\nNosso time te aguarda! 💈`;
       sendWhatsAppConfirmation(customer.phone, message);
-    }
 
-    res.status(201).json(createdBooking);
+      res.status(201).json(createdBooking);
+    }
   } catch (e) {
     console.error("ERRO AO CRIAR AGENDAMENTO:", e);
     if (e instanceof z.ZodError) {

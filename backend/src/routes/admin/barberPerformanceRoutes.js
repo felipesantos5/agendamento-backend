@@ -2,35 +2,20 @@ import express from "express";
 import mongoose from "mongoose";
 import { protectAdmin } from "../../middleware/authAdminMiddleware.js";
 import Booking from "../../models/Booking.js";
+import Subscription from "../../models/Subscription.js";
 import { startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { fromZonedTime, toZonedTime } from "date-fns-tz";
+import StockMovement from "../../models/StockMovement.js";
 
 const router = express.Router({ mergeParams: true });
 
-// Definir o fuso horário padrão
 const BRAZIL_TZ = "America/Sao_Paulo";
 
-// Proteger todas as rotas neste arquivo
-// Qualquer usuário logado (admin ou barber) pode acessar,
-// mas a lógica interna filtrará pelo ID do token.
 router.use(protectAdmin);
 
-/**
- * ROTA: GET /api/barbershops/:barbershopId/barber-performance
- *
- * Retorna as métricas de performance detalhadas para o barbeiro LOGADO.
- *
- * Query Params (Opcionais):
- * - ?startDate=YYYY-MM-DD
- * - ?endDate=YYYY-MM-DD
- * (Se não fornecidos, usa o mês atual)
- */
 router.get("/", async (req, res) => {
   try {
     const { barbershopId } = req.params;
-
-    // 1. IDENTIFICAR O BARBEIRO
-    // Pegamos o ID do perfil de barbeiro do token JWT (que o protectAdmin já decodificou)
     const barberId = req.adminUser?.barberProfileId;
 
     if (!barberId) {
@@ -42,7 +27,7 @@ router.get("/", async (req, res) => {
     const barberMongoId = new mongoose.Types.ObjectId(barberId);
     const barbershopMongoId = new mongoose.Types.ObjectId(barbershopId);
 
-    // 2. DEFINIR O PERÍODO DE TEMPO
+    // 2. DEFINIR O PERÍODO DE TEMPO (igual)
     let { startDate: startDateQuery, endDate: endDateQuery } = req.query;
     let startDate, endDate;
     const nowInBrazil = toZonedTime(new Date(), BRAZIL_TZ);
@@ -59,62 +44,32 @@ router.get("/", async (req, res) => {
       endDate = fromZonedTime(endOfMonth(nowInBrazil), BRAZIL_TZ);
     }
 
-    // 3. CONSTRUIR A PIPELINE DE AGREGAÇÃO
-    const pipeline = [
-      // Estágio 1: Filtrar agendamentos relevantes
+    // --- 3. PIPELINE DE SERVIÇOS (BOOKINGS) ---
+    const servicePipeline = [
       {
         $match: {
           barbershop: barbershopMongoId,
           barber: barberMongoId,
-          status: "completed", // Apenas agendamentos concluídos
+          status: "completed",
           time: { $gte: startDate, $lte: endDate },
         },
       },
-      // Estágio 2: Buscar detalhes do serviço (para preço e nome)
-      {
-        $lookup: {
-          from: "services",
-          localField: "service",
-          foreignField: "_id",
-          as: "serviceDetails",
-        },
-      },
-      // Estágio 3: Buscar detalhes do barbeiro (para taxa de comissão)
-      {
-        $lookup: {
-          from: "barbers",
-          localField: "barber",
-          foreignField: "_id",
-          as: "barberDetails",
-        },
-      },
-      // Estágio 4: Buscar detalhes do cliente (para métricas extras)
-      {
-        $lookup: {
-          from: "customers",
-          localField: "customer",
-          foreignField: "_id",
-          as: "customerDetails",
-        },
-      },
-      // Desconstruir os arrays dos lookups
+      // ... (lookups de service, barber, customer)
+      { $lookup: { from: "services", localField: "service", foreignField: "_id", as: "serviceDetails" } },
+      { $lookup: { from: "barbers", localField: "barber", foreignField: "_id", as: "barberDetails" } },
+      { $lookup: { from: "customers", localField: "customer", foreignField: "_id", as: "customerDetails" } },
       { $unwind: "$serviceDetails" },
       { $unwind: "$barberDetails" },
       { $unwind: "$customerDetails" },
-
-      // Estágio 5: Executar agregações paralelas (métricas gerais E breakdown por serviço)
       {
         $facet: {
-          // Faceta 1: Métricas Gerais
           geral: [
             {
               $group: {
                 _id: null,
                 totalRevenue: { $sum: "$serviceDetails.price" },
                 totalBookings: { $sum: 1 },
-                // Pega a comissão (assumindo que é a mesma para todos os bookings do barbeiro)
-                commissionRate: { $first: "$barberDetails.commission" },
-                // Cria um array de IDs de clientes únicos
+                serviceCommissionRate: { $first: "$barberDetails.commission" }, // ✅ Renomeado
                 uniqueCustomers: { $addToSet: "$customerDetails._id" },
               },
             },
@@ -123,21 +78,16 @@ router.get("/", async (req, res) => {
                 _id: 0,
                 totalRevenue: 1,
                 totalBookings: 1,
-                commissionRate: 1,
-                // Calcula a comissão total
-                totalCommission: {
-                  $multiply: ["$totalRevenue", { $divide: ["$commissionRate", 100] }],
+                serviceCommissionRate: 1,
+                totalServiceCommission: {
+                  $multiply: ["$totalRevenue", { $divide: ["$serviceCommissionRate", 100] }],
                 },
-                // Métrica extra: Ticket Médio
-                averageTicket: {
-                  $cond: [{ $gt: ["$totalBookings", 0] }, { $divide: ["$totalRevenue", "$totalBookings"] }, 0],
-                },
-                // Métrica extra: Total de Clientes Únicos
+                // ❌ averageTicket REMOVIDO
                 totalUniqueCustomers: { $size: "$uniqueCustomers" },
               },
             },
           ],
-          // Faceta 2: Breakdown por Serviço (O que você pediu)
+          // ... (facet 'servicosExecutados' continua o mesmo)
           servicosExecutados: [
             {
               $group: {
@@ -147,7 +97,7 @@ router.get("/", async (req, res) => {
                 revenueFromService: { $sum: "$serviceDetails.price" },
               },
             },
-            { $sort: { revenueFromService: -1 } }, // Ordena por mais rentáveis
+            { $sort: { revenueFromService: -1 } },
             {
               $project: {
                 _id: 0,
@@ -162,30 +112,133 @@ router.get("/", async (req, res) => {
       },
     ];
 
-    // 4. EXECUTAR A AGREGAÇÃO
-    const result = await Booking.aggregate(pipeline);
+    // --- 4. PIPELINE DE PRODUTOS (STOCKMOVEMENTS) ---
+    // (Esta pipeline continua a mesma da etapa anterior)
+    const productPipeline = [
+      {
+        $match: {
+          barbershop: barbershopMongoId,
+          barber: barberMongoId,
+          type: "venda",
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      { $lookup: { from: "products", localField: "product", foreignField: "_id", as: "productInfo" } },
+      { $unwind: "$productInfo" },
+      {
+        $project: {
+          saleRevenue: { $multiply: ["$quantity", "$productInfo.price.sale"] },
+          commissionAmount: {
+            $multiply: [{ $multiply: ["$quantity", "$productInfo.price.sale"] }, { $divide: [{ $ifNull: ["$productInfo.commissionRate", 0] }, 100] }],
+          },
+          quantity: 1,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalProductRevenue: { $sum: "$saleRevenue" },
+          totalProductCommission: { $sum: "$commissionAmount" },
+          totalProductsSold: { $sum: "$quantity" },
+        },
+      },
+      { $project: { _id: 0 } },
+    ];
 
-    // 5. FORMATAR A RESPOSTA
-    // O $facet retorna um array, pegamos o primeiro elemento
-    const metrics = result[0];
+    // --- 5. ✅ NOVA PIPELINE DE PLANOS (SUBSCRIPTIONS) ---
+    const planPipeline = [
+      {
+        $match: {
+          barbershop: barbershopMongoId,
+          barber: barberMongoId, // Apenas planos vendidos por este barbeiro
+          createdAt: { $gte: startDate, $lte: endDate }, // Vendidos neste período
+        },
+      },
+      { $lookup: { from: "plans", localField: "plan", foreignField: "_id", as: "planInfo" } },
+      { $lookup: { from: "barbers", localField: "barber", foreignField: "_id", as: "barberInfo" } },
+      { $unwind: "$planInfo" },
+      { $unwind: "$barberInfo" },
+      {
+        // Pré-calcula receita e comissão por plano vendido
+        $project: {
+          planRevenue: "$planInfo.price",
+          // Usa a comissão de SERVIÇO do barbeiro
+          commissionAmount: {
+            $multiply: ["$planInfo.price", { $divide: [{ $ifNull: ["$barberInfo.commission", 0] }, 100] }],
+          },
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalPlanRevenue: { $sum: "$planRevenue" },
+          totalPlanCommission: { $sum: "$commissionAmount" },
+          totalPlansSold: { $sum: 1 },
+        },
+      },
+      { $project: { _id: 0 } },
+    ];
 
-    // Limpa a resposta para o frontend
+    // 6. EXECUTAR AGREGAÇÕES EM PARALELO
+    const [serviceResult, productResult, planResult] = await Promise.all([
+      Booking.aggregate(servicePipeline),
+      StockMovement.aggregate(productPipeline),
+      Subscription.aggregate(planPipeline), // ✅ Adiciona a terceira
+    ]);
+
+    // 7. FORMATAR A RESPOSTA
+    const serviceMetrics = serviceResult[0];
+
+    const serviceOverview = serviceMetrics.geral[0] || {
+      totalRevenue: 0,
+      totalBookings: 0,
+      serviceCommissionRate: (await mongoose.model("Barber").findById(barberMongoId).select("commission").lean())?.commission || 0,
+      totalServiceCommission: 0,
+      totalUniqueCustomers: 0,
+    };
+
+    const productOverview = productResult[0] || {
+      totalProductRevenue: 0,
+      totalProductCommission: 0,
+      totalProductsSold: 0,
+    };
+
+    // ✅ Pega os dados de planos
+    const planOverview = planResult[0] || {
+      totalPlanRevenue: 0,
+      totalPlanCommission: 0,
+      totalPlansSold: 0,
+    };
+
+    // 8. COMBINAR OS RESULTADOS
     const response = {
-      // Formata o período para o frontend saber o que está vendo
       period: {
         startDate: startDate.toISOString().split("T")[0],
         endDate: endDate.toISOString().split("T")[0],
       },
-      // Se 'geral' estiver vazio (nenhum booking), retorna valores zerados
-      overview: metrics.geral[0] || {
-        totalRevenue: 0,
-        totalBookings: 0,
-        commissionRate: (await mongoose.model("Barber").findById(barberMongoId).select("commission").lean())?.commission || 0,
-        totalCommission: 0,
-        averageTicket: 0,
-        totalUniqueCustomers: 0,
+      overview: {
+        // Métricas de Serviço
+        totalServiceRevenue: serviceOverview.totalRevenue,
+        totalBookings: serviceOverview.totalBookings,
+        serviceCommissionRate: serviceOverview.serviceCommissionRate,
+        totalServiceCommission: serviceOverview.totalServiceCommission,
+        totalUniqueCustomers: serviceOverview.totalUniqueCustomers,
+
+        // Métricas de Produto
+        totalProductRevenue: productOverview.totalProductRevenue,
+        totalProductCommission: productOverview.totalProductCommission,
+        totalProductsSold: productOverview.totalProductsSold,
+
+        // ✅ Métricas de Plano
+        totalPlanRevenue: planOverview.totalPlanRevenue,
+        totalPlanCommission: planOverview.totalPlanCommission,
+        totalPlansSold: planOverview.totalPlansSold,
+
+        // ✅ Métrica Combinada Total
+        totalCommission: serviceOverview.totalServiceCommission + productOverview.totalProductCommission + planOverview.totalPlanCommission, // ✅ Somado
       },
-      serviceBreakdown: metrics.servicosExecutados || [],
+      // Breakdown de serviços (continua o mesmo)
+      serviceBreakdown: serviceMetrics.servicosExecutados || [],
     };
 
     res.json(response);

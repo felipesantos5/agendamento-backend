@@ -65,6 +65,12 @@ const ProductSchema = new Schema(
       ref: "Barbershop",
       required: true,
     },
+    commissionRate: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
   },
   {
     timestamps: true,

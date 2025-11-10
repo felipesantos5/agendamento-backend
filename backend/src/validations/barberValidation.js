@@ -17,7 +17,7 @@ const barberBaseSchema = z.object({
         end: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm"),
       })
     )
-    .optional(), // Disponibilidade pode ser opcional ao criar/editar
+    .optional(),
   break: z
     .object({
       enabled: z.boolean().default(false),
@@ -46,6 +46,7 @@ const barberBaseSchema = z.object({
       days: [],
     }),
   commission: z.number().optional().default(0),
+  productCommission: z.number().optional().default(0),
 });
 
 export const barberCreationSchema = barberBaseSchema.extend({

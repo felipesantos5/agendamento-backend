@@ -257,10 +257,14 @@ router.get("/:customerId", protectAdmin, requireRole("admin", "barber"), async (
 router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, customerId } = req.params;
-    const { planId } = req.body;
+    const { planId, barberId } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(customerId) || !mongoose.Types.ObjectId.isValid(planId)) {
       return res.status(400).json({ error: "ID do cliente ou plano inválido." });
+    }
+
+    if (barberId && !mongoose.Types.ObjectId.isValid(barberId)) {
+      return res.status(400).json({ error: "ID do barbeiro (vendedor) inválido." });
     }
 
     // Busca o plano para pegar 'durationInDays' E 'totalCredits'
@@ -317,10 +321,11 @@ router.post("/:customerId/subscribe", protectAdmin, requireRole("admin"), async 
       customer: customerId,
       plan: planId,
       barbershop: barbershopId,
+      barber: barberId || null,
       startDate,
       endDate,
       status: "active",
-      creditsRemaining: plan.totalCredits, // <-- DEFININDO OS CRÉDITOS
+      creditsRemaining: plan.totalCredits,
     });
 
     customer.subscriptions.push(newSubscription._id);

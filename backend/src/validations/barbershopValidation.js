@@ -38,6 +38,7 @@ export const BarbershopSchema = z.object({
   // checkout
   mercadoPagoAccessToken: z.string().optional().or(z.literal("")),
   paymentsEnabled: z.boolean().optional(),
+  requireOnlinePayment: z.boolean().optional(),
   // recorrencia
   loyaltyProgram: z
     .object({
@@ -46,6 +47,11 @@ export const BarbershopSchema = z.object({
       rewardDescription: z.string().trim().optional(),
     })
     .optional(),
+});
+
+export const BarbershopCreationSchema = BarbershopSchema.extend({
+  adminEmail: z.string().email("Email do admin é obrigatório e deve ser válido"),
+  adminPassword: z.string().min(6, "A senha do admin deve ter no mínimo 6 caracteres"),
 });
 
 export const BarbershopUpdateSchema = BarbershopSchema.partial();
