@@ -93,53 +93,76 @@ router.post("/:bookingId/create-payment", async (req, res) => {
 // Rota para Webhook (receber notificações do Mercado Pago)
 router.post("/webhook", async (req, res) => {
   const notification = req.body;
-
-  console.log(`notification`, notification);
-
-  // O ID da barbearia é essencial para buscar o Access Token correto
   const { barbershopId } = req.query;
 
+  console.log("🔔 Webhook Recebido:", notification); // Log para depuração
+
   try {
-    // 1. Filtra APENAS o evento que importa ('payment.updated')
-    if (notification.type === "payment" && notification.action === "payment.updated") {
-      if (!barbershopId) {
-        throw new Error("Webhook: barbershopId não foi fornecido na URL.");
-      }
+    let paymentId = null;
 
-      // 2. Pega o ID do pagamento (ex: 132713009869)
-      const paymentId = notification.data.id;
+    // --- ✅ NOVA LÓGICA DE CAPTURA DE ID ---
+    // Caso 1: Notificação de Pagamento (ex: payment.created, payment.updated)
+    if (notification.type === "payment" && notification.data?.id) {
+      console.log(`Webhook: Capturado 'type: payment' com ID: ${notification.data.id}`);
+      paymentId = notification.data.id;
+    }
+    // Caso 2: Notificação de Tópico (ex: topic: 'payment')
+    else if (notification.topic === "payment" && notification.resource) {
+      // O 'resource' pode ser uma URL ou só o ID
+      const resource = notification.resource;
+      paymentId = resource.substring(resource.lastIndexOf("/") + 1);
+      console.log(`Webhook: Capturado 'topic: payment' com ID: ${paymentId}`);
+    }
+    // Ignora outros eventos como 'merchant_order'
+    else {
+      console.log("Webhook: Evento ignorado (não é 'payment').");
+      return res.sendStatus(200); // Responde 200 para o MP parar de enviar
+    }
+    // ------------------------------------
 
-      const barbershop = await Barbershop.findById(barbershopId);
-      if (!barbershop || !barbershop.mercadoPagoAccessToken) {
-        throw new Error(`Webhook: Barbearia ${barbershopId} não encontrada ou sem token.`);
-      }
+    if (!barbershopId) {
+      throw new Error(`Webhook: barbershopId não foi fornecido para o paymentId: ${paymentId}`);
+    }
 
-      // 3. Busca os detalhes completos do pagamento no MP
-      const client = new MercadoPagoConfig({ accessToken: barbershop.mercadoPagoAccessToken });
-      const payment = await new Payment(client).get({ id: paymentId });
+    // --- LÓGICA DE VERIFICAÇÃO (Como estava antes) ---
+    const barbershop = await Barbershop.findById(barbershopId);
+    if (!barbershop || !barbershop.mercadoPagoAccessToken) {
+      throw new Error(`Webhook: Barbearia ${barbershopId} não encontrada ou sem token.`);
+    }
 
-      // 4. A MÁGICA: Conecta o pagamento ao agendamento via external_reference
-      if (payment && payment.external_reference) {
-        const bookingId = payment.external_reference;
-        const paymentStatus = payment.status;
+    const client = new MercadoPagoConfig({ accessToken: barbershop.mercadoPagoAccessToken });
 
-        // 5. Busca o agendamento no NOSSO banco
-        const booking = await Booking.findById(bookingId);
+    // Busca os detalhes completos do pagamento no MP
+    console.log(`Webhook: Buscando detalhes do pagamento ${paymentId} no Mercado Pago...`);
+    const payment = await new Payment(client).get({ id: paymentId });
 
-        if (booking) {
-          booking.paymentStatus = paymentStatus;
+    if (payment && payment.external_reference) {
+      const bookingId = payment.external_reference;
+      const paymentStatus = payment.status; // ex: 'approved', 'in_process', 'rejected'
 
-          // 6. LÓGICA DE CONFIRMAÇÃO
-          // Esta é a sua regra de negócio:
-          // Se o pagamento foi APROVADO e era OBRIGATÓRIO...
-          if (paymentStatus === "approved" && booking.isPaymentMandatory) {
-            // ...e ainda estava pendente...
-            if (booking.status === "pending_payment") {
-              // ...CONFIRMA o agendamento.
-              booking.status = "confirmed";
-            }
+      console.log(`Webhook: Pagamento ${paymentId} encontrado. Status: ${paymentStatus}. Referência (BookingID): ${bookingId}`);
 
-            // Popula os dados para enviar as notificações
+      const booking = await Booking.findById(bookingId);
+
+      if (booking) {
+        // Evita processar duas vezes se o status já estiver correto
+        if (booking.paymentStatus === paymentStatus) {
+          console.log(`Webhook: Booking ${bookingId} já está com status ${paymentStatus}. Ignorando.`);
+          return res.sendStatus(200);
+        }
+
+        booking.paymentStatus = paymentStatus;
+
+        // --- LÓGICA DE CONFIRMAÇÃO ---
+        // Se o pagamento foi APROVADO...
+        if (paymentStatus === "approved") {
+          // ...e era um pagamento OBRIGATÓRIO que estava PENDENTE...
+          if (booking.isPaymentMandatory && booking.status === "pending_payment") {
+            booking.status = "confirmed"; // ✅ Confirma o agendamento
+
+            console.log(`Webhook: Booking ${bookingId} (obrigatório) foi PAGO. Status atualizado para 'confirmed'.`);
+
+            // Popula dados para enviar notificações
             await booking.populate([
               { path: "customer", select: "name phone" },
               { path: "barber", select: "name" },
@@ -147,23 +170,29 @@ router.post("/webhook", async (req, res) => {
               { path: "service", select: "name" },
             ]);
 
-            // 7. Envia as notificações que foram "seguradas"
+            // Envia WhatsApp
             const formattedTime = formatBookingTime(booking.time, true);
             const cleanPhoneNumber = booking.barbershop.contact.replace(/\D/g, "");
             const whatsappLink = `https://wa.me/55${cleanPhoneNumber}`;
             const message = `Olá, ${booking.customer.name}! Seu pagamento foi aprovado e seu agendamento na ${booking.barbershop.name} está confirmado para ${formattedTime} ✅\n\nNos vemos lá! 💈\n\nFale com a barbearia: ${whatsappLink}`;
 
             sendWhatsAppConfirmation(booking.customer.phone, message);
-            sendEventToBarbershop(barbershopId, "new_booking", booking.toObject());
-          }
 
-          await booking.save();
-          console.log(`✅ Webhook: Agendamento ${bookingId} atualizado para status: ${paymentStatus}`);
+            // Envia SSE
+            sendEventToBarbershop(barbershopId, "new_booking", booking.toObject());
+          } else {
+            console.log(`Webhook: Booking ${bookingId} (opcional) foi PAGO. Status atualizado.`);
+          }
         }
+
+        await booking.save();
+      } else {
+        console.warn(`Webhook: Agendamento com ID ${bookingId} (external_reference) não encontrado no banco.`);
       }
+    } else {
+      console.warn(`Webhook: Pagamento ${paymentId} não encontrado no Mercado Pago ou não possui external_reference.`);
     }
 
-    // 8. Responde 200 para o Mercado Pago parar de enviar este evento.
     res.sendStatus(200);
   } catch (error) {
     console.error("❌ Erro ao processar webhook:", error);
