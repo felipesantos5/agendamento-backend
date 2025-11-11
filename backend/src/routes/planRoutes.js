@@ -18,7 +18,7 @@ router.post("/", async (req, res) => {
     const { barbershopId } = req.params;
 
     // --- 1. CAPTURE O NOVO CAMPO 'durationInDays' DO CORPO DA REQUISIÇÃO ---
-    const { name, description, price, durationInDays } = req.body;
+    const { name, description, price, durationInDays, totalCredits } = req.body;
 
     // --- 2. ATUALIZE A VALIDAÇÃO PARA INCLUIR O NOVO CAMPO ---
     if (!name || price === undefined || durationInDays === undefined) {
@@ -30,7 +30,8 @@ router.post("/", async (req, res) => {
       name,
       description,
       price,
-      durationInDays, // Adicionado aqui
+      durationInDays,
+      totalCredits,
       barbershop: barbershopId,
     });
 
@@ -70,15 +71,22 @@ router.get("/", async (req, res) => {
 router.put("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, planId } = req.params;
-    const { name, description, price, durationInDays } = req.body;
+    const { name, description, price, durationInDays, totalCredits } = req.body;
 
     if (!mongoose.Types.ObjectId.isValid(planId)) {
       return res.status(400).json({ error: "ID do plano inválido." });
     }
 
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (description !== undefined) updateData.description = description;
+    if (price !== undefined) updateData.price = price;
+    if (durationInDays !== undefined) updateData.durationInDays = durationInDays;
+    if (totalCredits !== undefined) updateData.totalCredits = totalCredits;
+
     const updatedPlan = await Plan.findOneAndUpdate(
       { _id: planId, barbershop: barbershopId }, // Garante que o admin só pode editar planos da sua própria barbearia
-      { $set: { name, description, price, durationInDays } },
+      { $set: updateData },
       { new: true, runValidators: true }
     );
 
