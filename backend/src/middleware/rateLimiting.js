@@ -1,8 +1,8 @@
 import rateLimit from "express-rate-limit";
 
 export const appointmentLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000, // 10 minutos
-  limit: 10, // Máximo de 5 tentativas de agendamento por IP a cada 10 minutos
+  windowMs: 15 * 60 * 1000, // 10 minutos
+  limit: 15, // Máximo de 5 tentativas de agendamento por IP a cada 10 minutos
   message: {
     error: "Limite de criação de agendamentos atingido. Por favor, aguarde 10 minutos para tentar novamente.",
   },
@@ -16,8 +16,8 @@ export const appointmentLimiter = rateLimit({
  */
 
 export const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  limit: 15,
+  windowMs: 50 * 60 * 1000,
+  limit: 50,
   message: {
     error: "Muitas tentativas de login deste IP. Por favor, tente novamente após 15 minutos.",
   },
@@ -30,8 +30,8 @@ export const loginLimiter = rateLimit({
  * 5 solicitações a cada 10 minutos por IP.
  */
 export const otpLimiter = rateLimit({
-  windowMs: 10 * 60 * 1000,
-  limit: 5,
+  windowMs: 50 * 60 * 1000,
+  limit: 50,
   message: {
     error: "Muitas solicitações de código. Por favor, tente novamente após 10 minutos.",
   },
