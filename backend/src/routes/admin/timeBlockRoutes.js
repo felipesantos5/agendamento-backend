@@ -28,9 +28,9 @@ router.post("/", async (req, res) => {
     }).populate("service", "duration");
 
     for (const booking of conflictingBookings) {
+      const duration = booking.service?.duration || 60;
       const bookingEndTime = new Date(
-        new Date(booking.time).getTime() +
-          (booking.service.duration || 60) * 60000
+        new Date(booking.time).getTime() + duration * 60000
       );
       if (bookingEndTime > startBlock) {
         return res
