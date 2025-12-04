@@ -476,15 +476,16 @@ router.delete("/:barberId", protectAdmin, requireRole("admin"), async (req, res)
       return res.status(400).json({ error: "ID do funcionário inválido." });
     }
 
-    // Opcional: Verificar se o barbeiro tem agendamentos futuros antes de deletar
+    // Opcional: Verificar se o barbeiro tem agendamentos futuros não cancelados antes de deletar
     const futureBookings = await Booking.findOne({
       barber: barberId,
       time: { $gte: new Date() },
+      status: { $ne: "canceled" }, // Ignora agendamentos cancelados
     });
 
     if (futureBookings) {
       return res.status(400).json({
-        error: "Não é possível deletar. Este funcionário possui agendamentos futuros.",
+        error: "Não é possível deletar. Este funcionário possui agendamentos futuros não cancelados.",
       });
     }
 
