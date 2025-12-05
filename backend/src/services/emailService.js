@@ -16,7 +16,7 @@ const transporter = nodemailer.createTransport({
  * @param {string} token O token de redefinição.
  */
 export const sendPasswordResetEmail = async (to, token) => {
-  const resetUrl = `http://localhost:5173/resetar-senha/${token}`; // URL do seu frontend
+  const resetUrl = `https://admin.barbeariagendamento.com.br/resetar-senha/${token}`; // URL do seu frontend
 
   const mailOptions = {
     from: '"Barbearia Agendamento" <suporte@barbeariagendamento.com.br>',
