@@ -80,8 +80,6 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
       // Envia o email com o link de configuração
       await sendAccountSetupEmail(data.email, setupToken, data.name, barbershopName);
 
-      console.log(`✅ Email de convite enviado para ${data.email}`);
-
       // Retorna sucesso com informação de que o email foi enviado
       res.status(201).json({
         barber: newBarber,
@@ -107,6 +105,94 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
     }
     console.error("Erro ao criar funcionário:", e);
     res.status(500).json({ error: e.message || "Erro ao criar funcionário." });
+  }
+});
+
+// Reenviar Email de Configuração de Senha
+// Rota: POST /barbershops/:barbershopId/barbers/:barberId/resend-setup-email
+router.post("/:barberId/resend-setup-email", protectAdmin, requireRole("admin"), async (req, res) => {
+  try {
+    const { barbershopId, barberId } = req.params;
+
+    // 1. Validação de Autorização
+    if (req.adminUser.barbershopId !== barbershopId) {
+      return res.status(403).json({
+        error: "Não autorizado a reenviar email para funcionários desta barbearia.",
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(barberId)) {
+      return res.status(400).json({ error: "ID do funcionário inválido." });
+    }
+
+    // 2. Buscar o barbeiro e verificar se existe
+    const barber = await Barber.findOne({
+      _id: barberId,
+      barbershop: barbershopId,
+    });
+
+    if (!barber) {
+      return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
+    }
+
+    // 3. Buscar a conta AdminUser associada
+    const adminUser = await AdminUser.findOne({
+      barberProfile: barberId,
+      barbershop: barbershopId,
+    });
+
+    if (!adminUser) {
+      return res.status(404).json({ error: "Conta de login não encontrada para este funcionário." });
+    }
+
+    // 4. Verificar se a conta já está ativa
+    if (adminUser.status === "active") {
+      return res.status(400).json({
+        error: "Este funcionário já configurou sua senha e está com a conta ativa.",
+        info: "Não é necessário reenviar o email de configuração.",
+      });
+    }
+
+    // 5. Gerar novo token de configuração
+    const setupToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(setupToken).digest("hex");
+    const tokenExpiration = Date.now() + 72 * 60 * 60 * 1000; // 72 horas
+
+    // 6. Atualizar o token no banco de dados
+    adminUser.accountSetupToken = hashedToken;
+    adminUser.accountSetupTokenExpires = new Date(tokenExpiration);
+    await adminUser.save();
+
+    // 7. Buscar o nome da barbearia para personalizar o email
+    const barbershop = await Barbershop.findById(barbershopId).select("name");
+    const barbershopName = barbershop?.name || "nossa barbearia";
+
+    // 8. Enviar o email
+    try {
+      await sendAccountSetupEmail(adminUser.email, setupToken, barber.name, barbershopName);
+
+      res.status(200).json({
+        success: true,
+        message: `Email de configuração reenviado com sucesso para ${adminUser.email}`,
+        emailSent: true,
+      });
+    } catch (emailError) {
+      console.error("⚠️ Erro ao reenviar email:", emailError);
+
+      // Retorna o link como fallback
+      const setupLink = `${process.env.ADMIN_FRONTEND_URL}/configurar-senha/${setupToken}`;
+
+      res.status(200).json({
+        success: true,
+        message: "Novo token gerado, mas houve erro ao enviar o email.",
+        emailSent: false,
+        setupLink: setupLink,
+        warning: "Por favor, copie e envie o link manualmente para o funcionário.",
+      });
+    }
+  } catch (e) {
+    console.error("Erro ao reenviar email de configuração:", e);
+    res.status(500).json({ error: "Erro interno ao reenviar email de configuração." });
   }
 });
 
@@ -532,12 +618,6 @@ router.delete("/:barberId", protectAdmin, requireRole("admin"), async (req, res)
         barberProfile: barberId,
         barbershop: barbershopId,
       });
-
-      if (deletedAdminUser) {
-        console.log(`✅ Conta de login deletada para o barbeiro: ${deletedAdminUser.email}`);
-      } else {
-        console.warn(`⚠️ Nenhuma conta de login encontrada para o barbeiro ${barberId}`);
-      }
     } catch (adminUserError) {
       // Loga o erro mas não bloqueia a deleção do barbeiro
       console.error("⚠️ Erro ao deletar conta de login do barbeiro:", adminUserError);

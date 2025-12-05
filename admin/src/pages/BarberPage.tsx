@@ -97,6 +97,8 @@ export function BarberPage() {
   const [profileImageFile, setProfileImageFile] = useState<File | null>(null);
   const [barberToDelete, setBarberToDelete] = useState<Barber | null>(null);
   const [setupLink, setSetupLink] = useState("");
+  const [isResendingEmail, setIsResendingEmail] = useState(false);
+
 
   const { isMobile } = useResponsive();
 
@@ -287,6 +289,49 @@ export function BarberPage() {
     }
   };
 
+  const handleResendSetupEmail = async () => {
+    if (!currentBarberForm._id || !barbershopId) return;
+    
+    setIsResendingEmail(true);
+    setError(null);
+
+    try {
+      const response = await apiClient.post(
+        `${API_BASE_URL}/barbershops/${barbershopId}/barbers/${currentBarberForm._id}/resend-setup-email`
+      );
+
+      if (response.data.emailSent) {
+        toast.success("Email reenviado com sucesso!", {
+          description: `Um novo email foi enviado para ${currentBarberForm.email} com o link de configuração.`,
+        });
+      } else if (response.data.emailSent === false) {
+        // Email falhou, mostra o link
+        toast.warning("Atenção: Email não enviado", {
+          description: response.data.warning || "Houve um problema ao enviar o email.",
+        });
+        if (response.data.setupLink) {
+          setSetupLink(response.data.setupLink);
+        }
+      }
+    } catch (err: any) {
+      console.error("Erro ao reenviar email:", err);
+      const errorMessage = err.response?.data?.error || "Falha ao reenviar o email.";
+      
+      // Se a conta já está ativa, mostra mensagem específica
+      if (err.response?.status === 400) {
+        toast.info("Conta já ativada", {
+          description: err.response?.data?.info || "Este funcionário já configurou sua senha.",
+        });
+      } else {
+        toast.error("Erro ao reenviar email", {
+          description: errorMessage,
+        });
+      }
+    } finally {
+      setIsResendingEmail(false);
+    }
+  };
+
   const copyToClipboard = () => {
     navigator.clipboard.writeText(setupLink);
     toast("Link criado com sucesso", {
@@ -427,7 +472,38 @@ export function BarberPage() {
                   <div className="space-y-1.5">
                     <Label htmlFor="email">Email de Login</Label>
                     <Input id="email" name="email" type="email" value={currentBarberForm.email || ""} onChange={handleFormInputChange} required />
-                    <p className="text-xs text-muted-foreground">O convite para definir a senha será associado a este email.</p>
+                    
+                    {dialogMode === "add" ? (
+                      <p className="text-xs text-muted-foreground">O convite para definir a senha será associado a este email.</p>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2 mt-2">
+                        <p className="text-xs text-muted-foreground flex-1">
+                          Se o funcionário não recebeu o email de configuração, você pode reenviá-lo.
+                        </p>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={handleResendSetupEmail}
+                          disabled={isResendingEmail}
+                          className="shrink-0"
+                        >
+                          {isResendingEmail ? (
+                            <>
+                              <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                              </svg>
+                              Enviando...
+                            </>
+                          ) : (
+                            <>
+                              📧 Reenviar Email
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
