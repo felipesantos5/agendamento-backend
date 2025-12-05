@@ -94,7 +94,7 @@ interface TimeBlock {
 const BARBER_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#000000", "#9467bd", "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"];
 
 export function AgendamentosPage() {
-  const { barbershopId } = useOutletContext<AdminOutletContext>();
+  const { barbershopId, paymentsEnabled } = useOutletContext<AdminOutletContext>();
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [allBarbers, setAllBarbers] = useState<Barber[]>([]);
@@ -804,7 +804,7 @@ export function AgendamentosPage() {
                         {/* Lado Esquerdo: Status */}
                         <div className="flex gap-2 items-center flex-wrap">
                           <Badge className={getStatusInfo(selectedBooking).className}>{getStatusInfo(selectedBooking).text}</Badge>
-                          {selectedBooking.paymentStatus && (
+                          {paymentsEnabled && selectedBooking.paymentStatus && (
                             <Badge className={getPaymentStatusInfo(selectedBooking).className}>
                               {translatePaymentStatus(selectedBooking.paymentStatus).text}
                             </Badge>
