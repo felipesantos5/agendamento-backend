@@ -14,6 +14,8 @@ import { ptBR } from "date-fns/locale";
 import crypto from "crypto";
 import BlockedDay from "../models/BlockedDay.js";
 import TimeBlock from "../models/TimeBlock.js";
+import { sendAccountSetupEmail } from "../services/emailService.js";
+import Barbershop from "../models/Barbershop.js";
 
 import "dotenv/config";
 
@@ -67,13 +69,38 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
     }
 
     // ✅ Retorna o link de configuração para o admin frontend
-    // Em um app real, você enviaria este link por email para data.email
     const setupLink = `${process.env.ADMIN_FRONTEND_URL}/configurar-senha/${setupToken}`;
 
-    res.status(201).json({
-      barber: newBarber,
-      setupLink: setupLink, // O admin pode copiar e enviar este link para o barbeiro
-    });
+    // 🆕 ENVIO AUTOMÁTICO DE EMAIL
+    try {
+      // Busca o nome da barbearia para personalizar o email
+      const barbershop = await Barbershop.findById(req.params.barbershopId).select("name");
+      const barbershopName = barbershop?.name || "nossa barbearia";
+
+      // Envia o email com o link de configuração
+      await sendAccountSetupEmail(data.email, setupToken, data.name, barbershopName);
+
+      console.log(`✅ Email de convite enviado para ${data.email}`);
+
+      // Retorna sucesso com informação de que o email foi enviado
+      res.status(201).json({
+        barber: newBarber,
+        setupLink: setupLink, // Mantém o link como fallback
+        emailSent: true,
+        message: `Funcionário criado com sucesso! Um email foi enviado para ${data.email} com instruções para configurar a senha.`,
+      });
+    } catch (emailError) {
+      // Se o envio de email falhar, ainda retorna sucesso na criação do barbeiro
+      // mas informa que o email não foi enviado
+      console.error("⚠️ Erro ao enviar email, mas barbeiro foi criado:", emailError);
+
+      res.status(201).json({
+        barber: newBarber,
+        setupLink: setupLink,
+        emailSent: false,
+        warning: "Funcionário criado, mas houve um erro ao enviar o email. Por favor, copie e envie o link manualmente.",
+      });
+    }
   } catch (e) {
     if (e instanceof z.ZodError) {
       return res.status(400).json({ error: "Dados inválidos.", details: e.errors });
@@ -497,6 +524,23 @@ router.delete("/:barberId", protectAdmin, requireRole("admin"), async (req, res)
 
     if (!deletedBarber) {
       return res.status(404).json({ error: "Funcionário não encontrado nesta barbearia." });
+    }
+
+    // 3. ✅ IMPORTANTE: Deletar também o AdminUser associado para liberar o email
+    try {
+      const deletedAdminUser = await AdminUser.findOneAndDelete({
+        barberProfile: barberId,
+        barbershop: barbershopId,
+      });
+
+      if (deletedAdminUser) {
+        console.log(`✅ Conta de login deletada para o barbeiro: ${deletedAdminUser.email}`);
+      } else {
+        console.warn(`⚠️ Nenhuma conta de login encontrada para o barbeiro ${barberId}`);
+      }
+    } catch (adminUserError) {
+      // Loga o erro mas não bloqueia a deleção do barbeiro
+      console.error("⚠️ Erro ao deletar conta de login do barbeiro:", adminUserError);
     }
 
     res.json({
