@@ -30,9 +30,12 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
     // ... (sua validação de autorização) ...
     const data = barberCreationSchema.parse(req.body);
 
-    const existingAdminUser = await AdminUser.findOne({ email: data.email });
-    if (existingAdminUser) {
-      return res.status(409).json({ error: "Este email já está em uso." });
+    // Só verifica duplicidade de email se o email foi fornecido
+    if (data.email) {
+      const existingAdminUser = await AdminUser.findOne({ email: data.email });
+      if (existingAdminUser) {
+        return res.status(409).json({ error: "Este email já está em uso." });
+      }
     }
 
     const newBarber = await Barber.create({
@@ -49,14 +52,15 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
       barbershop: req.params.barbershopId,
     });
 
-    // ✅ GERAÇÃO DO TOKEN
-    const setupToken = crypto.randomBytes(32).toString("hex");
-    const hashedToken = crypto.createHash("sha256").update(setupToken).digest("hex");
+    // Se o email foi fornecido, cria a conta de login (AdminUser)
+    if (data.email) {
+      // ✅ GERAÇÃO DO TOKEN
+      const setupToken = crypto.randomBytes(32).toString("hex");
+      const hashedToken = crypto.createHash("sha256").update(setupToken).digest("hex");
 
-    // O token expira em, por exemplo, 72 horas
-    const tokenExpiration = Date.now() + 72 * 60 * 60 * 1000;
+      // O token expira em, por exemplo, 72 horas
+      const tokenExpiration = Date.now() + 72 * 60 * 60 * 1000;
 
-    if (newBarber) {
       await AdminUser.create({
         email: data.email,
         role: "barber",
@@ -66,37 +70,43 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
         accountSetupToken: hashedToken,
         accountSetupTokenExpires: new Date(tokenExpiration),
       });
-    }
 
-    // ✅ Retorna o link de configuração para o admin frontend
-    const setupLink = `${process.env.ADMIN_FRONTEND_URL}/configurar-senha/${setupToken}`;
+      // ✅ Retorna o link de configuração para o admin frontend
+      const setupLink = `${process.env.ADMIN_FRONTEND_URL}/configurar-senha/${setupToken}`;
 
-    // 🆕 ENVIO AUTOMÁTICO DE EMAIL
-    try {
-      // Busca o nome da barbearia para personalizar o email
-      const barbershop = await Barbershop.findById(req.params.barbershopId).select("name");
-      const barbershopName = barbershop?.name || "nossa barbearia";
+      // 🆕 ENVIO AUTOMÁTICO DE EMAIL
+      try {
+        // Busca o nome da barbearia para personalizar o email
+        const barbershop = await Barbershop.findById(req.params.barbershopId).select("name");
+        const barbershopName = barbershop?.name || "nossa barbearia";
 
-      // Envia o email com o link de configuração
-      await sendAccountSetupEmail(data.email, setupToken, data.name, barbershopName);
+        // Envia o email com o link de configuração
+        await sendAccountSetupEmail(data.email, setupToken, data.name, barbershopName);
 
-      // Retorna sucesso com informação de que o email foi enviado
+        // Retorna sucesso com informação de que o email foi enviado
+        res.status(201).json({
+          barber: newBarber,
+          setupLink: setupLink, // Mantém o link como fallback
+          emailSent: true,
+          message: `Funcionário criado com sucesso! Um email foi enviado para ${data.email} com instruções para configurar a senha.`,
+        });
+      } catch (emailError) {
+        // Se o envio de email falhar, ainda retorna sucesso na criação do barbeiro
+        // mas informa que o email não foi enviado
+        console.error("⚠️ Erro ao enviar email, mas barbeiro foi criado:", emailError);
+
+        res.status(201).json({
+          barber: newBarber,
+          setupLink: setupLink,
+          emailSent: false,
+          warning: "Funcionário criado, mas houve um erro ao enviar o email. Por favor, copie e envie o link manualmente.",
+        });
+      }
+    } else {
+      // Se não foi fornecido email, apenas cria o barbeiro sem conta de login
       res.status(201).json({
         barber: newBarber,
-        setupLink: setupLink, // Mantém o link como fallback
-        emailSent: true,
-        message: `Funcionário criado com sucesso! Um email foi enviado para ${data.email} com instruções para configurar a senha.`,
-      });
-    } catch (emailError) {
-      // Se o envio de email falhar, ainda retorna sucesso na criação do barbeiro
-      // mas informa que o email não foi enviado
-      console.error("⚠️ Erro ao enviar email, mas barbeiro foi criado:", emailError);
-
-      res.status(201).json({
-        barber: newBarber,
-        setupLink: setupLink,
-        emailSent: false,
-        warning: "Funcionário criado, mas houve um erro ao enviar o email. Por favor, copie e envie o link manualmente.",
+        message: "Funcionário criado com sucesso! Nenhuma conta de login foi criada pois o email não foi fornecido.",
       });
     }
   } catch (e) {

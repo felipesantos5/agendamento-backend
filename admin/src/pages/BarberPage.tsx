@@ -62,7 +62,7 @@ type BarberFormData = {
   image?: string;
   availability: Availability[];
   break?: Break; // Adicionar campo break
-  email: string;
+  email?: string; // Agora é opcional - o dono pode criar barbeiro sem conta de login
   password?: string;
   commission?: number;
 };
@@ -228,16 +228,12 @@ export function BarberPage() {
       name: currentBarberForm.name,
       image: finalImageUrl,
       availability: validAvailability,
-      email: currentBarberForm.email,
-      break: currentBarberForm.break, // Adicionar esta linha
+      break: currentBarberForm.break,
       commission: Number(currentBarberForm.commission),
     };
 
-    if (dialogMode === "add") {
-      if (!currentBarberForm.email) {
-        setError("O email de login é obrigatório para novos funcionários.");
-        return;
-      }
+    // Só inclui o email no payload se tiver valor (evita enviar string vazia)
+    if (currentBarberForm.email && currentBarberForm.email.trim() !== "") {
       barberDataPayload.email = currentBarberForm.email;
     }
 
@@ -246,8 +242,8 @@ export function BarberPage() {
       if (dialogMode === "add") {
         const response = await apiClient.post(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`, barberDataPayload);
         
-        // Verifica se o email foi enviado com sucesso
-        if (response.data.emailSent) {
+        // Verifica o resultado da criação
+        if (response.data.emailSent === true) {
           // Email enviado com sucesso - mostra mensagem de sucesso
           toast.success("Funcionário criado com sucesso!", {
             description: `Um email foi enviado para ${currentBarberForm.email} com o link de configuração de senha.`,
@@ -259,9 +255,15 @@ export function BarberPage() {
             description: response.data.warning || "Houve um problema ao enviar o email. Copie o link abaixo e envie manualmente.",
           });
           setSetupLink(response.data.setupLink);
-        } else {
+        } else if (response.data.setupLink) {
           // Fallback para compatibilidade com versão antiga (sem envio de email)
           setSetupLink(response.data.setupLink);
+        } else {
+          // Barbeiro criado sem email (sem conta de login)
+          toast.success("Funcionário criado com sucesso!", {
+            description: response.data.message || "O funcionário foi cadastrado sem conta de login.",
+          });
+          setIsDialogOpen(false);
         }
       } else if (currentBarberForm._id) {
         await apiClient.put(`${API_BASE_URL}/barbershops/${barbershopId}/barbers/${currentBarberForm._id}`, barberDataPayload);
@@ -470,12 +472,17 @@ export function BarberPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label htmlFor="email">Email de Login</Label>
-                    <Input id="email" name="email" type="email" value={currentBarberForm.email || ""} onChange={handleFormInputChange} required />
+                    <Label htmlFor="email">Email de Login <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                    <Input id="email" name="email" type="email" value={currentBarberForm.email || ""} onChange={handleFormInputChange} placeholder="email@exemplo.com" />
                     
                     {dialogMode === "add" ? (
-                      <p className="text-xs text-muted-foreground">O convite para definir a senha será associado a este email.</p>
-                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        {currentBarberForm.email 
+                          ? "O convite para definir a senha será associado a este email."
+                          : "Deixe em branco se você (admin) já gerencia os agendamentos. Preencha apenas se quiser dar acesso separado ao funcionário."
+                        }
+                      </p>
+                    ) : currentBarberForm.email ? (
                       <div className="flex items-center justify-between gap-2 mt-2">
                         <p className="text-xs text-muted-foreground flex-1">
                           Se o funcionário não recebeu o email de configuração, você pode reenviá-lo.
@@ -503,6 +510,10 @@ export function BarberPage() {
                           )}
                         </Button>
                       </div>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Este funcionário não possui conta de login. Adicione um email se quiser dar acesso ao sistema.
+                      </p>
                     )}
                   </div>
 

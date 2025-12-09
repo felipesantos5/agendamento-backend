@@ -4,8 +4,8 @@ const barberBaseSchema = z.object({
   name: z.string().min(2, "Nome do funcionário é obrigatório"),
 
   // --- CAMPO ADICIONADO ---
-  // Torna o email opcional na base
-  email: z.string().email({ message: "Formato de email inválido." }).optional(),
+  // Torna o email opcional na base - aceita email válido, string vazia ou undefined
+  email: z.string().email({ message: "Formato de email inválido." }).optional().or(z.literal("")),
   // -------------------------
 
   image: z.string().url("URL da imagem inválida").optional().or(z.literal("")),
@@ -49,12 +49,9 @@ const barberBaseSchema = z.object({
   productCommission: z.number().optional().default(0),
 });
 
-export const barberCreationSchema = barberBaseSchema.extend({
-  // Sobrescreve 'email' para torná-lo obrigatório na criação
-  email: z.string().email({ message: "Formato de email inválido." }),
-  // Se você também envia a senha inicial no mesmo payload, adicione aqui:
-  // password: z.string().min(6, "A senha deve ter no mínimo 6 caracteres."),
-});
+// barberCreationSchema agora herda o 'email' opcional do barberBaseSchema
+// O email apenas é necessário se o dono quiser criar uma conta de login para o barbeiro
+export const barberCreationSchema = barberBaseSchema;
 
 // barberUpdateSchema agora herdará o 'email' opcional do barberBaseSchema
 export const barberUpdateSchema = barberBaseSchema;
