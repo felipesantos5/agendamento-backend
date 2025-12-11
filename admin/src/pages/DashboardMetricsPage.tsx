@@ -480,10 +480,10 @@ export default function DashboardMetricsPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Profissional</TableHead>
+                    <TableHead className="text-right text-green-600">Receita (Serviços)</TableHead>
+                    <TableHead className="text-right text-green-600">Receita (Planos)</TableHead>
+                    <TableHead className="text-right text-green-600">Receita (Produtos)</TableHead>
                     <TableHead className="text-right text-purple-600">Comissão Total</TableHead>
-                    <TableHead className="text-right text-gray-600">Com. (Serviços)</TableHead>
-                    <TableHead className="text-right text-gray-600">Com. (Planos)</TableHead>
-                    <TableHead className="text-right text-gray-600">Com. (Produtos)</TableHead>
                     <TableHead className="text-center">Atendimentos</TableHead>
                     <TableHead className="text-center">Vendas (Planos)</TableHead>
                     <TableHead className="text-center">Vendas (Prod.)</TableHead>
@@ -496,11 +496,13 @@ export default function DashboardMetricsPage() {
                         {/* Nome */}
                         <TableCell className="font-medium">{barber.name}</TableCell>
 
-                        {/* Comissões (Valores) */}
+                        {/* Receitas (Valores cheios) */}
+                        <TableCell className="text-right font-semibold text-green-700">{PriceFormater(barber.totalServiceRevenue)}</TableCell>
+                        <TableCell className="text-right font-semibold text-green-700">{PriceFormater(barber.totalPlanRevenue)}</TableCell>
+                        <TableCell className="text-right font-semibold text-green-700">{PriceFormater(barber.totalProductRevenue)}</TableCell>
+
+                        {/* Comissão Total */}
                         <TableCell className="text-right font-bold text-purple-700">{PriceFormater(barber.totalCommission)}</TableCell>
-                        <TableCell className="text-right text-gray-700">{PriceFormater(barber.totalServiceCommission)}</TableCell>
-                        <TableCell className="text-right text-gray-700">{PriceFormater(barber.totalPlanCommission)}</TableCell>
-                        <TableCell className="text-right text-gray-700">{PriceFormater(barber.totalProductCommission)}</TableCell>
 
                         {/* Contagens (Quantidades) */}
                         <TableCell className="text-center">{barber.completedBookings}</TableCell>
