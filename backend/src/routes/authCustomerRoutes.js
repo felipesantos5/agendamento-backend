@@ -16,12 +16,19 @@ router.post("/request-otp", otpLimiter, async (req, res) => {
       return res.status(400).json({ error: "O número de telefone é obrigatório." });
     }
 
-    // Encontra ou cria o cliente
-    const customer = await Customer.findOneAndUpdate(
-      { phone },
-      { $set: { phone, name: name } }, // Atualiza o nome se fornecido
-      { new: true, upsert: true, setDefaultsOnInsert: true }
-    );
+    // Primeiro, verifica se o cliente já existe
+    let customer = await Customer.findOne({ phone });
+
+    if (!customer) {
+      // Novo cliente: o nome é obrigatório
+      if (!name || !name.trim()) {
+        return res.status(400).json({ error: "O nome é obrigatório para novos clientes." });
+      }
+      customer = new Customer({ phone, name: name.trim() });
+    } else if (name && name.trim()) {
+      // Cliente existente: atualiza o nome se um novo for fornecido
+      customer.name = name.trim();
+    }
 
     // Gera o OTP (o método já hasheia e define a expiração internamente)
     const otpToSend = customer.getOtp();
