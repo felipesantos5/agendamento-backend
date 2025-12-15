@@ -39,6 +39,7 @@ import paymentRoutes from "./routes/paymentRoutes.js";
 import dashboardRoutes from "./routes/admin/dashboardRoutes.js";
 import barberPerformanceRoutes from "./routes/admin/barberPerformanceRoutes.js";
 import manualBookingRoutes from "./routes/admin/manualBookingRoute.js";
+import leadRoutes from "./routes/form/lead.routes.js";
 
 import { protectAdmin } from "./middleware/authAdminMiddleware.js";
 
@@ -71,6 +72,7 @@ const allowedOrigins = [
   "http://31.97.30.228:8088",
   "https://www.barbeariagendamento.com.br",
   "https://barbeariagendamento.com.br/",
+  "https://formulario.barbeariagendamento.com.br",
 ];
 
 const corsOptions = {
@@ -128,6 +130,10 @@ app.use("/api/barbershops/:barbershopId/bookings", paymentRoutes);
 app.use("/api/barbershops/:barbershopId/dashboard-metrics", dashboardRoutes);
 app.use("/api/barbershops/:barbershopId/barber-performance", barberPerformanceRoutes);
 app.use("/api/barbershops/:barbershopId/admin/bookings", manualBookingRoutes);
+
+// Form
+
+app.use('/api/leads', leadRoutes);
 
 // Exemplo de como você usaria o setBarbershopContext para as rotas da loja pública
 // import { setBarbershopContext } from './middlewares/barbershopContext.js';
