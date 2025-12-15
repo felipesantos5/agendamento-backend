@@ -259,9 +259,8 @@ export default function DashboardMetricsPage() {
                 <Button
                   id="date-range-popover"
                   variant={"outline"}
-                  className={`w-full sm:w-auto justify-start text-left font-normal ${
-                    filterMode === "range" ? "ring-2 ring-primary ring-offset-2" : ""
-                  }`}
+                  className={`w-full sm:w-auto justify-start text-left font-normal ${filterMode === "range" ? "ring-2 ring-primary ring-offset-2" : ""
+                    }`}
                   onClick={() => setFilterMode("range")}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -394,7 +393,7 @@ export default function DashboardMetricsPage() {
               <Separator className="my-6" />
 
               {/* Detalhes das Despesas (Comissões) */}
-              <div>
+              {/* <div>
                 <h3 className="text-lg font-semibold mb-3 text-primary flex items-center gap-2">
                   <ArrowDownWideNarrow size={20} />
                   Detalhes das Despesas (Comissões)
@@ -419,7 +418,7 @@ export default function DashboardMetricsPage() {
                     description="Comissão sobre venda de produtos"
                   />
                 </div>
-              </div>
+              </div> */}
 
               <Separator className="my-6" />
 
