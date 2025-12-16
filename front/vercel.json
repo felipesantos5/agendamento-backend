@@ -1,0 +1,15 @@
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "https://compre.barbeariagendamento.com.br",
+      "permanent": true
+    },
+    {
+      "source": "/localizacao/:barbershopId",
+      "destination": "https://api.barbeariagendamento.com.br/barbershops/:barbershopId/location",
+      "permanent": false
+    }
+  ]
+}
