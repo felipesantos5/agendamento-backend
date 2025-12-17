@@ -172,6 +172,73 @@ router.get("/", async (req, res) => {
               { $group: { _id: "$isNew", count: { $sum: 1 } } },
               { $project: { _id: 0, type: { $cond: ["$_id", "new", "returning"] }, count: 1 } },
             ],
+            // --- Facet 5: Faturamento por Dia ---
+            dailyRevenue: [
+              { $match: { status: "completed" } },
+              {
+                $group: {
+                  _id: {
+                    $dateToString: {
+                      format: "%Y-%m-%d",
+                      date: "$time",
+                      timezone: BRAZIL_TZ,
+                    },
+                  },
+                  revenue: {
+                    $sum: {
+                      $cond: [
+                        { $not: { $in: ["$paymentStatus", ["plan_credit", "loyalty_reward"]] } },
+                        { $ifNull: ["$serviceDetails.price", 0] },
+                        0,
+                      ],
+                    },
+                  },
+                  bookings: { $sum: 1 },
+                },
+              },
+              { $sort: { _id: 1 } },
+              {
+                $project: {
+                  _id: 0,
+                  date: "$_id",
+                  revenue: 1,
+                  bookings: 1,
+                },
+              },
+            ],
+            // --- Facet 6: Faturamento por Hora ---
+            hourlyRevenue: [
+              { $match: { status: "completed" } },
+              {
+                $group: {
+                  _id: {
+                    $hour: {
+                      date: "$time",
+                      timezone: BRAZIL_TZ,
+                    },
+                  },
+                  revenue: {
+                    $sum: {
+                      $cond: [
+                        { $not: { $in: ["$paymentStatus", ["plan_credit", "loyalty_reward"]] } },
+                        { $ifNull: ["$serviceDetails.price", 0] },
+                        0,
+                      ],
+                    },
+                  },
+                  bookings: { $sum: 1 },
+                },
+              },
+              { $sort: { _id: 1 } },
+              {
+                $project: {
+                  _id: 0,
+                  hour: "$_id",
+                  revenue: 1,
+                  bookings: 1,
+                },
+              },
+            ],
           },
         },
       ]), // Fim Agregação 1 (Bookings)
@@ -428,6 +495,8 @@ router.get("/", async (req, res) => {
         },
         { new: 0, returning: 0 }
       ),
+      dailyRevenue: bookingData?.dailyRevenue || [],
+      hourlyRevenue: bookingData?.hourlyRevenue || [],
     };
 
     res.status(200).json(dashboardData);

@@ -2,7 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useOutletContext } from "react-router-dom";
 import { DateRange } from "react-day-picker";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "sonner";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,22 +23,32 @@ import {
   ClipboardCheck,
   ClipboardX,
   BadgePercent,
-  Package,
-  Scissors,
-  ShoppingCart,
-  TrendingUp,
   LineChart,
   ArrowDownWideNarrow,
+  BarChart3,
+  PieChart,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Legend,
+  AreaChart,
+  Area,
+} from "recharts";
 
 // Helpers & Services
 import apiClient from "@/services/api";
 import { PriceFormater } from "@/helper/priceFormater";
 import { API_BASE_URL } from "@/config/BackendUrl";
 import { AdminOutletContext } from "@/types/AdminOutletContext";
-
-// --- ✅ NOVAS INTERFACES (1/4) ---
-// Baseado 100% no seu novo payload
 
 interface Period {
   startDate: string;
@@ -50,7 +60,7 @@ interface GeneralMetrics {
   totalBookings: number;
   completedBookings: number;
   canceledBookings: number;
-  pendingBookings: number; // Novo
+  pendingBookings: number;
   cancellationRate: number;
   totalUniqueCustomers: number;
   totalPlansSold: number;
@@ -102,6 +112,20 @@ interface CustomerStats {
   returning: number;
 }
 
+// Faturamento diário
+interface DailyRevenue {
+  date: string;
+  revenue: number;
+  bookings: number;
+}
+
+// Faturamento por hora
+interface HourlyRevenue {
+  hour: number;
+  revenue: number;
+  bookings: number;
+}
+
 // Estrutura principal da resposta da API
 interface DashboardMetricsData {
   period: Period;
@@ -110,7 +134,21 @@ interface DashboardMetricsData {
   barberPerformance: BarberPerformance[];
   servicePerformance: ServicePerformance[];
   customerStats: CustomerStats;
+  dailyRevenue: DailyRevenue[];
+  hourlyRevenue: HourlyRevenue[];
 }
+
+// Cores para os gráficos
+const CHART_COLORS = [
+  "#3b82f6", // blue-500
+  "#10b981", // emerald-500
+  "#f59e0b", // amber-500
+  "#ef4444", // red-500
+  "#8b5cf6", // violet-500
+  "#06b6d4", // cyan-500
+  "#ec4899", // pink-500
+  "#84cc16", // lime-500
+];
 
 // --- Componente Principal ---
 export default function DashboardMetricsPage() {
@@ -210,84 +248,6 @@ export default function DashboardMetricsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Filtros */}
-      <Card>
-        <CardHeader className="flex flex-col md:flex-row justify-between md:items-center gap-4">
-          <div>
-            <CardTitle>Métricas da Barbearia</CardTitle>
-            <CardDescription>{isLoading ? "Calculando..." : `Exibindo resultados de ${formatActivePeriodDisplay()}.`}</CardDescription>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <Select
-              value={selectedMonth}
-              onValueChange={(value) => {
-                setSelectedMonth(value);
-                setFilterMode("month");
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-[150px]">
-                <SelectValue placeholder="Mês" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthNames.map((name, index) => (
-                  <SelectItem key={index} value={(index + 1).toString()}>
-                    {name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select
-              value={selectedYear}
-              onValueChange={(value) => {
-                setSelectedYear(value);
-                setFilterMode("month");
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-[120px]">
-                <SelectValue placeholder="Ano" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableYears.map((year) => (
-                  <SelectItem key={year} value={year}>
-                    {year}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date-range-popover"
-                  variant={"outline"}
-                  className={`w-full sm:w-auto justify-start text-left font-normal ${filterMode === "range" ? "ring-2 ring-primary ring-offset-2" : ""
-                    }`}
-                  onClick={() => setFilterMode("range")}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {filterMode === "range" ? formatDateRangeDisplay(dateRange) : "Intervalo Específico"}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange?.from ?? new Date()}
-                  selected={dateRange}
-                  onSelect={(range) => {
-                    setDateRange(range);
-                    if (range?.from) {
-                      setFilterMode("range");
-                    }
-                  }}
-                  numberOfMonths={2}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-        </CardHeader>
-      </Card>
-
       {/* Loading */}
       {isLoading && (
         <div className="flex justify-center items-center py-10">
@@ -322,13 +282,83 @@ export default function DashboardMetricsPage() {
       {data && !isLoading && !error && (
         <>
           {/* Card de Resumo Financeiro (Bruto vs Líquido) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Resumo Financeiro</CardTitle>
-              <CardDescription>O desempenho financeiro consolidado da barbearia no período.</CardDescription>
+          <Card className="gap-4">
+            <CardHeader className="flex flex-row justify-between">
+              <div className="flex flex-col">
+                <CardTitle>Resumo Financeiro</CardTitle>
+                {/* <CardDescription>O desempenho financeiro consolidado da barbearia no período.</CardDescription> */}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <Select
+                  value={selectedMonth}
+                  onValueChange={(value) => {
+                    setSelectedMonth(value);
+                    setFilterMode("month");
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-[150px]">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthNames.map((name, index) => (
+                      <SelectItem key={index} value={(index + 1).toString()}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={selectedYear}
+                  onValueChange={(value) => {
+                    setSelectedYear(value);
+                    setFilterMode("month");
+                  }}
+                >
+                  <SelectTrigger className="w-full sm:w-[120px]">
+                    <SelectValue placeholder="Ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableYears.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="date-range-popover"
+                      variant={"outline"}
+                      className={`w-full sm:w-auto justify-start text-left font-normal ${filterMode === "range" ? "ring-2 ring-primary ring-offset-2" : ""
+                        }`}
+                      onClick={() => setFilterMode("range")}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {filterMode === "range" ? formatDateRangeDisplay(dateRange) : "Intervalo Específico"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      initialFocus
+                      mode="range"
+                      defaultMonth={dateRange?.from ?? new Date()}
+                      selected={dateRange}
+                      onSelect={(range) => {
+                        setDateRange(range);
+                        if (range?.from) {
+                          setFilterMode("range");
+                        }
+                      }}
+                      numberOfMonths={2}
+                      locale={ptBR}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
                 <MetricCard
                   title="Faturamento Bruto"
                   value={PriceFormater(data.financialOverview.totalGrossRevenue)}
@@ -360,10 +390,10 @@ export default function DashboardMetricsPage() {
                 />
               </div>
 
-              <Separator className="my-6" />
+              {/* <Separator className="my-6" /> */}
 
-              {/* Detalhes da Receita Bruta */}
-              <div>
+              {/* Detalhes da Receita Bruta 
+              {/*<div>
                 <h3 className="text-lg font-semibold mb-3 text-primary flex items-center gap-2">
                   <TrendingUp size={20} />
                   Detalhes da Receita Bruta
@@ -388,9 +418,9 @@ export default function DashboardMetricsPage() {
                     description={`${data.generalMetrics.totalProductsSold} produtos vendidos`}
                   />
                 </div>
-              </div>
+              </div>*/}
 
-              <Separator className="my-6" />
+              {/* <Separator className="my-6" /> */}
 
               {/* Detalhes das Despesas (Comissões) */}
               {/* <div>
@@ -419,6 +449,225 @@ export default function DashboardMetricsPage() {
                   />
                 </div>
               </div> */}
+
+              <div className="grid gap-6 lg:grid-cols-2">
+                <Card className="lg:col-span-2">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5 text-primary" />
+                      <CardTitle>Faturamento por Dia</CardTitle>
+                    </div>
+
+                  </CardHeader>
+                  <CardContent className="p-0!">
+                    {data.dailyRevenue.length > 0 ? (
+                      <div className="h-[350px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart
+                            data={data.dailyRevenue.map((item) => ({
+                              ...item,
+                              dateFormatted: format(parseISO(item.date), "dd/MM", { locale: ptBR }),
+                              dateComplete: format(parseISO(item.date), "dd 'de' MMMM", { locale: ptBR }),
+                            }))}
+                            margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                          >
+                            <defs>
+                              <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                            <XAxis
+                              dataKey="dateFormatted"
+                              tick={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              tickFormatter={(value) => `R$${value.toLocaleString("pt-BR")}`}
+                              tick={{ fontSize: 12 }}
+                              tickLine={false}
+                              axisLine={false}
+                              width={80}
+                            />
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                    <div className="rounded-lg border bg-background p-3 shadow-lg">
+                                      <p className="font-medium">{data.dateComplete}</p>
+                                      <p className="text-sm text-blue-600">
+                                        Receita: {PriceFormater(data.revenue)}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {data.bookings} atendimento{data.bookings !== 1 ? "s" : ""}
+                                      </p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="revenue"
+                              stroke="#3b82f6"
+                              strokeWidth={2}
+                              fill="url(#colorRevenue)"
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="flex h-[350px] items-center justify-center text-muted-foreground">
+                        Nenhum dado de faturamento diário para este período.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Gráfico de Pizza - Serviços */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <PieChart className="h-5 w-5 text-primary" />
+                      <CardTitle>Receita por Serviço</CardTitle>
+                    </div>
+                    <CardDescription>
+                      Distribuição do faturamento entre os serviços
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {data.servicePerformance.length > 0 ? (
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <RechartsPieChart>
+                            <Pie
+                              data={data.servicePerformance.slice(0, 6).map((service, index) => ({
+                                name: service.name || "Serviço Removido",
+                                value: service.totalRevenue,
+                                count: service.count,
+                                fill: CHART_COLORS[index % CHART_COLORS.length],
+                              }))}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={2}
+                              dataKey="value"
+                            >
+                              {data.servicePerformance.slice(0, 6).map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                              ))}
+                            </Pie>
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                    <div className="rounded-lg border bg-background p-3 shadow-lg">
+                                      <p className="font-medium">{data.name}</p>
+                                      <p className="text-sm" style={{ color: data.fill }}>
+                                        {PriceFormater(data.value)}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {data.count} atendimento{data.count !== 1 ? "s" : ""}
+                                      </p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Legend
+                              formatter={(value) => (
+                                <span className="text-xs text-foreground">{value}</span>
+                              )}
+                            />
+                          </RechartsPieChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                        Nenhum dado de serviços para este período.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Gráfico de Barras - Horários mais Rentáveis */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-primary" />
+                      <CardTitle>Faturamento por Horário</CardTitle>
+                    </div>
+                    <CardDescription>
+                      Horários com maior receita de serviços
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {data.hourlyRevenue.length > 0 ? (
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={data.hourlyRevenue.map((item) => ({
+                              ...item,
+                              hourFormatted: `${String(item.hour).padStart(2, "0")}:00`,
+                            }))}
+                            margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" vertical={false} />
+                            <XAxis
+                              dataKey="hourFormatted"
+                              tick={{ fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              tickFormatter={(value) => `R$${value}`}
+                              tick={{ fontSize: 11 }}
+                              tickLine={false}
+                              axisLine={false}
+                              width={60}
+                            />
+                            <Tooltip
+                              content={({ active, payload }) => {
+                                if (active && payload && payload.length) {
+                                  const data = payload[0].payload;
+                                  return (
+                                    <div className="rounded-lg border bg-background p-3 shadow-lg">
+                                      <p className="font-medium">{data.hourFormatted}</p>
+                                      <p className="text-sm text-emerald-600">
+                                        Receita: {PriceFormater(data.revenue)}
+                                      </p>
+                                      <p className="text-sm text-muted-foreground">
+                                        {data.bookings} atendimento{data.bookings !== 1 ? "s" : ""}
+                                      </p>
+                                    </div>
+                                  );
+                                }
+                                return null;
+                              }}
+                            />
+                            <Bar
+                              dataKey="revenue"
+                              fill="#10b981"
+                              radius={[4, 4, 0, 0]}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="flex h-[300px] items-center justify-center text-muted-foreground">
+                        Nenhum dado de horário para este período.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
 
               <Separator className="my-6" />
 
@@ -467,6 +716,9 @@ export default function DashboardMetricsPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* ===== SEÇÃO DE GRÁFICOS ===== */}
+
 
           {/* ✅ TABELA DE BARBEIROS (4/4) - ATUALIZADA CONFORME SOLICITADO */}
           <Card>
@@ -522,7 +774,7 @@ export default function DashboardMetricsPage() {
           </Card>
 
           {/* Desempenho dos Serviços */}
-          <Card>
+          {/* <Card>
             <CardHeader>
               <CardTitle>Serviços Mais Populares</CardTitle>
               <CardDescription>Receita e quantidade por serviço no período.</CardDescription>
@@ -555,7 +807,7 @@ export default function DashboardMetricsPage() {
                 </TableBody>
               </Table>
             </CardContent>
-          </Card>
+          </Card> */}
         </>
       )}
     </div>
