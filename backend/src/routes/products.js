@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import Product from "../models/Product.js";
 import Barbershop from "../models/Barbershop.js";
 import StockMovement from "../models/StockMovement.js";
-import { requireRole, protectAdmin } from "../middleware/authAdminMiddleware.js";
+import { requireRole, protectAdmin, checkAccountStatus } from "../middleware/authAdminMiddleware.js";
 
 const router = express.Router({ mergeParams: true });
 
@@ -118,7 +118,7 @@ router.get("/store", async (req, res) => {
   }
 });
 
-router.get("/:productId", protectAdmin, async (req, res) => {
+router.get("/:productId", protectAdmin, checkAccountStatus, async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
 
@@ -140,7 +140,7 @@ router.get("/:productId", protectAdmin, async (req, res) => {
 });
 
 // POST /api/barbershops/:barbershopId/products - Criar produto
-router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
+router.post("/", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId } = req.params;
 
@@ -192,7 +192,7 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
 });
 
 // PUT /api/barbershops/:barbershopId/products/:productId - Atualizar produto
-router.put("/:productId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.put("/:productId", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
 
@@ -238,7 +238,7 @@ router.put("/:productId", protectAdmin, requireRole("admin"), async (req, res) =
 });
 
 // DELETE /api/barbershops/:barbershopId/products/:productId - Deletar produto
-router.delete("/:productId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.delete("/:productId", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
 
@@ -262,7 +262,7 @@ router.delete("/:productId", protectAdmin, requireRole("admin"), async (req, res
 });
 
 // POST /api/barbershops/:barbershopId/products/:productId/stock - Movimentar estoque
-router.post("/:productId/stock", protectAdmin, async (req, res) => {
+router.post("/:productId/stock", protectAdmin, checkAccountStatus, async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
     const { type, quantity, reason, unitCost, notes, barberId } = req.body;
@@ -353,7 +353,7 @@ router.post("/:productId/stock", protectAdmin, async (req, res) => {
 });
 
 // GET /api/barbershops/:barbershopId/products/:productId/movements - Histórico de movimentações
-router.get("/:productId/movements", protectAdmin, async (req, res) => {
+router.get("/:productId/movements", protectAdmin, checkAccountStatus, async (req, res) => {
   try {
     const { barbershopId, productId } = req.params;
     const { page = 1, limit = 20 } = req.query;
@@ -387,7 +387,7 @@ router.get("/:productId/movements", protectAdmin, async (req, res) => {
 });
 
 // GET /api/barbershops/:barbershopId/products/reports/low-stock - Relatório de baixo estoque
-router.get("/reports/low-stock", protectAdmin, async (req, res) => {
+router.get("/reports/low-stock", protectAdmin, checkAccountStatus, async (req, res) => {
   try {
     const { barbershopId } = req.params;
 
@@ -409,7 +409,7 @@ router.get("/reports/low-stock", protectAdmin, async (req, res) => {
 });
 
 // GET /api/barbershops/:barbershopId/products/reports/categories - Relatório por categorias
-router.get("/reports/categories", protectAdmin, requireRole("admin"), async (req, res) => {
+router.get("/reports/categories", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId } = req.params;
 

@@ -69,9 +69,9 @@ export function Loja() {
           apiClient.get(`/api/barbershops/${currentBarbershop._id}/products`),
         ]);
 
-        setAllServices(servicesResponse.data);
-        setAllBarbers(barbersResponse.data);
-        setPlans(plansResponse.data);
+        setAllServices(Array.isArray(servicesResponse.data) ? servicesResponse.data : []);
+        setAllBarbers(Array.isArray(barbersResponse.data) ? barbersResponse.data : []);
+        setPlans(Array.isArray(plansResponse.data) ? plansResponse.data : []);
         setProducts(productsResponse.data?.products || []);
       } catch (error) {
         if (axios.isAxiosError(error) && error.response?.status === 404) {
@@ -140,16 +140,40 @@ export function Loja() {
 
         <main>
           <div ref={bookingSectionRef}>
-            {activeTab === "agendamento" && <BookingPane barbershop={barbershop} allServices={allServices} allBarbers={allBarbers} />}
+            {activeTab === "agendamento" && (
+              <>
+                {barbershop?.accountStatus === "inactive" ? (
+                  <div className="mx-4 my-8 p-6 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex flex-col items-center text-center space-y-3">
+                      <div className="text-3xl">😔</div>
+                      <h2 className="text-xl font-bold text-red-700">Agendamentos Temporariamente Indisponíveis</h2>
+                      <p className="text-sm text-red-600">
+                        O período de teste gratuito desta barbearia expirou.
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        A barbearia está temporariamente impossibilitada de receber novos agendamentos.
+                      </p>
+                      <div className="mt-4 p-3 bg-white rounded-md border border-red-200">
+                        <p className="text-xs text-gray-700">
+                          Se você é o proprietário desta barbearia, entre em contato conosco para reativar sua conta.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <BookingPane barbershop={barbershop} allServices={allServices} allBarbers={allBarbers} />
+                )}
+              </>
+            )}
           </div>
 
-          {activeTab === "avaliacoes" && <ReviewsPane barbershopId={barbershop._id} />}
+          {activeTab === "avaliacoes" && barbershop && <ReviewsPane barbershopId={barbershop._id} />}
 
-          {activeTab === "planos" && <PlansPane barbershopId={barbershop._id} />}
+          {activeTab === "planos" && barbershop && <PlansPane barbershopId={barbershop._id} />}
 
           {activeTab === "products" && <CustomerProductsPage />}
         </main>
-        <ShopInfo barbershop={barbershop} availability={barbershop.workingHours} />
+        {barbershop && <ShopInfo barbershop={barbershop} availability={barbershop.workingHours} />}
       </div>
     </div>
   );

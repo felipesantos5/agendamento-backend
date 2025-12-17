@@ -18,11 +18,22 @@ import {
   LayoutDashboard,
   ChartBar,
   Repeat,
+  ExternalLink,
+  MessageSquare,
+  AlertTriangle,
 } from "lucide-react"; // Ícones de exemplo
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { API_BASE_URL } from "@/config/BackendUrl";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Tipo para os dados básicos da barbearia que podem ser úteis no layout
 interface BarbershopContextData {
@@ -33,6 +44,9 @@ interface BarbershopContextData {
   paymentsEnabled: boolean;
   loyaltyProgramEnable?: boolean;
   loyaltyProgramCount?: number;
+  isTrial?: boolean;
+  trialEndsAt?: string;
+  accountStatus?: string;
 }
 
 // Contexto para compartilhar dados da barbearia com as páginas filhas (opcional, mas útil)
@@ -48,6 +62,8 @@ export function AdminLayout() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [showExpiredModal, setShowExpiredModal] = useState(false);
+  const [barbersCount, setBarbersCount] = useState<number>(0);
 
   useEffect(() => {
     if (!barbershopSlug) {
@@ -70,8 +86,20 @@ export function AdminLayout() {
             paymentsEnabled: response.data.paymentsEnabled,
             loyaltyProgramEnable: response.data.loyaltyProgram.enabled,
             loyaltyProgramCount: response.data.loyaltyProgram.targetCount,
+            isTrial: response.data.isTrial,
+            trialEndsAt: response.data.trialEndsAt,
+            accountStatus: response.data.accountStatus,
           });
           setError(null);
+
+          // Busca quantidade de barbeiros
+          try {
+            const barbersResponse = await apiClient.get(`${API_BASE_URL}/barbershops/${response.data._id}/barbers`);
+            setBarbersCount(barbersResponse.data?.length || 0);
+          } catch (barbersErr) {
+            console.error("Erro ao buscar barbeiros:", barbersErr);
+            setBarbersCount(0);
+          }
         } else {
           setError("Barbearia não encontrada.");
         }
@@ -85,6 +113,25 @@ export function AdminLayout() {
 
     fetchBarbershopForLayout();
   }, [barbershopSlug]);
+
+  // Controla exibição do modal de conta expirada
+  useEffect(() => {
+    if (barbershop?.accountStatus === "inactive") {
+      // Verifica se o usuário já fechou o modal nesta sessão
+      const modalDismissed = sessionStorage.getItem(`expiredModal_${barbershop._id}`);
+      if (!modalDismissed) {
+        setShowExpiredModal(true);
+      }
+    }
+  }, [barbershop]);
+
+  const handleCloseExpiredModal = () => {
+    if (barbershop) {
+      // Salva no sessionStorage que o usuário fechou o modal
+      sessionStorage.setItem(`expiredModal_${barbershop._id}`, "true");
+    }
+    setShowExpiredModal(false);
+  };
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen">Carregando painel da barbearia...</div>;
@@ -191,15 +238,72 @@ export function AdminLayout() {
 
   const visibleNavItems = navItems.filter((item) => user?.role && item.roles.includes(user.role));
 
+  // Função para calcular dias restantes do trial
+  const calculateDaysRemaining = (trialEndsAt: string): number => {
+    const endDate = new Date(trialEndsAt);
+    const today = new Date();
+    const diffTime = endDate.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
   const SidebarContent = () => (
     <>
       <div className="p-5">
         <h1 className="text-2xl font-bold text-white mb-1">Painel</h1>
         <div>
-          <h2 className="text-sm font-medium text-rose-400 truncate" title={barbershop!.name}>
-            {barbershop!.name}
-          </h2>
-          <img src={barbershop.image} alt="" />
+          <div>
+            <h2 className="text-sm font-medium text-rose-400 truncate" title={barbershop!.name}>
+              {barbershop!.name}
+            </h2>
+            <img src={barbershop.image} alt="" />
+            {/* Botão Link de Agendamento */}
+            <a
+              href={`https://barbeariagendamento.com.br/${barbershop.slug}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 block"
+            >
+              <Button
+                variant="default"
+                className="w-full bg-gradient-to-r from-rose-600 to-rose-500 hover:from-rose-700 hover:to-rose-600 text-white shadow-lg"
+              >
+                Página de Agendamento
+              </Button>
+            </a>
+          </div>
+
+          {/* Indicador de Trial */}
+          {barbershop.isTrial && barbershop.trialEndsAt && barbershop.accountStatus === "trial" && (
+            <div className="mt-3 p-2.5 bg-amber-500/20 border border-amber-500/50 rounded-lg">
+              <div className="flex items-center justify-center gap-2">
+                <div className="flex flex-col items-center text-center">
+                  <span className="text-xs text-amber-300 font-medium">Teste Grátis</span>
+                  <span className="text-lg font-bold text-amber-400">
+                    {calculateDaysRemaining(barbershop.trialEndsAt)}
+                  </span>
+                  <span className="text-xs text-amber-300">
+                    {calculateDaysRemaining(barbershop.trialEndsAt) === 1 ? "dia restante" : "dias restantes"}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Banner de Conta Inativa */}
+          {barbershop.accountStatus === "inactive" && (
+            <div className="mt-3 p-3 bg-red-500/20 border border-red-500/50 rounded-lg">
+              <div className="flex flex-col gap-1 text-center">
+                <span className="text-xs font-bold text-red-400">CONTA DESATIVADA</span>
+                <span className="text-[10px] text-red-300">
+                  Você pode visualizar seus dados.
+                </span>
+                <span className="text-[10px] text-red-200 mt-1">
+                  Entre em contato para reativar.
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       <nav className="flex flex-col space-y-1 mt-4 flex-grow px-3 overflow-x-auto">
@@ -212,10 +316,9 @@ export function AdminLayout() {
               key={item.label}
               to={item.to}
               className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ease-in-out
-                ${
-                  isActive
-                    ? "bg-rose-600 text-white shadow-lg transform scale-105"
-                    : "text-gray-300 hover:bg-zinc-800 hover:text-white hover:shadow-md"
+                ${isActive
+                  ? "bg-rose-600 text-white shadow-lg transform scale-105"
+                  : "text-gray-300 hover:bg-zinc-800 hover:text-white hover:shadow-md"
                 }`}
               onClick={() => setIsMobileSidebarOpen(false)} // Fecha ao clicar no item em mobile
             >
@@ -240,6 +343,76 @@ export function AdminLayout() {
 
   return (
     <BarbershopAdminContext.Provider value={barbershop}>
+      {/* Modal de Conta Expirada */}
+      <Dialog open={showExpiredModal} onOpenChange={setShowExpiredModal}>
+        <DialogContent className="sm:max-w-[500px] bg-gradient-to-br from-amber-50 to-amber-100 border-2 border-amber-400">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-amber-200 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-amber-700" />
+              </div>
+              <DialogTitle className="text-2xl text-amber-900">Teste Grátis Expirado</DialogTitle>
+            </div>
+            <DialogDescription className="text-amber-800 text-base">
+              Seu período de teste de 7 dias chegou ao fim. Você pode continuar visualizando seus dados, mas não
+              poderá mais criar ou editar informações.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 my-4">
+            <div className="bg-white p-4 rounded-lg border border-amber-200">
+              <h3 className="font-semibold text-amber-900 mb-2">O que você ainda pode fazer:</h3>
+              <ul className="space-y-1 text-sm text-gray-700">
+                <li className="flex items-center gap-2">
+                  <span className="text-green-600">✓</span> Visualizar todos os seus dados
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-600">✓</span> Consultar histórico de agendamentos
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="text-green-600">✓</span> Ver relatórios e métricas
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-amber-200 p-4 rounded-lg border border-amber-300">
+              <p className="text-sm text-amber-900 font-medium">
+                Para continuar recebendo agendamentos e gerenciando sua barbearia, assine um plano agora!
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-col sm:flex-col gap-2">
+            <a
+              href="https://wa.me/5548996994257?text=Olá,%20gostaria%20de%20contratar%20o%20sistema%20de%20agendamento"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full"
+            >
+              <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Falar com Atendente no WhatsApp
+              </Button>
+            </a>
+
+            <a
+              href={
+                barbersCount >= 4
+                  ? "https://compre.barbeariagendamento.com.br/plano-plus" // Link X - 4 ou mais barbeiros
+                  : "https://compre.barbeariagendamento.com.br/plano-basico" // Link Y - 3 ou menos barbeiros
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full"
+            >
+              <Button className="w-full bg-amber-600 hover:bg-amber-700 text-white">
+                Comprar Plano Agora
+              </Button>
+            </a>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex min-h-screen bg-gray-100">
         <aside className="hidden lg:flex lg:flex-col lg:w-52 bg-neutral-950 text-gray-200 fixed h-full">
           <SidebarContent />

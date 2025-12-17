@@ -41,7 +41,7 @@ import barberPerformanceRoutes from "./routes/admin/barberPerformanceRoutes.js";
 import manualBookingRoutes from "./routes/admin/manualBookingRoute.js";
 import leadRoutes from "./routes/form/lead.routes.js";
 
-import { protectAdmin } from "./middleware/authAdminMiddleware.js";
+import { protectAdmin, checkAccountStatus } from "./middleware/authAdminMiddleware.js";
 
 import "./services/schedulerService.js";
 
@@ -108,10 +108,10 @@ app.use("/barbershops", barbershopRoutes);
 app.use("/barbershops/:barbershopId/barbers", barberRoutes);
 app.use("/barbershops/:barbershopId/services", serviceRoutes);
 app.use("/barbershops/:barbershopId/bookings", bookingRoutes); // bookingRoutes agora contém a sub-rota para free-slots
-app.use("/api/upload", protectAdmin, uploadRoutes);
-app.use("/barbershops/:barbershopId/analytics", protectAdmin, analyticsRoutes);
-app.use("/barbershops/:barbershopId/commissions", protectAdmin, commissionRoutes);
-app.use("/api/barbershops/:barbershopId/blocked-days", blockedDayRoutes);
+app.use("/api/upload", protectAdmin, checkAccountStatus, uploadRoutes);
+app.use("/barbershops/:barbershopId/analytics", protectAdmin, checkAccountStatus, analyticsRoutes);
+app.use("/barbershops/:barbershopId/commissions", protectAdmin, checkAccountStatus, commissionRoutes);
+app.use("/api/barbershops/:barbershopId/blocked-days", protectAdmin, checkAccountStatus, blockedDayRoutes);
 app.use("/api/barbershops/:barbershopId/reviews", reviewRoutes);
 app.use("/api/barbershops/:barbershopId/plans", planRoutes);
 
@@ -120,16 +120,16 @@ app.use("/api/auth/customer", customerRoutes);
 app.use("/api/auth/customer", authCustomerRoutes);
 
 app.use("/api/auth/admin", authAdminRoutes);
-app.use("/api/barbershops/:barbershopId/admin/customers", customerAdminRoutes);
+app.use("/api/barbershops/:barbershopId/admin/customers", protectAdmin, checkAccountStatus, customerAdminRoutes);
 app.use("/api/barbershops/:barbershopId/products", productRoutes);
 
 // admin
 
-app.use("/api/barbershops/:barbershopId/time-blocks", timeBlockRoutes);
+app.use("/api/barbershops/:barbershopId/time-blocks", protectAdmin, checkAccountStatus, timeBlockRoutes);
 app.use("/api/barbershops/:barbershopId/bookings", paymentRoutes);
-app.use("/api/barbershops/:barbershopId/dashboard-metrics", dashboardRoutes);
-app.use("/api/barbershops/:barbershopId/barber-performance", barberPerformanceRoutes);
-app.use("/api/barbershops/:barbershopId/admin/bookings", manualBookingRoutes);
+app.use("/api/barbershops/:barbershopId/dashboard-metrics", protectAdmin, checkAccountStatus, dashboardRoutes);
+app.use("/api/barbershops/:barbershopId/barber-performance", protectAdmin, checkAccountStatus, barberPerformanceRoutes);
+app.use("/api/barbershops/:barbershopId/admin/bookings", protectAdmin, checkAccountStatus, manualBookingRoutes);
 
 // Form
 

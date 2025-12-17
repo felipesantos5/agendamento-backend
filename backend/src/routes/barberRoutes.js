@@ -8,8 +8,7 @@ import Service from "../models/Service.js";
 import { barberCreationSchema, barberUpdateSchema } from "../validations/barberValidation.js";
 import { z } from "zod";
 import { startOfDay, endOfDay, parseISO, format as formatDateFns } from "date-fns";
-import { protectAdmin } from "../middleware/authAdminMiddleware.js";
-import { requireRole } from "../middleware/authAdminMiddleware.js";
+import { protectAdmin, checkAccountStatus, requireRole } from "../middleware/authAdminMiddleware.js";
 import { ptBR } from "date-fns/locale";
 import crypto from "crypto";
 import BlockedDay from "../models/BlockedDay.js";
@@ -25,7 +24,7 @@ const BRAZIL_TIMEZONE = "America/Sao_Paulo";
 
 // Adicionar Barbeiro a uma Barbearia
 // Rota: POST /barbershops/:barbershopId/barbers
-router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
+router.post("/", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     // ... (sua validação de autorização) ...
     const data = barberCreationSchema.parse(req.body);
@@ -120,7 +119,7 @@ router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
 
 // Reenviar Email de Configuração de Senha
 // Rota: POST /barbershops/:barbershopId/barbers/:barberId/resend-setup-email
-router.post("/:barberId/resend-setup-email", protectAdmin, requireRole("admin"), async (req, res) => {
+router.post("/:barberId/resend-setup-email", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 
@@ -466,7 +465,7 @@ router.get("/:barberId/free-slots", async (req, res) => {
   }
 });
 
-router.get("/bookings/barber", protectAdmin, async (req, res) => {
+router.get("/bookings/barber", protectAdmin, checkAccountStatus, async (req, res) => {
   try {
     const { role, barberProfileId, barbershopId } = req.adminUser; // Dados do token JWT
 
@@ -497,7 +496,7 @@ router.get("/bookings/barber", protectAdmin, async (req, res) => {
 });
 
 // Rota: PUT /barbershops/:barbershopId/barbers/:barberId
-router.put("/:barberId", protectAdmin, async (req, res) => {
+router.put("/:barberId", protectAdmin, checkAccountStatus, async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 
@@ -584,7 +583,7 @@ router.put("/:barberId", protectAdmin, async (req, res) => {
 });
 
 // Rota: DELETE /barbershops/:barbershopId/barbers/:barberId
-router.delete("/:barberId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.delete("/:barberId", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, barberId } = req.params;
 

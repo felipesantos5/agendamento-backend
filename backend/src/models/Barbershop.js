@@ -70,6 +70,19 @@ const BarbershopSchema = new mongoose.Schema(
         },
       },
     },
+    // Trial account fields
+    isTrial: {
+      type: Boolean,
+      default: false,
+    },
+    trialEndsAt: {
+      type: Date,
+    },
+    accountStatus: {
+      type: String,
+      enum: ["active", "trial", "inactive"],
+      default: "active",
+    },
   },
   { timestamps: true }
 );

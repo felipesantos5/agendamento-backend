@@ -2,8 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import Service from "../models/Service.js";
 import { z } from "zod";
-import { protectAdmin } from "../middleware/authAdminMiddleware.js";
-import { requireRole } from "../middleware/authAdminMiddleware.js";
+import { protectAdmin, checkAccountStatus, requireRole } from "../middleware/authAdminMiddleware.js";
 import { ZodObjectId } from "../validations/utils.js";
 
 const router = express.Router({ mergeParams: true });
@@ -18,7 +17,7 @@ const ServiceValidationSchema = z.object({
 
 // Adicionar Serviço a uma Barbearia
 // Rota: POST /barbershops/:barbershopId/services
-router.post("/", protectAdmin, requireRole("admin"), async (req, res) => {
+router.post("/", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     // O schema de validação não deve incluir 'barbershop', pois será pego dos params.
     const serviceData = req.body;
@@ -67,7 +66,7 @@ router.get("/", async (req, res) => {
 
 // ✅ NOVA ROTA: Atualizar um Serviço existente
 // Rota: PUT /barbershops/:barbershopId/services/:serviceId
-router.put("/:serviceId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.put("/:serviceId", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, serviceId } = req.params;
 
@@ -109,7 +108,7 @@ router.put("/:serviceId", protectAdmin, requireRole("admin"), async (req, res) =
 });
 
 // Rota: DELETE /barbershops/:barbershopId/services/:serviceId
-router.delete("/:serviceId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.delete("/:serviceId", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, serviceId } = req.params;
 

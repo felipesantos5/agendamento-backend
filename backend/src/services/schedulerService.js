@@ -1,5 +1,6 @@
 import cron from "node-cron";
 import Booking from "../models/Booking.js";
+import Barbershop from "../models/Barbershop.js";
 import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
 import { startOfDay, endOfDay, getHours } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
@@ -190,4 +191,42 @@ cron.schedule(
   }
 );
 
+// Função para desativar contas trial expiradas
+const deactivateExpiredTrials = async () => {
+  const now = new Date();
+  try {
+    // Busca barbearias com trial expirado que ainda estão com status "trial"
+    const filter = {
+      isTrial: true,
+      accountStatus: "trial",
+      trialEndsAt: { $lt: now },
+    };
+
+    const update = {
+      $set: { accountStatus: "inactive" },
+    };
+
+    const result = await Barbershop.updateMany(filter, update);
+
+    if (result.modifiedCount > 0) {
+      console.log(`[CRON] ${result.modifiedCount} conta(s) trial expirada(s) foram desativadas.`);
+    }
+  } catch (error) {
+    console.error("❌ Erro ao desativar contas trial expiradas:", error);
+  }
+};
+
+// Cron job para desativar contas trial expiradas (roda diariamente às 00:00)
+cron.schedule(
+  "0 0 * * *",
+  () => {
+    deactivateExpiredTrials();
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
+
 updateExpiredBookings();
+deactivateExpiredTrials(); // Executa uma vez ao iniciar o servidor
