@@ -29,7 +29,7 @@ export const BarbershopSchema = z.object({
   slug: z.string().max(50, "Descrição muito longa"),
   workingHours: z.array(WorkingHourSchema).min(1, "Informe pelo menos um horário de funcionamento"),
   // style
-  themeColor: z.string().regex(hexColorRegex, "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)").optional().default("#D10000"),
+  themeColor: z.string().regex(hexColorRegex, "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)").optional().default("#000000"),
   LogoBackgroundColor: z
     .string()
     .regex(hexColorRegex, "Cor primária deve ser um código hexadecimal válido (ex: #RRGGBB)")

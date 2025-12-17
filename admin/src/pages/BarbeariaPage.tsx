@@ -360,7 +360,7 @@ export function BarbeariaConfigPage() {
           </div>
 
           <div className="space-y-2">
-            <ColorSelector label="Cor principal" color={formData.themeColor || "#D10000"} onChange={handleThemeColorChange} />
+            <ColorSelector label="Cor principal" color={formData.themeColor || "#000000"} onChange={handleThemeColorChange} />
             <p className="text-xs text-muted-foreground">Esta cor será usada em botões e destaques na página de agendamento da sua barbearia.</p>
           </div>
 
