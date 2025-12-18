@@ -118,8 +118,15 @@ export function BookingPane({ barbershop, allServices, allBarbers }: BookingPane
     }
   };
 
-  const selectedServiceName = useMemo(() => allServices.find((s) => s._id === formData.service)?.name, [allServices, formData.service]);
-  const selectedBarberName = useMemo(() => allBarbers.find((b) => b._id === formData.barber)?.name, [allBarbers, formData.barber]);
+  const selectedServiceName = useMemo(() => {
+    if (!Array.isArray(allServices)) return undefined;
+    return allServices.find((s) => s._id === formData.service)?.name;
+  }, [allServices, formData.service]);
+
+  const selectedBarberName = useMemo(() => {
+    if (!Array.isArray(allBarbers)) return undefined;
+    return allBarbers.find((b) => b._id === formData.barber)?.name;
+  }, [allBarbers, formData.barber]);
 
   // Lógica de submissão (handleSubmit)
   const handleSubmit = async (e: React.FormEvent) => {
@@ -133,6 +140,12 @@ export function BookingPane({ barbershop, allServices, allBarbers }: BookingPane
       return;
     }
 
+    if (!Array.isArray(allServices)) {
+      toast.error("Erro ao carregar serviços.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const selectedService = allServices.find((s) => s._id === service);
     if (!selectedService) {
       toast.error("Serviço selecionado inválido.");
@@ -141,7 +154,9 @@ export function BookingPane({ barbershop, allServices, allBarbers }: BookingPane
     }
 
     const serviceDuration = selectedService.duration;
-    const formattedAddress = `${barbershop.address.rua}, ${barbershop.address.numero} - ${barbershop.address.bairro}, ${barbershop.address.cidade}/${barbershop.address.estado}`;
+    const formattedAddress = barbershop.address
+      ? `${barbershop.address.rua}, ${barbershop.address.numero} - ${barbershop.address.bairro}, ${barbershop.address.cidade}/${barbershop.address.estado}`
+      : "Endereço não disponível";
 
     const bookingPayload = {
       barber: barber,

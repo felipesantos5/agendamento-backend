@@ -10,10 +10,13 @@ interface ShopInfoProps {
 
 export function ShopInfo({ barbershop, availability }: ShopInfoProps) {
   // Monta o endereço completo e o link para o Google Maps
-  const fullAddress = `${barbershop.address.rua}, ${barbershop.address.numero} - ${barbershop.address.bairro}, ${barbershop.address.cidade}/${barbershop.address.estado}`;
-  const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-    fullAddress
-  )}`;
+  const fullAddress = barbershop.address
+    ? `${barbershop.address.rua}, ${barbershop.address.numero} - ${barbershop.address.bairro}, ${barbershop.address.cidade}/${barbershop.address.estado}`
+    : "Endereço não disponível";
+
+  const googleMapsUrl = barbershop.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`
+    : "#";
 
   // Formata os links de redes sociais
   const whatsappLink = barbershop.contact

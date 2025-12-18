@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+import Barbershop from "../models/Barbershop.js";
 import "dotenv/config";
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -54,4 +55,45 @@ export const requireRole = (...allowedRoles) => {
       res.status(403).json({ error: "Acesso proibido: permissões insuficientes." });
     }
   };
+};
+
+// Middleware para verificar se a conta da barbearia está ativa
+export const checkAccountStatus = async (req, res, next) => {
+  try {
+    // Pega o barbershopId do token JWT (adicionado pelo protectAdmin)
+    const barbershopId = req.adminUser?.barbershopId;
+
+    if (!barbershopId) {
+      return res.status(401).json({ error: "Barbearia não identificada." });
+    }
+
+    // Busca a barbearia no banco
+    const barbershop = await Barbershop.findById(barbershopId).select("accountStatus isTrial trialEndsAt");
+
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada." });
+    }
+
+    // Verifica se a conta está inativa
+    if (barbershop.accountStatus === "inactive") {
+      // Permite requisições GET (leitura) mesmo com conta inativa
+      if (req.method === "GET") {
+        return next();
+      }
+
+      // Bloqueia POST, PUT, DELETE, PATCH (modificação)
+      return res.status(403).json({
+        error: "Conta inativa",
+        message: "Sua conta de teste expirou. Entre em contato para reativar ou assinar um plano.",
+        accountStatus: "inactive",
+        isTrial: barbershop.isTrial,
+      });
+    }
+
+    // Se tudo estiver ok, continua
+    next();
+  } catch (error) {
+    console.error("Erro ao verificar status da conta:", error);
+    return res.status(500).json({ error: "Erro ao verificar status da conta." });
+  }
 };

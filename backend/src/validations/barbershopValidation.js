@@ -55,3 +55,9 @@ export const BarbershopCreationSchema = BarbershopSchema.extend({
 });
 
 export const BarbershopUpdateSchema = BarbershopSchema.partial();
+
+export const TrialSignupSchema = z.object({
+  barbershopName: z.string().min(2, "Nome da barbearia é obrigatório"),
+  adminEmail: z.string().email("Email inválido"),
+  adminPassword: z.string().min(6, "A senha deve ter no mínimo 6 caracteres"),
+});

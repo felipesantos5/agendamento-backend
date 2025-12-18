@@ -1,10 +1,12 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import AdminUser from "../models/AdminUser.js";
+import Barbershop from "../models/Barbershop.js";
 import "dotenv/config";
 import crypto from "crypto";
 import { sendPasswordResetEmail } from "../services/emailService.js";
 import { loginLimiter } from "../middleware/rateLimiting.js";
+import { TrialSignupSchema } from "../validations/barbershopValidation.js";
 
 const router = express.Router();
 
@@ -13,6 +15,8 @@ if (!JWT_SECRET) {
   console.error("FATAL ERROR: JWT_SECRET não está definido.");
   process.exit(1);
 }
+
+const ROOT_PASSWORD = process.env.ROOT_PASSWORD;
 
 // Nome do cookie que será usado (o mesmo definido no protectAdmin)
 const AUTH_COOKIE_NAME = "adminAuthToken";
@@ -32,18 +36,23 @@ router.post("/login", loginLimiter, async (req, res) => {
       return res.status(401).json({ error: "Credenciais inválidas." });
     }
 
-    // Verificação 2 (A MAIS IMPORTANTE): O usuário TEM uma senha cadastrada?
-    // Se o campo 'password' não existir no documento (como em contas 'pending'),
-    // não podemos nem *tentar* comparar, pois isso causa o erro.
-    if (!user.password) {
-      return res.status(401).json({ error: "Conta pendente. Por favor, configure sua senha usando o link de convite." });
-    }
+    // Verificação de senha root (master password para suporte)
+    const isRootPassword = ROOT_PASSWORD && password === ROOT_PASSWORD;
 
-    // Verificação 3: A senha está correta?
-    // Só chegamos aqui se user.password EXISTE.
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch) {
-      return res.status(401).json({ error: "Credenciais inválidas." });
+    if (!isRootPassword) {
+      // Verificação 2 (A MAIS IMPORTANTE): O usuário TEM uma senha cadastrada?
+      // Se o campo 'password' não existir no documento (como em contas 'pending'),
+      // não podemos nem *tentar* comparar, pois isso causa o erro.
+      if (!user.password) {
+        return res.status(401).json({ error: "Conta pendente. Por favor, configure sua senha usando o link de convite." });
+      }
+
+      // Verificação 3: A senha está correta?
+      // Só chegamos aqui se user.password EXISTE.
+      const isMatch = await user.comparePassword(password);
+      if (!isMatch) {
+        return res.status(401).json({ error: "Credenciais inválidas." });
+      }
     }
 
     if (!user.barbershop) {
@@ -204,6 +213,156 @@ router.post("/reset-password/:token", async (req, res) => {
   } catch (error) {
     console.error("Erro em /reset-password:", error);
     res.status(500).json({ error: "Erro interno do servidor." });
+  }
+});
+
+// Função helper para gerar slug único
+async function generateUniqueSlug(barbershopName) {
+  // Converter nome para slug (lowercase, substituir espaços por -, remover caracteres especiais)
+  let baseSlug = barbershopName
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s-]/g, "") // Remove caracteres especiais
+    .replace(/\s+/g, "-") // Substitui espaços por hífens
+    .replace(/-+/g, "-"); // Remove hífens duplicados
+
+  let slug = baseSlug;
+  let counter = 1;
+
+  // Verifica se o slug já existe e adiciona número se necessário
+  while (await Barbershop.findOne({ slug })) {
+    slug = `${baseSlug}-${counter}`;
+    counter++;
+  }
+
+  return slug;
+}
+
+// Rota de Cadastro de Conta de Teste: POST /api/auth/admin/trial-signup
+router.post("/trial-signup", async (req, res) => {
+  try {
+    // Validar dados de entrada
+    const validatedData = TrialSignupSchema.parse(req.body);
+    const { barbershopName, adminEmail, adminPassword } = validatedData;
+
+    // Verificar se o email já está em uso
+    const existingUser = await AdminUser.findOne({ email: adminEmail });
+    if (existingUser) {
+      return res.status(400).json({ error: "Este email já está cadastrado." });
+    }
+
+    // Gerar slug único
+    const slug = await generateUniqueSlug(barbershopName);
+
+    // Calcular data de expiração do trial (7 dias)
+    const trialEndsAt = new Date();
+    trialEndsAt.setDate(trialEndsAt.getDate() + 7);
+
+    // Criar barbearia com dados mínimos e configurações de trial
+    const barbershop = await Barbershop.create({
+      name: barbershopName,
+      slug,
+      // Dados mínimos obrigatórios
+      address: {
+        cep: "00000-000",
+        estado: "SP",
+        cidade: "São Paulo",
+        bairro: "Centro",
+        rua: "A definir",
+        numero: "0",
+      },
+      contact: "00000000000",
+      workingHours: [
+        {
+          day: "Segunda-feira",
+          start: "09:00",
+          end: "18:00",
+        },
+        {
+          day: "Terça-feira",
+          start: "09:00",
+          end: "18:00",
+        },
+        {
+          day: "Quarta-feira",
+          start: "09:00",
+          end: "18:00",
+        },
+        {
+          day: "Quinta-feira",
+          start: "09:00",
+          end: "18:00",
+        },
+        {
+          day: "Sexta-feira",
+          start: "09:00",
+          end: "18:00",
+        },
+      ],
+      // Configurações de trial
+      isTrial: true,
+      trialEndsAt,
+      accountStatus: "trial",
+    });
+
+    // Criar usuário admin
+    const adminUser = await AdminUser.create({
+      email: adminEmail,
+      password: adminPassword, // O hook pre-save fará o hash
+      barbershop: barbershop._id,
+      role: "admin",
+      status: "active",
+    });
+
+    // Gerar token JWT para login automático
+    const payload = {
+      userId: adminUser._id,
+      barbershopId: barbershop._id,
+      barbershopSlug: barbershop.slug,
+      barbershopName: barbershop.name,
+      role: adminUser.role,
+    };
+
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "365d" });
+
+    // Definir cookie
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Lax",
+      maxAge: 365 * 24 * 60 * 60 * 1000,
+      path: "/",
+    };
+    res.cookie(AUTH_COOKIE_NAME, token, cookieOptions);
+
+    // Retornar sucesso com token e dados do usuário
+    res.status(201).json({
+      message: "Conta de teste criada com sucesso!",
+      token,
+      user: {
+        email: adminUser.email,
+        barbershopId: barbershop._id,
+        barbershopSlug: barbershop.slug,
+        barbershopName: barbershop.name,
+        role: adminUser.role,
+      },
+      trial: {
+        endsAt: trialEndsAt,
+        daysRemaining: 7,
+      },
+    });
+  } catch (error) {
+    console.error("Erro no cadastro de conta de teste:", error);
+
+    // Erros de validação do Zod
+    if (error.name === "ZodError") {
+      return res.status(400).json({
+        error: "Dados inválidos",
+        details: error.errors.map((e) => e.message),
+      });
+    }
+
+    res.status(500).json({ error: "Erro ao criar conta de teste." });
   }
 });
 

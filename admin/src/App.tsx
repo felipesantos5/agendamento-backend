@@ -6,6 +6,8 @@ import { ServicesPage } from "./pages/ServicesPage";
 import { BarberPage } from "./pages/BarberPage";
 import { AgendamentosPage } from "./pages/AgendamentosPage";
 import { LoginPage } from "./pages/LoginPage";
+import { TrialSignupPage } from "./pages/TrialSignupPage";
+import { AccountExpiredPage } from "./pages/AccountExpiredPage";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
 import { SetPasswordPage } from "./pages/SetPasswordPage.tsx";
 import { useAuth } from "./contexts/AuthContext.tsx";
@@ -25,6 +27,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/criar-conta" element={<TrialSignupPage />} />
+        <Route path="/conta-expirada" element={<AccountExpiredPage />} />
         <Route path="/configurar-senha/:token" element={<SetPasswordPage />} />
         <Route path="/resetar-senha/:token" element={<ResetPasswordPage />} />
 

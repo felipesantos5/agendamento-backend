@@ -1,7 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import Plan from "../models/Plan.js";
-import { protectAdmin, requireRole } from "../middleware/authAdminMiddleware.js";
+import { protectAdmin, checkAccountStatus, requireRole } from "../middleware/authAdminMiddleware.js";
 
 // Usamos mergeParams para acessar o :barbershopId da rota pai
 const router = express.Router({ mergeParams: true });
@@ -13,7 +13,7 @@ const router = express.Router({ mergeParams: true });
  * ROTA PARA CRIAR UM NOVO PLANO
  * POST /api/barbershops/:barbershopId/plans
  */
-router.post("/", async (req, res) => {
+router.post("/", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId } = req.params;
 
@@ -68,7 +68,7 @@ router.get("/", async (req, res) => {
  * ROTA PARA ATUALIZAR UM PLANO
  * PUT /api/barbershops/:barbershopId/plans/:planId
  */
-router.put("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.put("/:planId", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, planId } = req.params;
     const { name, description, price, durationInDays, totalCredits } = req.body;
@@ -107,7 +107,7 @@ router.put("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
  * ROTA PARA DELETAR UM PLANO
  * DELETE /api/barbershops/:barbershopId/plans/:planId
  */
-router.delete("/:planId", protectAdmin, requireRole("admin"), async (req, res) => {
+router.delete("/:planId", protectAdmin, checkAccountStatus, requireRole("admin"), async (req, res) => {
   try {
     const { barbershopId, planId } = req.params;
 

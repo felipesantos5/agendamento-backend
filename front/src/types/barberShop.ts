@@ -29,6 +29,7 @@ export interface Barbershop {
   address: Address;
   workingHours: WorkingHour[];
   paymentsEnabled?: boolean;
+  accountStatus?: string;
 }
 
 export interface Barber {

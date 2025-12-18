@@ -43,6 +43,12 @@ apiClient.interceptors.response.use(
       }
     }
 
+    // Verifica se o erro é uma conta inativa (trial expirado)
+    // Não redireciona mais, apenas loga - o usuário pode continuar visualizando
+    if (error.response && error.response.status === 403 && error.response.data?.accountStatus === "inactive") {
+      console.log("Conta inativa (trial expirado) - operação de escrita bloqueada.");
+    }
+
     // É importante retornar a promessa rejeitada para que o erro ainda possa
     // ser tratado no componente que fez a chamada (ex: para parar um spinner de loading).
     return Promise.reject(error);
