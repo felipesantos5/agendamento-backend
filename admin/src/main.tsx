@@ -2,12 +2,15 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import { AuthProvider } from "./contexts/AuthContext.tsx";
+import { SuperAdminAuthProvider } from "./contexts/SuperAdminAuthContext.tsx";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
+    <SuperAdminAuthProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </SuperAdminAuthProvider>
   </StrictMode>
 );

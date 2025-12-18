@@ -40,8 +40,11 @@ import dashboardRoutes from "./routes/admin/dashboardRoutes.js";
 import barberPerformanceRoutes from "./routes/admin/barberPerformanceRoutes.js";
 import manualBookingRoutes from "./routes/admin/manualBookingRoute.js";
 import leadRoutes from "./routes/form/lead.routes.js";
+import authSuperAdminRoutes from "./routes/authSuperAdminRoutes.js";
+import superAdminRoutes from "./routes/superAdminRoutes.js";
 
 import { protectAdmin, checkAccountStatus } from "./middleware/authAdminMiddleware.js";
+import { protectSuperAdmin } from "./middleware/authSuperAdminMiddleware.js";
 
 import "./services/schedulerService.js";
 
@@ -132,8 +135,11 @@ app.use("/api/barbershops/:barbershopId/barber-performance", protectAdmin, check
 app.use("/api/barbershops/:barbershopId/admin/bookings", protectAdmin, checkAccountStatus, manualBookingRoutes);
 
 // Form
-
 app.use('/api/leads', leadRoutes);
+
+// Super Admin
+app.use("/api/auth/superadmin", authSuperAdminRoutes);
+app.use("/api/superadmin", protectSuperAdmin, superAdminRoutes);
 
 // Exemplo de como você usaria o setBarbershopContext para as rotas da loja pública
 // import { setBarbershopContext } from './middlewares/barbershopContext.js';
