@@ -18,7 +18,6 @@ import {
   LayoutDashboard,
   ChartBar,
   Repeat,
-  ExternalLink,
   MessageSquare,
   AlertTriangle,
 } from "lucide-react"; // Ícones de exemplo
@@ -124,14 +123,6 @@ export function AdminLayout() {
       }
     }
   }, [barbershop]);
-
-  const handleCloseExpiredModal = () => {
-    if (barbershop) {
-      // Salva no sessionStorage que o usuário fechou o modal
-      sessionStorage.setItem(`expiredModal_${barbershop._id}`, "true");
-    }
-    setShowExpiredModal(false);
-  };
 
   if (isLoading) {
     return <div className="flex justify-center items-center min-h-screen">Carregando painel da barbearia...</div>;
