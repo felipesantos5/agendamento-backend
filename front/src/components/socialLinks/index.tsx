@@ -4,6 +4,26 @@ interface AppFooterProps {
   barbershopName?: string | null;
 }
 
+// Função auxiliar para formatar o link do Instagram
+const formatInstagramLink = (instagram?: string | null): string | null => {
+  if (!instagram || !instagram.trim()) return null;
+
+  const value = instagram.trim();
+
+  // Se já é um link completo, retorna como está
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value;
+  }
+
+  // Remove @ do início se existir e monta o link
+  const username = value.startsWith("@") ? value.slice(1) : value;
+
+  // Remove qualquer parte de URL que possa ter sido colada parcialmente
+  const cleanUsername = username.replace(/^(instagram\.com\/|www\.instagram\.com\/)/, "");
+
+  return `https://instagram.com/${cleanUsername}`;
+};
+
 // Função auxiliar para formatar o link do WhatsApp
 const formatWhatsAppLink = (number?: string | null): string | null => {
   if (!number) return null;
@@ -55,11 +75,11 @@ export function SocialLinks({
           </a>
         </p>
 
-        {(instagram || whatsappLink) && (
+        {(formatInstagramLink(instagram) || whatsappLink) && (
           <div className="flex justify-center items-center gap-4">
-            {instagram && (
+            {formatInstagramLink(instagram) && (
               <a
-                href={instagram.startsWith("http") ? instagram : `https://instagram.com/${instagram}`}
+                href={formatInstagramLink(instagram)!}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Instagram de ${barbershopName}`}

@@ -2,6 +2,26 @@ import { MapPin, Instagram } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Barbershop, Availability } from "@/types/barberShop"; // Importando suas tipagens
 
+// Função auxiliar para formatar o link do Instagram
+const formatInstagramLink = (instagram?: string | null): string | null => {
+  if (!instagram || !instagram.trim()) return null;
+
+  const value = instagram.trim();
+
+  // Se já é um link completo, retorna como está
+  if (value.startsWith("http://") || value.startsWith("https://")) {
+    return value;
+  }
+
+  // Remove @ do início se existir e monta o link
+  const username = value.startsWith("@") ? value.slice(1) : value;
+
+  // Remove qualquer parte de URL que possa ter sido colada parcialmente
+  const cleanUsername = username.replace(/^(instagram\.com\/|www\.instagram\.com\/)/, "");
+
+  return `https://instagram.com/${cleanUsername}`;
+};
+
 // A interface de props agora espera o objeto barbershop e a disponibilidade
 interface ShopInfoProps {
   barbershop: Barbershop;
@@ -83,7 +103,7 @@ export function ShopInfo({ barbershop, availability }: ShopInfoProps) {
       </section>
 
       {/* Seção de Redes Sociais */}
-      {(whatsappLink || barbershop.instagram) && (
+      {(whatsappLink || formatInstagramLink(barbershop.instagram)) && (
         <section className="flex flex-col sm:flex-row gap-3">
           {whatsappLink && (
             <a
@@ -108,9 +128,9 @@ export function ShopInfo({ barbershop, availability }: ShopInfoProps) {
               WhatsApp
             </a>
           )}
-          {barbershop.instagram && (
+          {formatInstagramLink(barbershop.instagram) && (
             <a
-              href={barbershop.instagram}
+              href={formatInstagramLink(barbershop.instagram)!}
               target="_blank"
               rel="noopener noreferrer"
               className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-500 via-pink-500 to-orange-400 text-white rounded-xl py-3 px-4 font-medium text-sm active:scale-[0.98] transition-transform"
