@@ -5,6 +5,7 @@ import { CustomerLoginPage } from "./pages/CustomerLoginPage";
 import { ProtectedRouteCustomer } from "./components/ProtectedRouteCustomer.tsx";
 import { MyBookingsPage } from "./pages/MyBookingsPage.tsx";
 import { PaymentSucessPage } from "./pages/PayedSucess.tsx";
+import { SubscriptionSuccessPage } from "./pages/SubscriptionSuccessPage.tsx";
 
 function App() {
   return (
@@ -18,6 +19,10 @@ function App() {
         <Route
           path="/:slug/pagamento-sucesso"
           element={<PaymentSucessPage />}
+        />
+        <Route
+          path="/:slug/assinatura-sucesso"
+          element={<SubscriptionSuccessPage />}
         />
 
         <Route path="/entrar" element={<CustomerLoginPage />} />

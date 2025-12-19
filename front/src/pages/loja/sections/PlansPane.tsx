@@ -1,8 +1,9 @@
-import { PlansList } from "@/components/PlansList"; // Importe o novo componente
+import { PlansList } from "@/components/PlansList";
 import { AnimatePresence, motion } from "framer-motion";
 
 interface PlansPaneProps {
   barbershopId: string;
+  barbershopSlug: string;
 }
 
 const sectionAnimation = {
@@ -12,11 +13,11 @@ const sectionAnimation = {
   transition: { duration: 0.3, ease: "easeInOut" },
 };
 
-export function PlansPane({ barbershopId }: PlansPaneProps) {
+export function PlansPane({ barbershopId, barbershopSlug }: PlansPaneProps) {
   return (
     <AnimatePresence mode="wait">
       <motion.div
-        key="services" // Chave única para o AnimatePresence identificar o elemento
+        key="services"
         initial={sectionAnimation.initial}
         animate={sectionAnimation.animate}
         exit={sectionAnimation.exit}
@@ -26,7 +27,7 @@ export function PlansPane({ barbershopId }: PlansPaneProps) {
           <h2 className="text-2xl font-semibold text-gray-900">Nossos Planos e Pacotes</h2>
         </div>
 
-        <PlansList barbershopId={barbershopId} />
+        <PlansList barbershopId={barbershopId} barbershopSlug={barbershopSlug} />
       </motion.div>
     </AnimatePresence>
   );

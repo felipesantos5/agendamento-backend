@@ -61,6 +61,28 @@ export function LoginForm({
       login(token, customer); // Salva o token e dados no contexto
       toast.success(`Bem-vindo de volta, ${customer.name}!`);
 
+      // Verificar se há assinatura pendente
+      const pendingSubscription = sessionStorage.getItem("pendingSubscription");
+      if (pendingSubscription) {
+        const { planId, barbershopId, barbershopSlug } = JSON.parse(pendingSubscription);
+        sessionStorage.removeItem("pendingSubscription");
+
+        try {
+          // Continuar o fluxo de assinatura
+          const subscriptionResponse = await apiClient.post(
+            `/api/barbershops/${barbershopId}/subscriptions/create-preapproval`,
+            { planId }
+          );
+          window.location.href = subscriptionResponse.data.init_point;
+          return;
+        } catch (subscriptionError: unknown) {
+          const axiosError = subscriptionError as { response?: { data?: { error?: string } } };
+          toast.error(axiosError.response?.data?.error || "Erro ao continuar assinatura.");
+          navigate(`/${barbershopSlug}`);
+          return;
+        }
+      }
+
       // Redireciona para a página de "Minha Conta" ou para o início
       navigate("/meus-agendamentos");
     } catch (error: any) {

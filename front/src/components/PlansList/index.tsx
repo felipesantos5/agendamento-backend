@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import apiClient from "@/services/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PriceFormater } from "@/helper/priceFormater";
 import { Spinner } from "@/components/ui/spinnerLoading";
+import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
+import { Loader2 } from "lucide-react";
 
 interface Plan {
   _id: string;
@@ -15,11 +18,49 @@ interface Plan {
 
 interface PlansListProps {
   barbershopId: string;
+  barbershopSlug: string;
 }
 
-export function PlansList({ barbershopId }: PlansListProps) {
+export function PlansList({ barbershopId, barbershopSlug }: PlansListProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubscribing, setIsSubscribing] = useState<string | null>(null);
+
+  const { isAuthenticated } = useCustomerAuth();
+  const navigate = useNavigate();
+
+  const handleSubscribe = async (planId: string) => {
+    // Se não está logado, salvar planId e redirecionar para login
+    if (!isAuthenticated) {
+      sessionStorage.setItem(
+        "pendingSubscription",
+        JSON.stringify({
+          planId,
+          barbershopId,
+          barbershopSlug,
+        })
+      );
+      navigate("/entrar", { state: { from: `/${barbershopSlug}` } });
+      return;
+    }
+
+    // Se está logado, criar assinatura
+    setIsSubscribing(planId);
+    try {
+      const response = await apiClient.post(`/api/barbershops/${barbershopId}/subscriptions/create-preapproval`, {
+        planId,
+      });
+
+      // Redirecionar para o checkout do Mercado Pago
+      window.location.href = response.data.init_point;
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Erro ao iniciar assinatura.";
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      toast.error(axiosError.response?.data?.error || errorMessage);
+    } finally {
+      setIsSubscribing(null);
+    }
+  };
 
   useEffect(() => {
     if (!barbershopId) return;
@@ -65,7 +106,14 @@ export function PlansList({ barbershopId }: PlansListProps) {
               {PriceFormater(plan.price)}
               <span className="text-lg font-normal text-muted-foreground">/mês</span>
             </div>
-            <Button className="w-full bg-[var(--loja-theme-color)] hover:bg-[var(--loja-theme-color)]/90">Assinar Plano</Button>
+            <Button
+              onClick={() => handleSubscribe(plan._id)}
+              disabled={isSubscribing === plan._id}
+              className="w-full bg-[var(--loja-theme-color)] hover:bg-[var(--loja-theme-color)]/90"
+            >
+              {isSubscribing === plan._id && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Assinar Plano
+            </Button>
           </CardFooter>
         </Card>
       ))}
