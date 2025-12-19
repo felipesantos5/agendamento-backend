@@ -17,10 +17,7 @@ interface ShopHeaderProps {
 export function ShopHeader({ barbershop, onBookNowClick }: ShopHeaderProps) {
   return (
     <header className="flex flex-col items-center text-center p-4 sm:p-6 relative">
-      <Link className="absolute top-4 right-4 bg-black rounded-full p-2" to={"/meus-agendamentos"}>
-        <User className="text-white" />
-      </Link>
-      <Avatar className="w-32 h-32 border-4 border-white dark:border-gray-800 shadow-lg mb-4">
+      <Avatar className="w-36 h-36 border-4 border-white dark:border-gray-800 shadow-lg mb-4 mt-4">
         <AvatarImage src={barbershop.logoUrl} alt={barbershop.name} />
         <AvatarFallback>{barbershop.name.charAt(0)}</AvatarFallback>
       </Avatar>
@@ -28,6 +25,11 @@ export function ShopHeader({ barbershop, onBookNowClick }: ShopHeaderProps) {
       <Button onClick={onBookNowClick} size="lg" className="w-full max-w-xs bg-[var(--loja-theme-color)] hover:bg-[var(--loja-theme-color)]/90">
         Agendar Agora
       </Button>
+      <Link to="/meus-agendamentos" className="w-full mt-3 mb-2">
+        <Button onClick={onBookNowClick} size="lg" className=" w-full max-w-xs border-[var(--loja-theme-color)] border bg-white text-black hover:bg-[var(--loja-theme-color)]/90 hover:text-white">
+          Reagendar/Cancelar Agendamentos
+        </Button>
+      </Link>
     </header>
   );
 }
