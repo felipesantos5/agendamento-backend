@@ -239,7 +239,7 @@ export function SuperAdminDashboardPage() {
                   <TableHead className="text-slate-400">Email Admin</TableHead>
                   <TableHead className="text-slate-400 text-center">Total</TableHead>
                   <TableHead className="text-slate-400 text-center">Semanal</TableHead>
-                  <TableHead className="text-slate-400">Status</TableHead>
+                  <TableHead className="text-slate-400 text-center w-[160px]">Status</TableHead>
                   <TableHead className="text-slate-400">Criada em</TableHead>
                   <TableHead className="text-slate-400 text-center">Ações</TableHead>
                 </TableRow>
@@ -262,7 +262,7 @@ export function SuperAdminDashboardPage() {
                     <TableCell className="text-center text-slate-300">
                       {shop.metrics.weeklyBookings}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center">
                       {getStatusBadge(shop.accountStatus, shop.isTrial, shop.trialDayNumber)}
                     </TableCell>
                     <TableCell className="text-slate-300">
