@@ -28,7 +28,7 @@ const subscriptionSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["active", "expired", "canceled"],
+      enum: ["pending", "active", "expired", "canceled"],
       default: "active",
     },
     creditsRemaining: {
@@ -39,6 +39,21 @@ const subscriptionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Barber",
       required: false,
+    },
+    // Campos para integração com Mercado Pago
+    mercadoPagoPreapprovalId: {
+      type: String,
+      index: true,
+    },
+    autoRenew: {
+      type: Boolean,
+      default: true,
+    },
+    lastPaymentDate: {
+      type: Date,
+    },
+    nextPaymentDate: {
+      type: Date,
     },
   },
   { timestamps: true }

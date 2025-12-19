@@ -1,6 +1,7 @@
 import cron from "node-cron";
 import Booking from "../models/Booking.js";
 import Barbershop from "../models/Barbershop.js";
+import Subscription from "../models/Subscription.js";
 import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
 import { startOfDay, endOfDay, getHours } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
@@ -228,5 +229,42 @@ cron.schedule(
   }
 );
 
+// Função para expirar assinaturas vencidas
+const expireSubscriptions = async () => {
+  const now = new Date();
+  try {
+    // Atualiza assinaturas ativas ou canceladas que já passaram da data de término
+    const filter = {
+      status: { $in: ["active", "canceled"] },
+      endDate: { $lt: now },
+    };
+
+    const update = {
+      $set: { status: "expired" },
+    };
+
+    const result = await Subscription.updateMany(filter, update);
+
+    if (result.modifiedCount > 0) {
+      console.log(`[CRON] ${result.modifiedCount} assinatura(s) expirada(s) foram atualizadas.`);
+    }
+  } catch (error) {
+    console.error("❌ Erro ao expirar assinaturas:", error);
+  }
+};
+
+// Cron job para expirar assinaturas (roda diariamente às 00:05)
+cron.schedule(
+  "5 0 * * *",
+  () => {
+    expireSubscriptions();
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
+
 updateExpiredBookings();
 deactivateExpiredTrials(); // Executa uma vez ao iniciar o servidor
+expireSubscriptions(); // Executa uma vez ao iniciar o servidor
