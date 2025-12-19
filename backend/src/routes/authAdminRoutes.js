@@ -262,16 +262,16 @@ router.post("/trial-signup", async (req, res) => {
     const barbershop = await Barbershop.create({
       name: barbershopName,
       slug,
-      // Dados mínimos obrigatórios
+      // Endereço em branco para o usuário preencher
       address: {
-        cep: "00000-000",
-        estado: "SP",
-        cidade: "São Paulo",
-        bairro: "Centro",
-        rua: "A definir",
-        numero: "0",
+        cep: "",
+        estado: "",
+        cidade: "",
+        bairro: "",
+        rua: "",
+        numero: "",
       },
-      contact: "00000000000",
+      contact: "",
       workingHours: [
         {
           day: "Segunda-feira",
