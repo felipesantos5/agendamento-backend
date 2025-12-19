@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PriceFormater } from "@/helper/priceFormater";
+import { Spinner } from "@/components/ui/spinnerLoading";
 
 interface Plan {
   _id: string;
@@ -18,11 +19,13 @@ interface PlansListProps {
 
 export function PlansList({ barbershopId }: PlansListProps) {
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     if (!barbershopId) return;
 
     const fetchPlans = async () => {
+      setIsLoading(true);
       try {
         const response = await apiClient.get(`/api/barbershops/${barbershopId}/plans`);
         setPlans(response.data);
@@ -30,11 +33,20 @@ export function PlansList({ barbershopId }: PlansListProps) {
         console.error("Erro ao carregar planos:", error);
         toast.error("Não foi possível carregar os planos.");
       } finally {
+        setIsLoading(false);
       }
     };
 
     fetchPlans();
   }, [barbershopId]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Spinner />
+      </div>
+    );
+  }
 
   if (plans.length === 0) {
     return <p className="text-center text-muted-foreground pb-8">Nenhum plano disponível no momento.</p>;

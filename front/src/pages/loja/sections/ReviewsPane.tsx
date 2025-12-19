@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Star, Loader2, CheckCircle } from "lucide-react";
+import { Spinner } from "@/components/ui/spinnerLoading";
 import { AnimatePresence, motion } from "framer-motion";
 
 // Tipagem para uma avaliação recebida da API
@@ -62,9 +63,11 @@ export function ReviewsPane({ barbershopId }: ReviewsPaneProps) {
   const [myRating, setMyRating] = useState(5);
   const [myComment, setMyComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingReviews, setIsLoadingReviews] = useState(true);
 
   const fetchReviews = async () => {
     if (!barbershopId) return;
+    setIsLoadingReviews(true);
     try {
       const response = await apiClient.get(`api/barbershops/${barbershopId}/reviews`);
       setReviews(response.data);
@@ -77,6 +80,7 @@ export function ReviewsPane({ barbershopId }: ReviewsPaneProps) {
     } catch (error) {
       toast.error("Erro ao buscar avaliações.");
     } finally {
+      setIsLoadingReviews(false);
     }
   };
 
@@ -104,6 +108,14 @@ export function ReviewsPane({ barbershopId }: ReviewsPaneProps) {
       setIsSubmitting(false);
     }
   };
+
+  if (isLoadingReviews) {
+    return (
+      <div className="flex items-center justify-center p-12">
+        <Spinner />
+      </div>
+    );
+  }
 
   return (
     <AnimatePresence mode="wait">
