@@ -16,6 +16,7 @@ import { Loader2 } from "lucide-react";
 import { Booking } from "@/types/bookings";
 import { translatePaymentStatus } from "@/helper/translatePaymentStatus";
 import { AdminOutletContext } from "@/types/AdminOutletContext";
+import { PriceFormater } from "@/helper/priceFormater";
 
 // --- Tipagens ---
 interface Barber {
@@ -178,6 +179,7 @@ export const AgendamentosList = () => {
                 <TableHead>Profissional</TableHead>
                 <TableHead>Serviço</TableHead>
                 <TableHead>Pagamento</TableHead>
+                <TableHead>Valor</TableHead>
                 <TableHead className="text-right">Data & Hora</TableHead>
               </TableRow>
             </TableHeader>
@@ -190,11 +192,15 @@ export const AgendamentosList = () => {
                     <TableCell>{booking.barber?.name || "Profissional Deletado"}</TableCell>
                     <TableCell>{booking.service?.name || "Serviço Deletado"}</TableCell>
                     <TableCell>{translatePaymentStatus(booking.paymentStatus).text}</TableCell>
+                    <TableCell className="">
+                      {PriceFormater(booking.service.price)}
+                    </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {format(new Date(booking.time), "dd/MM/yyyy 'às' HH:mm", {
                         locale: ptBR,
                       })}
                     </TableCell>
+
                   </TableRow>
                 ))
               ) : (

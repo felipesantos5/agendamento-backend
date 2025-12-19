@@ -514,7 +514,7 @@ export function AdminLayout() {
           )}
         </div>
 
-        <main className="flex-1 p-2 lg:p-6  overflow-y-auto lg:ml-52 pt-20">
+        <main className="flex-1 p-2 lg:p-6 overflow-y-auto lg:ml-60 pt-20">
           <Outlet context={outletContextData} />
         </main>
       </div>
