@@ -17,7 +17,14 @@ const barberBaseSchema = z.object({
         end: z.string().regex(/^\d{2}:\d{2}$/, "Formato de hora deve ser HH:mm"),
       })
     )
-    .optional(),
+    .optional()
+    .default([
+      { day: "Segunda-feira", start: "09:00", end: "18:00" },
+      { day: "Terça-feira", start: "09:00", end: "18:00" },
+      { day: "Quarta-feira", start: "09:00", end: "18:00" },
+      { day: "Quinta-feira", start: "09:00", end: "18:00" },
+      { day: "Sexta-feira", start: "09:00", end: "18:00" },
+    ]),
   break: z
     .object({
       enabled: z.boolean().default(false),

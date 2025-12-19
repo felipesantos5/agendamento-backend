@@ -33,6 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { SetupWizard } from "@/components/SetupWizard";
 
 // Tipo para os dados básicos da barbearia que podem ser úteis no layout
 interface BarbershopContextData {
@@ -63,6 +64,7 @@ export function AdminLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [showExpiredModal, setShowExpiredModal] = useState(false);
   const [barbersCount, setBarbersCount] = useState<number>(0);
+  const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
     if (!barbershopSlug) {
@@ -91,12 +93,23 @@ export function AdminLayout() {
           });
           setError(null);
 
-          // Busca quantidade de barbeiros
+          // Busca quantidade de barbeiros e serviços
           try {
-            const barbersResponse = await apiClient.get(`${API_BASE_URL}/barbershops/${response.data._id}/barbers`);
-            setBarbersCount(barbersResponse.data?.length || 0);
+            const [barbersResponse, servicesResponse] = await Promise.all([
+              apiClient.get(`${API_BASE_URL}/barbershops/${response.data._id}/barbers`),
+              apiClient.get(`${API_BASE_URL}/barbershops/${response.data._id}/services`),
+            ]);
+            const barbersLen = barbersResponse.data?.length || 0;
+            const servicesLen = servicesResponse.data?.length || 0;
+            setBarbersCount(barbersLen);
+
+
+            // Verifica se precisa do wizard de configuração (admin only)
+            if (user?.role === "admin" && (barbersLen === 0 || servicesLen === 0)) {
+              setNeedsSetup(true);
+            }
           } catch (barbersErr) {
-            console.error("Erro ao buscar barbeiros:", barbersErr);
+            console.error("Erro ao buscar barbeiros/serviços:", barbersErr);
             setBarbersCount(0);
           }
         } else {
@@ -137,6 +150,21 @@ export function AdminLayout() {
           Voltar para o início
         </Link>
       </div>
+    );
+  }
+
+  // Wizard de configuração inicial
+  if (needsSetup && barbershop) {
+    return (
+      <SetupWizard
+        barbershopId={barbershop._id}
+        barbershopName={barbershop.name}
+        onComplete={() => {
+          setNeedsSetup(false);
+          // Recarrega os dados para atualizar os contadores
+          window.location.reload();
+        }}
+      />
     );
   }
 
@@ -247,7 +275,7 @@ export function AdminLayout() {
             <h2 className="text-sm font-medium text-rose-400 truncate" title={barbershop!.name}>
               {barbershop!.name}
             </h2>
-            <img src={barbershop.image} alt="" />
+            <img src={barbershop.image} alt="Logo Barbearia" className="w-2/3" />
             {/* Botão Link de Agendamento */}
             <a
               href={`https://barbeariagendamento.com.br/${barbershop.slug}`}

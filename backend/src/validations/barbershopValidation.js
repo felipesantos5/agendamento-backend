@@ -2,12 +2,12 @@
 import { z } from "zod";
 
 export const AddressSchema = z.object({
-  cep: z.string().min(8, "CEP deve ter pelo menos 8 dígitos"),
-  estado: z.string().min(2, "Informe o estado"),
-  cidade: z.string().min(2, "Informe a cidade"),
-  bairro: z.string().min(2, "Informe o bairro"),
-  rua: z.string().min(2, "Informe a rua"),
-  numero: z.string().min(1, "Informe o número"),
+  cep: z.string().optional().default(""),
+  estado: z.string().optional().default(""),
+  cidade: z.string().optional().default(""),
+  bairro: z.string().optional().default(""),
+  rua: z.string().optional().default(""),
+  numero: z.string().optional().default(""),
   complemento: z.string().optional(),
 });
 
@@ -21,10 +21,10 @@ const hexColorRegex = /^#([0-9A-Fa-f]{6})$/;
 
 export const BarbershopSchema = z.object({
   name: z.string().min(2, "Nome obrigatório"),
-  description: z.string().max(300, "Descrição muito longa"),
-  address: AddressSchema,
+  description: z.string().max(300, "Descrição muito longa").optional().default(""),
+  address: AddressSchema.optional(),
   logoUrl: z.string().url("URL inválida").or(z.literal("")).optional(),
-  contact: z.string().min(8, "Contato obrigatório"),
+  contact: z.string().optional().default(""),
   instagram: z.string().optional(),
   slug: z.string().max(50, "Descrição muito longa"),
   workingHours: z.array(WorkingHourSchema).min(1, "Informe pelo menos um horário de funcionamento"),

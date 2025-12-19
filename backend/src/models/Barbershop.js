@@ -2,12 +2,12 @@
 import mongoose from "mongoose";
 
 const AddressSchema = new mongoose.Schema({
-  cep: { type: String, required: true },
-  estado: { type: String, required: true },
-  cidade: { type: String, required: true },
-  bairro: { type: String, required: true },
-  rua: { type: String, required: true },
-  numero: { type: String, required: true },
+  cep: { type: String, default: "" },
+  estado: { type: String, default: "" },
+  cidade: { type: String, default: "" },
+  bairro: { type: String, default: "" },
+  rua: { type: String, default: "" },
+  numero: { type: String, default: "" },
   complemento: { type: String },
 });
 

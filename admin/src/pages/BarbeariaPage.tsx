@@ -92,6 +92,7 @@ export function BarbeariaConfigPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoRemoved, setLogoRemoved] = useState(false); // Rastreia se a logo foi removida
   const [isUploading, setIsUploading] = useState(false);
   const [qrCodeBlob, setQrCodeBlob] = useState<Blob | null>(null); // Armazena o blob da imagem
   const [qrCodeUrl, setQrCodeUrl] = useState(""); // Armazena a URL local (blob:)
@@ -239,7 +240,11 @@ export function BarbeariaConfigPage() {
 
     let finalLogoUrl = formData.logoUrl;
 
-    if (logoFile) {
+    // Se a logo foi removida, define como string vazia
+    if (logoRemoved && !logoFile) {
+      finalLogoUrl = "";
+    } else if (logoFile) {
+      // Se há um novo arquivo para upload
       setIsUploading(true);
       const imageUploadData = new FormData();
       imageUploadData.append("logoFile", logoFile);
@@ -248,6 +253,7 @@ export function BarbeariaConfigPage() {
         const uploadResponse = await apiClient.post(`${API_BASE_URL}/api/upload/logo`, imageUploadData);
         finalLogoUrl = uploadResponse.data.logoUrl;
         setLogoFile(null);
+        setLogoRemoved(false); // Reset após upload bem-sucedido
       } catch (uploadError: any) {
         console.error("Erro no upload da logo:", uploadError);
         setError(uploadError.response?.data?.error || "Falha ao fazer upload da nova logo. As outras alterações não foram salvas.");
@@ -272,6 +278,7 @@ export function BarbeariaConfigPage() {
       const updateResponse = await apiClient.put(`${API_BASE_URL}/barbershops/${barbershopId}`, payload);
       setSuccessMessage("Dados da barbearia atualizados com sucesso!");
       setFormData(updateResponse.data);
+      setLogoRemoved(false); // Reset após salvamento bem-sucedido
     } catch (err: any) {
       console.error("Erro ao atualizar barbearia:", err);
       setError(err.response?.data?.error || "Falha ao atualizar dados da barbearia.");
@@ -331,7 +338,6 @@ export function BarbeariaConfigPage() {
                 onChange={handleContactChange}
                 maxLength={15}
                 placeholder="(XX) XXXXX-XXXX"
-                required
               />
             </div>
 
@@ -349,10 +355,12 @@ export function BarbeariaConfigPage() {
 
           <div className="space-y-2">
             <ImageUploader
-              label="Logo da Barbearia"
               initialImageUrl={formData.logoUrl || null}
               onFileSelect={(file) => {
                 setLogoFile(file);
+                if (file) {
+                  setLogoRemoved(false); // Se selecionou um novo arquivo, não está mais removido
+                }
               }}
               aspectRatio="square"
             />
@@ -399,24 +407,22 @@ export function BarbeariaConfigPage() {
                     value={CepFormat(formData.address?.cep || "")}
                     onChange={handleCepChange}
                     maxLength={9}
-                    minLength={9}
                     placeholder="00000-000"
-                    required
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="rua">Rua</Label>
-                  <Input id="rua" name="rua" value={formData.address?.rua || ""} onChange={handleAddressChange} required />
+                  <Input id="rua" name="rua" value={formData.address?.rua || ""} onChange={handleAddressChange} />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="numero">Número</Label>
-                  <Input id="numero" name="numero" value={formData.address?.numero || ""} onChange={handleAddressChange} required />
+                  <Input id="numero" name="numero" value={formData.address?.numero || ""} onChange={handleAddressChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="bairro">Bairro</Label>
-                  <Input id="bairro" name="bairro" value={formData.address?.bairro || ""} onChange={handleAddressChange} required />
+                  <Input id="bairro" name="bairro" value={formData.address?.bairro || ""} onChange={handleAddressChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="complemento">Complemento</Label>
@@ -426,11 +432,11 @@ export function BarbeariaConfigPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="cidade">Cidade</Label>
-                  <Input id="cidade" name="cidade" value={formData.address?.cidade || ""} onChange={handleAddressChange} required />
+                  <Input id="cidade" name="cidade" value={formData.address?.cidade || ""} onChange={handleAddressChange} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="estado">Estado (UF)</Label>
-                  <Input id="estado" name="estado" maxLength={2} value={formData.address?.estado || ""} onChange={handleAddressChange} required />
+                  <Input id="estado" name="estado" maxLength={2} value={formData.address?.estado || ""} onChange={handleAddressChange} />
                 </div>
               </div>
             </div>
