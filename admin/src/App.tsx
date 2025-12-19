@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AdminLayout } from "./layouts/AdminLayout";
+import { SuperAdminLayout } from "./layouts/SuperAdminLayout";
 
 import { BarbeariaConfigPage } from "./pages/BarbeariaPage";
 import { ServicesPage } from "./pages/ServicesPage";
@@ -9,6 +10,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { TrialSignupPage } from "./pages/TrialSignupPage";
 import { AccountExpiredPage } from "./pages/AccountExpiredPage";
 import { ProtectedRoute } from "./components/ProtectedRoute.tsx";
+import { SuperAdminProtectedRoute } from "./components/SuperAdminProtectedRoute";
 import { SetPasswordPage } from "./pages/SetPasswordPage.tsx";
 import { useAuth } from "./contexts/AuthContext.tsx";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage.tsx";
@@ -21,11 +23,23 @@ import { ProductManagement } from "./pages/Products.tsx";
 import DashboardMetricsPage from "./pages/DashboardMetricsPage.tsx";
 import { BarberPerformancePage } from "./pages/BarberPerformancePage.tsx";
 import { RecurrencePage } from "./pages/RecurrencePage.tsx";
+import { SuperAdminLoginPage } from "./pages/superadmin/SuperAdminLoginPage";
+import { SuperAdminDashboardPage } from "./pages/superadmin/SuperAdminDashboardPage";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Super Admin Routes */}
+        <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
+        <Route element={<SuperAdminProtectedRoute />}>
+          <Route path="/superadmin" element={<SuperAdminLayout />}>
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<SuperAdminDashboardPage />} />
+          </Route>
+        </Route>
+
+        {/* Regular Admin Routes */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/criar-conta" element={<TrialSignupPage />} />
         <Route path="/conta-expirada" element={<AccountExpiredPage />} />
