@@ -7,13 +7,14 @@ import { Label } from "../ui/label";
 
 interface ImageUploaderProps {
   onFileSelect: (file: File | null) => void;
+  onRemove?: () => void; // Callback quando a imagem é removida (para limpar URL existente)
   initialImageUrl?: string | null; // Para exibir uma imagem já existente (ex: ao editar)
   label?: string;
   className?: string; // Para estilização customizada do container
-  aspectRatio?: "square" | "portrait" | "landscape"; // Para ajudar no estilo do preview
+  aspectRatio?: "square" | "portrait" | "landscape"; // Para ajustar no estilo do preview
 }
 
-export function ImageUploader({ onFileSelect, initialImageUrl, label = "Logo/Imagem", className = "", aspectRatio = "square" }: ImageUploaderProps) {
+export function ImageUploader({ onFileSelect, onRemove, initialImageUrl, label = "Logo/Imagem", className = "", aspectRatio = "square" }: ImageUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialImageUrl || null);
   const [isDragging, setIsDragging] = useState(false);
@@ -107,6 +108,10 @@ export function ImageUploader({ onFileSelect, initialImageUrl, label = "Logo/Ima
     onFileSelect(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // Limpa o input de arquivo
+    }
+    // Notifica o componente pai que a imagem foi removida
+    if (onRemove) {
+      onRemove();
     }
   };
 

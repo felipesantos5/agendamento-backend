@@ -241,7 +241,7 @@ export function BarberPage() {
     try {
       if (dialogMode === "add") {
         const response = await apiClient.post(`${API_BASE_URL}/barbershops/${barbershopId}/barbers`, barberDataPayload);
-        
+
         // Verifica o resultado da criação
         if (response.data.emailSent === true) {
           // Email enviado com sucesso - mostra mensagem de sucesso
@@ -293,7 +293,7 @@ export function BarberPage() {
 
   const handleResendSetupEmail = async () => {
     if (!currentBarberForm._id || !barbershopId) return;
-    
+
     setIsResendingEmail(true);
     setError(null);
 
@@ -318,7 +318,7 @@ export function BarberPage() {
     } catch (err: any) {
       console.error("Erro ao reenviar email:", err);
       const errorMessage = err.response?.data?.error || "Falha ao reenviar o email.";
-      
+
       // Se a conta já está ativa, mostra mensagem específica
       if (err.response?.status === 400) {
         toast.info("Conta já ativada", {
@@ -462,7 +462,6 @@ export function BarberPage() {
                       initialImageUrl={currentBarberForm.image || null}
                       onFileSelect={(file) => setProfileImageFile(file)}
                       aspectRatio="square"
-                      label=""
                     />
                   </div>
 
@@ -474,10 +473,10 @@ export function BarberPage() {
                   <div className="space-y-1.5">
                     <Label htmlFor="email">Email de Login <span className="text-muted-foreground font-normal">(opcional)</span></Label>
                     <Input id="email" name="email" type="email" value={currentBarberForm.email || ""} onChange={handleFormInputChange} placeholder="email@exemplo.com" />
-                    
+
                     {dialogMode === "add" ? (
                       <p className="text-xs text-muted-foreground">
-                        {currentBarberForm.email 
+                        {currentBarberForm.email
                           ? "O convite para definir a senha será associado a este email."
                           : "Deixe em branco se você (admin) já gerencia os agendamentos. Preencha apenas se quiser dar acesso separado ao funcionário."
                         }
@@ -717,11 +716,10 @@ export function BarberPage() {
                                   key={day}
                                   className={`
                               flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all
-                              ${
-                                currentBarberForm.break?.days?.includes(day)
-                                  ? "border-primary bg-primary/10 shadow-sm"
-                                  : "border-gray-200 bg-white hover:bg-gray-50"
-                              }
+                              ${currentBarberForm.break?.days?.includes(day)
+                                      ? "border-primary bg-primary/10 shadow-sm"
+                                      : "border-gray-200 bg-white hover:bg-gray-50"
+                                    }
                             `}
                                   onClick={() => handleBreakDayToggle(day)}
                                 >
@@ -769,7 +767,7 @@ export function BarberPage() {
               <DialogHeader>
                 <DialogTitle>⚠️ Link de Configuração (Backup)</DialogTitle>
                 <DialogDescription>
-                  O email automático pode ter falhado. Copie e envie este link manualmente para o funcionário via WhatsApp ou outro meio. 
+                  O email automático pode ter falhado. Copie e envie este link manualmente para o funcionário via WhatsApp ou outro meio.
                   Ele poderá definir sua própria senha e acessar o sistema. Este link é de uso único e
                   expira em 72 horas.
                 </DialogDescription>

@@ -3,17 +3,15 @@
 import { useState, useCallback, useEffect, DragEvent, ChangeEvent, useRef } from "react";
 import { UploadCloud, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button"; //
-import { Label } from "@/components/ui/label";
 
 interface ImageUploaderProps {
   onFileSelect: (file: File | null) => void;
   initialImageUrl?: string | null; // Para exibir uma imagem já existente (ex: ao editar)
-  label?: string;
   className?: string; // Para estilização customizada do container
   aspectRatio?: "square" | "portrait" | "landscape"; // Para ajudar no estilo do preview
 }
 
-export function ImageUploader({ onFileSelect, initialImageUrl, label = "Logo/Imagem", className = "", aspectRatio = "square" }: ImageUploaderProps) {
+export function ImageUploader({ onFileSelect, initialImageUrl, className = "", aspectRatio = "square" }: ImageUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialImageUrl || null);
   const [isDragging, setIsDragging] = useState(false);
@@ -118,7 +116,6 @@ export function ImageUploader({ onFileSelect, initialImageUrl, label = "Logo/Ima
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {label && <Label htmlFor={fileInputRef.current?.id || "image-upload"}>{label}</Label>}
       {previewUrl ? (
         <div className="relative group">
           <img src={previewUrl} alt="Preview" className={`w-full h-auto max-h-60 object-contain rounded-md border ${aspectRatioClass}`} />

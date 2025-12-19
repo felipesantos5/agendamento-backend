@@ -566,7 +566,7 @@ export const ProductManagement = () => {
             <div className="space-y-6 py-4">
               <div className="space-y-2">
                 <Label>Imagem do Produto</Label>
-                <ImageUploader initialImageUrl={productForm.image || null} onFileSelect={setProductImageFile} aspectRatio="square" label="" />
+                <ImageUploader initialImageUrl={productForm.image || null} onFileSelect={setProductImageFile} aspectRatio="square" />
                 {isUploadingImage && <p className="text-sm text-blue-500">Enviando imagem...</p>}
               </div>
 
