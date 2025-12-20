@@ -148,38 +148,45 @@ cron.schedule(
   }
 );
 
-cron.schedule(
-  "0 8 * * *",
-  () => {
-    sendDailyReminders(8);
-  },
-  {
-    scheduled: true,
-    timezone: "America/Sao_Paulo",
-  }
-);
+// ⚠️ WORKERS DE MENSAGENS - NÃO RODAM EM DESENVOLVIMENTO
+if (process.env.NODE_ENV !== 'development') {
+  cron.schedule(
+    "0 8 * * *",
+    () => {
+      sendDailyReminders(8);
+    },
+    {
+      scheduled: true,
+      timezone: "America/Sao_Paulo",
+    }
+  );
 
-cron.schedule(
-  "0 11 * * 2", // "Às 11:00, toda Terça-feira"
-  () => {
-    sendAutomatedReturnReminders();
-  },
-  {
-    scheduled: true,
-    timezone: "America/Sao_Paulo",
-  }
-);
+  cron.schedule(
+    "0 11 * * 2", // "Às 11:00, toda Terça-feira"
+    () => {
+      sendAutomatedReturnReminders();
+    },
+    {
+      scheduled: true,
+      timezone: "America/Sao_Paulo",
+    }
+  );
 
-cron.schedule(
-  "0 13 * * *",
-  () => {
-    sendDailyReminders(13);
-  },
-  {
-    scheduled: true,
-    timezone: "America/Sao_Paulo",
-  }
-);
+  cron.schedule(
+    "0 13 * * *",
+    () => {
+      sendDailyReminders(13);
+    },
+    {
+      scheduled: true,
+      timezone: "America/Sao_Paulo",
+    }
+  );
+
+  console.log("✅ Workers de mensagens automáticas ATIVADOS (Produção)");
+} else {
+  console.log("⚠️  Workers de mensagens automáticas DESATIVADOS (Desenvolvimento)");
+}
 
 cron.schedule(
   "0 * * * *",
