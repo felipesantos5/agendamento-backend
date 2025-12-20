@@ -287,6 +287,19 @@ router.put(
       }).format(bookingDate);
 
       if (status === "canceled") {
+        // Devolve créditos se o agendamento usou crédito de plano
+        if (booking.subscriptionUsed && booking.paymentStatus === "plan_credit") {
+          const subscription = await Subscription.findById(booking.subscriptionUsed);
+          if (subscription) {
+            subscription.creditsRemaining += 1;
+            // Se estava expirado por falta de créditos, reativa
+            if (subscription.status === "expired" && subscription.endDate >= new Date()) {
+              subscription.status = "active";
+            }
+            await subscription.save();
+          }
+        }
+
         const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate}.`;
 
         sendWhatsAppConfirmation(booking.customer.phone, message);
@@ -383,7 +396,20 @@ router.put(
         });
       }
 
-      // 4. Se tudo estiver certo, atualiza o status
+      // 4. Devolve créditos se o agendamento usou crédito de plano
+      if (booking.subscriptionUsed && booking.paymentStatus === "plan_credit") {
+        const subscription = await Subscription.findById(booking.subscriptionUsed);
+        if (subscription) {
+          subscription.creditsRemaining += 1;
+          // Se estava expirado por falta de créditos, reativa
+          if (subscription.status === "expired" && subscription.endDate >= new Date()) {
+            subscription.status = "active";
+          }
+          await subscription.save();
+        }
+      }
+
+      // 5. Se tudo estiver certo, atualiza o status
       booking.status = "canceled";
       await booking.save();
 
@@ -649,7 +675,8 @@ router.delete("/:bookingId", async (req, res) => {
       return res.status(400).json({ error: "ID do agendamento inválido." });
     }
 
-    const booking = await Booking.findOneAndDelete({
+    // Busca o booking primeiro para poder devolver créditos
+    const booking = await Booking.findOne({
       _id: bookingId,
       barbershop: barbershopId,
     });
@@ -657,6 +684,22 @@ router.delete("/:bookingId", async (req, res) => {
     if (!booking) {
       return res.status(404).json({ error: "Agendamento não encontrado." });
     }
+
+    // Devolve créditos se o agendamento usou crédito de plano
+    if (booking.subscriptionUsed && booking.paymentStatus === "plan_credit") {
+      const subscription = await Subscription.findById(booking.subscriptionUsed);
+      if (subscription) {
+        subscription.creditsRemaining += 1;
+        // Se estava expirado por falta de créditos, reativa
+        if (subscription.status === "expired" && subscription.endDate >= new Date()) {
+          subscription.status = "active";
+        }
+        await subscription.save();
+      }
+    }
+
+    // Agora deleta o booking
+    await Booking.findByIdAndDelete(bookingId);
 
     const barbershop = await Barbershop.findById(barbershopId);
 

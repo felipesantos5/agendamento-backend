@@ -10,6 +10,16 @@ import DateTimeSelection from "@/components/dataTimeSelection";
 import PersonalInfo from "@/components/personalInfo";
 import { Barber, Barbershop } from "@/types/barberShop";
 import { Service } from "@/types/Service";
+import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
+
+// Tipo para os créditos do cliente
+export interface CustomerCredit {
+  planId: string;
+  planName: string;
+  creditsRemaining: number;
+  totalCredits: number;
+  endDate: string;
+}
 
 // ... (interfaces e estado inicial permanecem os mesmos) ...
 interface BookingPaneProps {
@@ -42,10 +52,29 @@ export function BookingPane({ barbershop, allServices, allBarbers }: BookingPane
   const navigate = useNavigate();
   const location = useLocation(); // Hook para acessar o state da navegação
   const { slug } = useParams<{ slug: string }>();
+  const { isAuthenticated } = useCustomerAuth();
+
+  // Estado para armazenar os créditos do cliente
+  const [customerCredits, setCustomerCredits] = useState<CustomerCredit[]>([]);
 
   // ***** NOVO: Tenta pegar os dados de remarcação do state *****
   const rescheduleInfo = (location.state as RescheduleState)?.rescheduleData;
   // **********************************************************
+
+  // Busca os créditos do cliente se estiver logado
+  useEffect(() => {
+    const fetchCredits = async () => {
+      if (isAuthenticated && barbershop._id) {
+        try {
+          const response = await apiClient.get(`/api/auth/customer/me/credits/${barbershop._id}`);
+          setCustomerCredits(response.data);
+        } catch (error) {
+          console.error("Erro ao buscar créditos:", error);
+        }
+      }
+    };
+    fetchCredits();
+  }, [isAuthenticated, barbershop._id]);
 
   const [formData, setFormData] = useState(() => {
     // Se houver dados de remarcação, inicializa o form com eles
@@ -199,6 +228,30 @@ export function BookingPane({ barbershop, allServices, allBarbers }: BookingPane
         const newBooking = responseData;
         const isPlanCredit = newBooking.paymentStatus === "plan_credit";
 
+        // Atualiza os créditos localmente se foi usado crédito de plano
+        if (isPlanCredit && newBooking.subscriptionUsed) {
+          setCustomerCredits((prevCredits) =>
+            prevCredits.map((credit) => {
+              // Encontra o serviço para pegar o planId
+              const selectedSvc = allServices.find((s) => s._id === service);
+              // Extrai o ID do plano (pode ser string ou objeto populado)
+              const planId = selectedSvc?.plan
+                ? typeof selectedSvc.plan === "string"
+                  ? selectedSvc.plan
+                  : selectedSvc.plan._id
+                : null;
+
+              if (planId === credit.planId) {
+                return {
+                  ...credit,
+                  creditsRemaining: credit.creditsRemaining - 1,
+                };
+              }
+              return credit;
+            })
+          );
+        }
+
         const successMessage = rescheduleInfo
           ? "Seu horário foi remarcado com sucesso!"
           : isPlanCredit
@@ -294,6 +347,8 @@ export function BookingPane({ barbershop, allServices, allBarbers }: BookingPane
                 (serviceId) => updateFormData({ service: serviceId, barber: "" }) // Limpa barbeiro ao trocar serviço
               }
               onSelectBarber={(barberId) => updateFormData({ barber: barberId })}
+              customerCredits={customerCredits}
+              isAuthenticated={isAuthenticated}
             />
           )}
 

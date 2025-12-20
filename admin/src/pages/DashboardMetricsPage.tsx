@@ -24,7 +24,6 @@ import {
   ClipboardX,
   BadgePercent,
   LineChart,
-  ArrowDownWideNarrow,
   BarChart3,
   PieChart,
 } from "lucide-react";
@@ -374,11 +373,11 @@ export default function DashboardMetricsPage() {
                   valueClassName="text-red-600"
                 />
                 <MetricCard
-                  title="Despesas (Custos)"
-                  value={PriceFormater(data.financialOverview.totalCostOfGoods)}
-                  icon={ArrowDownWideNarrow}
-                  description="Custo dos produtos vendidos"
-                  valueClassName="text-orange-600"
+                  title="Receita de Planos"
+                  value={PriceFormater(data.financialOverview.revenueFromPlans)}
+                  icon={ClipboardList}
+                  description={`${data.generalMetrics.totalPlansSold} planos vendidos`}
+                  valueClassName="text-purple-600"
                 />
                 <MetricCard
                   title="Faturamento Líquido"

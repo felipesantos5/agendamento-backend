@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
 import apiClient from "@/services/api";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,20 +18,62 @@ import {
 import { toast } from "sonner";
 import { format, isPast } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Calendar, Clock, CreditCard, Home, Loader2, LogOut, Repeat, Scissors, User, X } from "lucide-react";
+import {
+  Calendar,
+  Clock,
+  CreditCard,
+  Home,
+  Loader2,
+  LogOut,
+  Repeat,
+  User,
+  X,
+  Star,
+  XCircle,
+  CalendarDays,
+  Package,
+} from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import RescheduleBookingModal from "@/components/RescheduleBookingModal.tsx";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PopulatedBooking } from "@/types/PopulatedBooking";
 
+interface Subscription {
+  _id: string;
+  plan: {
+    _id: string;
+    name: string;
+    description?: string;
+    price: number;
+    durationInDays: number;
+    totalCredits: number;
+  };
+  barbershop: {
+    _id: string;
+    name: string;
+    slug: string;
+    logoUrl?: string;
+  };
+  status: "active" | "expired" | "canceled" | "pending";
+  creditsRemaining: number;
+  autoRenew: boolean;
+  startDate: string;
+  endDate: string;
+}
+
+type TabId = "agendamentos" | "planos";
+
 export function MyBookingsPage() {
   const { customer, logout } = useCustomerAuth();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<PopulatedBooking[]>([]);
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingPayment, setIsCreatingPayment] = useState<string | null>(null);
+  const [isCancelingSubscription, setIsCancelingSubscription] = useState<string | null>(null);
   const [bookingToReschedule, setBookingToReschedule] = useState<PopulatedBooking | null>(null);
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabId>("agendamentos");
 
   // Função para buscar os agendamentos
   const fetchBookings = async () => {
@@ -41,19 +83,63 @@ export function MyBookingsPage() {
     } catch (error) {
       console.error("Erro ao buscar agendamentos:", error);
       toast.error("Não foi possível carregar seus agendamentos.");
-    } finally {
-      setIsLoading(false);
+    }
+  };
+
+  // Função para buscar as assinaturas
+  const fetchSubscriptions = async () => {
+    try {
+      const response = await apiClient.get<Subscription[]>("/api/auth/customer/me/subscriptions");
+      setSubscriptions(response.data);
+    } catch (error) {
+      console.error("Erro ao buscar assinaturas:", error);
     }
   };
 
   useEffect(() => {
-    fetchBookings();
+    const loadData = async () => {
+      await Promise.all([fetchBookings(), fetchSubscriptions()]);
+      setIsLoading(false);
+    };
+    loadData();
   }, []);
+
+  // Função para cancelar assinatura
+  const handleCancelSubscription = async (subscription: Subscription) => {
+    setIsCancelingSubscription(subscription._id);
+    try {
+      await apiClient.post(`/api/barbershops/${subscription.barbershop._id}/subscriptions/${subscription._id}/cancel`);
+      toast.success("Renovação automática cancelada. Seus créditos continuam válidos até o fim do período.");
+      setSubscriptions((prev) => prev.map((s) => (s._id === subscription._id ? { ...s, autoRenew: false } : s)));
+    } catch (error) {
+      toast.error("Erro ao cancelar assinatura.");
+    } finally {
+      setIsCancelingSubscription(null);
+    }
+  };
+
+  const getSubscriptionStatusInfo = (status: Subscription["status"], autoRenew: boolean) => {
+    switch (status) {
+      case "active":
+        return {
+          text: autoRenew ? "Ativo" : "Não renova",
+          className: autoRenew ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800",
+        };
+      case "expired":
+        return { text: "Expirado", className: "bg-gray-100 text-gray-600" };
+      case "canceled":
+        return { text: "Cancelado", className: "bg-red-100 text-red-800" };
+      case "pending":
+        return { text: "Pendente", className: "bg-yellow-100 text-yellow-800" };
+      default:
+        return { text: status, className: "bg-gray-100 text-gray-800" };
+    }
+  };
 
   // Separa os agendamentos em "próximos" e "passados"
   const { upcomingBookings, pastBookings } = useMemo(() => {
-    const upcoming = bookings.filter((b) => !isPast(new Date(b.time)));
-    const past = bookings.filter((b) => isPast(new Date(b.time)));
+    const upcoming = bookings.filter((b) => !isPast(new Date(b.time)) && b.status !== "canceled");
+    const past = bookings.filter((b) => isPast(new Date(b.time)) || b.status === "canceled");
     return { upcomingBookings: upcoming, pastBookings: past };
   }, [bookings]);
 
@@ -68,7 +154,6 @@ export function MyBookingsPage() {
     try {
       await apiClient.put(`/barbershops/${booking.barbershop._id}/bookings/${booking._id}/cancel`);
       toast.success("Agendamento cancelado com sucesso!");
-      // Atualiza a lista localmente para refletir a mudança instantaneamente
       setBookings((prev) => prev.map((b) => (b._id === booking._id ? { ...b, status: "canceled" } : b)));
     } catch (error) {
       toast.error("Ocorreu um erro ao cancelar o agendamento.");
@@ -84,7 +169,7 @@ export function MyBookingsPage() {
   const handlePayNow = async (booking: PopulatedBooking) => {
     if (!booking.barbershop._id || !booking._id) return;
 
-    setIsCreatingPayment(booking._id); // Ativa o loading para este botão específico
+    setIsCreatingPayment(booking._id);
     try {
       const response = await apiClient.post(`/api/barbershops/${booking.barbershop._id}/bookings/${booking._id}/create-payment`);
       const { payment_url } = response.data;
@@ -93,9 +178,10 @@ export function MyBookingsPage() {
       } else {
         throw new Error("URL de pagamento não recebida.");
       }
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || "Falha ao iniciar pagamento.");
-      setIsCreatingPayment(null); // Desativa o loading em caso de erro
+    } catch (error: unknown) {
+      const axiosError = error as { response?: { data?: { error?: string } } };
+      toast.error(axiosError.response?.data?.error || "Falha ao iniciar pagamento.");
+      setIsCreatingPayment(null);
     }
   };
 
@@ -119,290 +205,479 @@ export function MyBookingsPage() {
   };
 
   const handleRescheduleSuccess = (updatedBooking: PopulatedBooking) => {
-    setIsRescheduleModalOpen(false); // Fecha o modal
+    setIsRescheduleModalOpen(false);
     setBookingToReschedule(null);
     toast.success("Horário remarcado com sucesso!");
-    // Atualiza a lista de agendamentos localmente
     setBookings((prevBookings) => prevBookings.map((b) => (b._id === updatedBooking._id ? updatedBooking : b)));
-    // Ou, alternativamente, buscar a lista novamente:
-    // fetchBookings();
   };
+
+  // Contadores para as badges nas tabs
+  const activeSubscriptionsCount = subscriptions.filter((s) => s.status === "active").length;
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-[var(--loja-theme-color)]" />
+      <div className="flex justify-center items-center h-screen bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200">
-      <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-10">
-        {/* --- NOVO HEADER --- */}
-        <header className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-bold">Meus Agendamentos</h1>
-            <p className="text-muted-foreground">Olá, {customer?.name?.split(" ")[0]}!</p>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      {/* Header fixo */}
+      <header className="sticky top-0 z-10 bg-white dark:bg-gray-800 border-b shadow-sm">
+        <div className="max-w-3xl mx-auto px-4 py-3">
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-xl font-bold text-gray-900 dark:text-white">Minha Conta</h1>
+              <p className="text-sm text-gray-500">Olá, {customer?.name?.split(" ")[0]}!</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-sm text-gray-600">
+                ← Voltar
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleLogout} className="text-gray-600">
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="text-sm font-semibold hover:underline cursor-pointer">
-              ← Voltar
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="h-5 w-5" />
-              <span className="sr-only">Sair</span>
-            </Button>
+        </div>
+
+        {/* Tabs */}
+        <div className="max-w-3xl mx-auto px-4">
+          <div className="flex border-b-0">
+            <button
+              onClick={() => setActiveTab("agendamentos")}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "agendamentos"
+                ? "border-gray-900 text-gray-900 dark:border-white dark:text-white"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              <CalendarDays className="h-4 w-4" />
+              <span>Agendamentos</span>
+              {upcomingBookings.length > 0 && (
+                <span className="bg-blue-100 text-blue-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {upcomingBookings.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("planos")}
+              className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${activeTab === "planos"
+                ? "border-gray-900 text-gray-900 dark:border-white dark:text-white"
+                : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+            >
+              <Package className="h-4 w-4" />
+              <span>Meus Planos</span>
+              {activeSubscriptionsCount > 0 && (
+                <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded-full">
+                  {activeSubscriptionsCount}
+                </span>
+              )}
+            </button>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* --- SEÇÃO DE PRÓXIMOS AGENDAMENTOS COM NOVO CARD --- */}
-        <section>
-          <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Próximos</h2>
-          {upcomingBookings.length > 0 ? (
-            <div className="space-y-6">
-              {upcomingBookings.map((booking) => {
-                const statusInfo = getStatusInfo(booking.status);
+      {/* Conteúdo */}
+      <main className="max-w-3xl mx-auto px-4 py-6 space-y-6">
+        {/* TAB: Agendamentos */}
+        {activeTab === "agendamentos" && (
+          <>
+            {/* Próximos Agendamentos */}
+            <section>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-blue-600" />
+                Próximos
+              </h2>
+              {upcomingBookings.length > 0 ? (
+                <div className="space-y-3">
+                  {upcomingBookings.map((booking) => {
+                    const statusInfo = getStatusInfo(booking.status);
+                    const canBeCancelled = booking.status === "booked" || booking.status === "confirmed";
+                    const showPayButton =
+                      booking.barbershop.paymentsEnabled === true &&
+                      booking.paymentStatus !== "approved" &&
+                      booking.status !== "canceled";
+                    const showPaiedBadge =
+                      booking.barbershop.paymentsEnabled === true &&
+                      booking.paymentStatus === "approved" &&
+                      booking.status !== "canceled";
+                    const canBeRescheduled = booking.status === "booked" || booking.status === "confirmed";
 
-                const canBeCancelled = booking.status === "booked" || booking.status === "confirmed";
-
-                const showPayButton =
-                  booking.barbershop.paymentsEnabled === true && booking.paymentStatus !== "approved" && booking.status !== "canceled";
-
-                const showPaiedBadge =
-                  booking.barbershop.paymentsEnabled === true && booking.paymentStatus === "approved" && booking.status !== "canceled";
-
-                const canBeRescheduled = booking.status === "booked" || booking.status === "confirmed";
-
-                return (
-                  <Card
-                    key={booking._id}
-                    className="bg-white dark:bg-gray-800 shadow-md transition-all hover:shadow-lg gap-0 group-hover:ring-2 pb-0 group-hover:ring-blue-200 cursor-pointer"
-                    onClick={(e) => {
-                      if ((e.target as HTMLElement).closest("button")) return;
-                      navigate(`/${booking.barbershop.slug}`);
-                    }}
-                  >
-                    <CardHeader className="p-4 sm:p-6">
-                      <div className="flex flex-col justify-between items-start gap-4">
-                        <div className="flex items-center gap-2">
-                          <img src={booking.barbershop.logoUrl} alt="logo barbearia" className="w-24" />
-                          <CardTitle className="text-xl md:text-2xl group-hover:underline">{booking.barbershop.name}</CardTitle>
-                        </div>
-                        <div className="flex gap-2">
-                          <Badge className={`${statusInfo.className} border`}>{statusInfo.text}</Badge>
-                          {showPaiedBadge && <Badge className="bg-green-500 border">Pago no App</Badge>}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-4 sm:p-6 space-y-4 text-sm sm:text-base pt-0">
-                      {booking.service ? (
-                        <div className="flex items-center gap-3">
-                          <Scissors className="h-5 w-5 text-muted-foreground" />
-                          <span className="font-semibold">{booking.service?.name || "Serviço indisponível"}</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <Scissors className="h-5 w-5 text-muted-foreground" />
-                          <span className="font-semibold italic text-muted-foreground">Serviço indisponível</span>
-                        </div>
-                      )}
-
-                      {/* --- CORREÇÃO PREVENTIVA AQUI --- */}
-                      {booking.barber ? (
-                        <div className="flex items-center gap-3">
-                          <User className="h-5 w-5 text-muted-foreground" />
-                          <span>
-                            com <strong>{booking.barber?.name || "Profissional indisponível"}</strong>
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <User className="h-5 w-5 text-muted-foreground" />
-                          <span className="italic text-muted-foreground">Profissional indisponível</span>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-5 w-5 text-muted-foreground" />
-                        <span>{format(new Date(booking.time), "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Clock className="h-5 w-5 text-muted-foreground" />
-                        <span>
-                          às <strong>{format(new Date(booking.time), "HH:mm")}h</strong>
-                        </span>
-                      </div>
-                    </CardContent>
-                    <CardFooter className="p-4 rounded-b-lg gap-4 sm:p-6 bg-gray-50 dark:bg-gray-800/50 border-t flex-col md:flex-row">
-                      {showPayButton && (
-                        <Button
-                          onClick={() => handlePayNow(booking)}
-                          disabled={isCreatingPayment === booking._id}
-                          className="bg-blue-600 hover:bg-blue-700 text-white w-full md:w-auto"
+                    return (
+                      <Card
+                        key={booking._id}
+                        className="bg-white dark:bg-gray-800 shadow-sm border overflow-hidden"
+                      >
+                        {/* Header compacto do card */}
+                        <div
+                          className="p-4 cursor-pointer"
+                          onClick={() => navigate(`/${booking.barbershop.slug}`)}
                         >
-                          {isCreatingPayment === booking._id ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          ) : (
-                            <CreditCard className="mr-2 h-4 w-4" />
-                          )}
-                          {isCreatingPayment === booking._id ? "Aguarde..." : "Pagar Agora"}
-                        </Button>
-                      )}
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              {booking.barbershop.logoUrl && (
+                                <img
+                                  src={booking.barbershop.logoUrl}
+                                  alt=""
+                                  className="w-12 h-12 object-contain rounded-lg bg-gray-100 flex-shrink-0"
+                                />
+                              )}
+                              <div className="min-w-0">
+                                <p className="font-semibold text-gray-900 dark:text-white truncate">
+                                  {booking.barbershop.name}
+                                </p>
+                                <p className="text-sm text-gray-500 truncate">
+                                  {booking.service?.name || "Serviço"}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                              <Badge className={`${statusInfo.className} border text-xs`}>{statusInfo.text}</Badge>
+                              {showPaiedBadge && (
+                                <Badge className="bg-green-500 text-white text-xs">Pago</Badge>
+                              )}
+                            </div>
+                          </div>
 
-                      {canBeRescheduled && (
-                        <Button
-                          variant="outline"
-                          onClick={() => handleOpenRescheduleModal(booking)} // Chama a função para abrir o modal
-                          className="w-full md:w-auto"
-                          size="default"
-                        >
-                          <Repeat className="mr-2 h-4 w-4" />
-                          Remarcar
-                        </Button>
-                      )}
-                      {canBeCancelled && (
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" className="w-full md:w-auto">
-                              Cancelar Agendamento
+                          {/* Info do agendamento */}
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3 space-y-2">
+                            <div className="flex items-center gap-2 text-sm">
+                              <User className="h-4 w-4 text-gray-400" />
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {booking.barber?.name || "Profissional"}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Calendar className="h-4 w-4 text-gray-400" />
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {format(new Date(booking.time), "EEEE, dd 'de' MMM", { locale: ptBR })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                              <Clock className="h-4 w-4 text-gray-400" />
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {format(new Date(booking.time), "HH:mm")}h
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Ações */}
+                        <div className="px-4 pb-4 flex flex-wrap gap-2">
+                          {showPayButton && (
+                            <Button
+                              onClick={() => handlePayNow(booking)}
+                              disabled={isCreatingPayment === booking._id}
+                              size="sm"
+                              className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                            >
+                              {isCreatingPayment === booking._id ? (
+                                <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                              ) : (
+                                <CreditCard className="mr-1 h-4 w-4" />
+                              )}
+                              Pagar
                             </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Você tem certeza?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Esta ação irá cancelar o seu agendamento para o serviço de{" "}
-                                <strong>{booking.service?.name || "serviço indisponível"}</strong> no dia no dia{" "}
-                                <strong>{format(new Date(booking.time), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</strong>
-                                .
-                                <br />
-                                <br />
-                                Esta ação não pode ser desfeita.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Manter Agendamento</AlertDialogCancel>
-                              <AlertDialogAction
-                                onClick={() => handleCancelBooking(booking)}
-                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 text-white"
-                              >
-                                Sim, Cancelar
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      )}
-                    </CardFooter>
-                  </Card>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-10 px-4 border-2 border-dashed rounded-lg">
-              <Home className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-semibold">Nenhum agendamento futuro</h3>
-              <p className="mt-1 text-sm text-gray-500">Que tal marcar um novo horário?</p>
-            </div>
-          )}
-        </section>
+                          )}
 
-        {/* --- SEÇÃO DE HISTÓRICO COM NOVO CARD --- */}
-        <section>
-          <h2 className="text-2xl font-semibold mb-4 border-b pb-2">Histórico</h2>
-          {pastBookings.length > 0 ? (
-            <>
-              <div className="space-y-4">
-                {paginatedPastBookings.map((booking) => {
-                  const statusInfo = getStatusInfo(booking.status, true);
-                  return (
-                    <Card
-                      key={booking._id}
-                      className="bg-white dark:bg-gray-800 shadow-md transition-all hover:shadow-lg gap-0 group-hover:ring-2 group-hover:ring-blue-200 cursor-pointer"
-                      onClick={(e) => {
-                        if ((e.target as HTMLElement).closest("button")) return;
-                        navigate(`/${booking.barbershop.slug}`);
-                      }}
-                    >
-                      <CardHeader className="p-4 sm:p-6">
-                        <div className="flex justify-between items-start gap-4">
-                          <div className="flex items-center gap-2">
-                            <img src={booking.barbershop.logoUrl} alt="logo barbearia" className="w-24" />
-                            <CardTitle className="text-xl md:text-2xl group-hover:underline">{booking.barbershop.name}</CardTitle>
-                          </div>
-                          <Badge className={`${statusInfo.className} border`}>{statusInfo.text}</Badge>
+                          {canBeRescheduled && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleOpenRescheduleModal(booking)}
+                              className="flex-1"
+                            >
+                              <Repeat className="mr-1 h-4 w-4" />
+                              Remarcar
+                            </Button>
+                          )}
+
+                          {canBeCancelled && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50">
+                                  Cancelar
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Cancelar agendamento?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Seu agendamento para <strong>{booking.service?.name}</strong> em{" "}
+                                    <strong>{format(new Date(booking.time), "dd/MM 'às' HH:mm", { locale: ptBR })}</strong>{" "}
+                                    será cancelado. Esta ação não pode ser desfeita.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Manter</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleCancelBooking(booking)}
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                  >
+                                    Sim, cancelar
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
                         </div>
-                      </CardHeader>
-                      <CardContent className="p-4 sm:p-6 space-y-4 text-sm sm:text-base">
-                        {booking.service ? (
-                          <div className="flex items-center gap-3">
-                            <Scissors className="h-5 w-5 text-muted-foreground" />
-                            <span className="font-semibold">{booking.service?.name || "Serviço indisponível"}</span>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3">
-                            <Scissors className="h-5 w-5 text-muted-foreground" />
-                            <span className="font-semibold italic text-muted-foreground">Serviço indisponível</span>
-                          </div>
-                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed">
+                  <Home className="mx-auto h-10 w-10 text-gray-300" />
+                  <p className="mt-2 text-sm font-medium text-gray-600">Nenhum agendamento futuro</p>
+                  <p className="text-xs text-gray-400">Que tal marcar um novo horário?</p>
+                </div>
+              )}
+            </section>
 
-                        {/* --- CORREÇÃO PREVENTIVA AQUI --- */}
-                        {booking.barber ? (
+            {/* Histórico */}
+            <section>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-gray-400" />
+                Histórico
+              </h2>
+              {pastBookings.length > 0 ? (
+                <>
+                  <div className="space-y-2">
+                    {paginatedPastBookings.map((booking) => {
+                      const statusInfo = getStatusInfo(booking.status, true);
+                      return (
+                        <div
+                          key={booking._id}
+                          className="bg-white dark:bg-gray-800 rounded-lg border p-3 flex items-center gap-3 cursor-pointer hover:bg-gray-50"
+                          onClick={() => navigate(`/${booking.barbershop.slug}`)}
+                        >
+                          {booking.barbershop.logoUrl && (
+                            <img
+                              src={booking.barbershop.logoUrl}
+                              alt=""
+                              className="w-10 h-10 object-contain rounded bg-gray-100 flex-shrink-0"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm text-gray-900 dark:text-white truncate">
+                              {booking.service?.name || "Serviço"}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {format(new Date(booking.time), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}
+                            </p>
+                          </div>
+                          <Badge className={`${statusInfo.className} border text-xs`}>{statusInfo.text}</Badge>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {totalHistoryPages > 1 && (
+                    <div className="flex justify-center items-center gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setHistoryPage((p) => Math.max(1, p - 1))}
+                        disabled={historyPage === 1}
+                      >
+                        Anterior
+                      </Button>
+                      <span className="text-xs text-gray-500">
+                        {historyPage} / {totalHistoryPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
+                        disabled={historyPage === totalHistoryPages}
+                      >
+                        Próxima
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm text-gray-400 text-center py-6">Nenhum agendamento anterior</p>
+              )}
+            </section>
+          </>
+        )}
+
+        {/* TAB: Meus Planos */}
+        {activeTab === "planos" && (
+          <section>
+            {subscriptions.length > 0 ? (
+              <div className="space-y-4">
+                {subscriptions.map((subscription) => {
+                  const statusInfo = getSubscriptionStatusInfo(subscription.status, subscription.autoRenew);
+                  const isActive = subscription.status === "active";
+                  const canCancel = isActive && subscription.autoRenew;
+                  const creditsPercentage = (subscription.creditsRemaining / subscription.plan.totalCredits) * 100;
+
+                  return (
+                    <Card key={subscription._id} className="bg-white dark:bg-gray-800 shadow-sm border overflow-hidden">
+                      {/* Header do plano */}
+                      <div className="p-4 border-b bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-700">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            <User className="h-5 w-5 text-muted-foreground" />
-                            <span>
-                              com <strong>{booking.barber?.name || "Profissional indisponível"}</strong>
+                            {subscription.barbershop.logoUrl && (
+                              <img
+                                src={subscription.barbershop.logoUrl}
+                                alt=""
+                                className="w-12 h-12 object-contain rounded-lg bg-white border"
+                              />
+                            )}
+                            <div>
+                              <h3 className="font-semibold text-gray-900 dark:text-white">
+                                {subscription.plan.name}
+                              </h3>
+                              <p className="text-sm text-gray-500">{subscription.barbershop.name}</p>
+                            </div>
+                          </div>
+                          <Badge className={`${statusInfo.className} border text-xs`}>{statusInfo.text}</Badge>
+                        </div>
+                      </div>
+
+                      {/* Conteúdo do plano */}
+                      <div className="p-4 space-y-4">
+                        {/* Barra de créditos */}
+                        <div>
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm text-gray-600 dark:text-gray-400">Créditos disponíveis</span>
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
+                              {subscription.creditsRemaining}
+                              <span className="text-sm font-normal text-gray-500">
+                                {" "}
+                                / {subscription.plan.totalCredits}
+                              </span>
                             </span>
                           </div>
-                        ) : (
-                          <div className="flex items-center gap-3">
-                            <User className="h-5 w-5 text-muted-foreground" />
-                            <span className="italic text-muted-foreground">Profissional indisponível</span>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                            <div
+                              className={`h-2.5 rounded-full transition-all ${creditsPercentage > 50
+                                ? "bg-green-500"
+                                : creditsPercentage > 20
+                                  ? "bg-yellow-500"
+                                  : "bg-red-500"
+                                }`}
+                              style={{ width: `${creditsPercentage}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Info grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            <p className="text-xs text-gray-500 mb-1">Válido até</p>
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              {format(new Date(subscription.endDate), "dd/MM/yyyy", { locale: ptBR })}
+                            </p>
+                          </div>
+                          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            <p className="text-xs text-gray-500 mb-1">Valor mensal</p>
+                            <p className="font-semibold text-gray-900 dark:text-white">
+                              R$ {subscription.plan.price.toFixed(2).replace(".", ",")}
+                            </p>
+                          </div>
+                        </div>
+
+                        {subscription.plan.description && (
+                          <p className="text-sm text-gray-500 bg-gray-50 dark:bg-gray-700/50 rounded-lg p-3">
+                            {subscription.plan.description}
+                          </p>
+                        )}
+
+                        {/* Renovação automática info */}
+                        {isActive && (
+                          <div
+                            className={`flex items-center gap-2 text-sm p-3 rounded-lg ${subscription.autoRenew
+                              ? "bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                              : "bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+                              }`}
+                          >
+                            {subscription.autoRenew ? (
+                              <>
+                                <Repeat className="h-4 w-4" />
+                                <span>Renovação automática ativa</span>
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="h-4 w-4" />
+                                <span>Não será renovado automaticamente</span>
+                              </>
+                            )}
                           </div>
                         )}
-                        <div className="flex items-center gap-3">
-                          <Calendar className="h-5 w-5 text-muted-foreground" />
-                          <span>{format(new Date(booking.time), "EEEE, dd 'de' MMMM", { locale: ptBR })}</span>
+                      </div>
+
+                      {/* Ação de cancelar */}
+                      {canCancel && (
+                        <div className="px-4 pb-4">
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full text-red-600 border-red-200 hover:bg-red-50"
+                                disabled={isCancelingSubscription === subscription._id}
+                              >
+                                {isCancelingSubscription === subscription._id ? (
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                  <XCircle className="mr-2 h-4 w-4" />
+                                )}
+                                Cancelar Renovação Automática
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Cancelar renovação?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Você continuará com acesso aos seus{" "}
+                                  <strong>{subscription.creditsRemaining} créditos</strong> até{" "}
+                                  <strong>
+                                    {format(new Date(subscription.endDate), "dd/MM/yyyy", { locale: ptBR })}
+                                  </strong>
+                                  .
+                                  <br />
+                                  <br />
+                                  Após essa data, sua assinatura será encerrada e não haverá cobranças futuras.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Manter</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => handleCancelSubscription(subscription)}
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  Sim, cancelar renovação
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Clock className="h-5 w-5 text-muted-foreground" />
-                          <span>
-                            às <strong>{format(new Date(booking.time), "HH:mm")}h</strong>
-                          </span>
-                        </div>
-                      </CardContent>
+                      )}
                     </Card>
                   );
                 })}
               </div>
-              {/* Paginação */}
-              {totalHistoryPages > 1 && (
-                <div className="flex justify-center items-center gap-2 mt-6">
-                  <Button variant="outline" size="sm" onClick={() => setHistoryPage((p) => Math.max(1, p - 1))} disabled={historyPage === 1}>
-                    Anterior
-                  </Button>
-                  <span className="mx-2 text-sm">
-                    Página {historyPage} de {totalHistoryPages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setHistoryPage((p) => Math.min(totalHistoryPages, p + 1))}
-                    disabled={historyPage === totalHistoryPages}
-                  >
-                    Próxima
-                  </Button>
-                </div>
-              )}
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">Você ainda não possui histórico de agendamentos.</p>
-          )}
-        </section>
-      </div>
+            ) : (
+              <div className="text-center py-16 px-4 bg-white dark:bg-gray-800 rounded-xl border-2 border-dashed">
+                <Star className="mx-auto h-12 w-12 text-gray-300" />
+                <p className="mt-3 text-base font-medium text-gray-600">Você ainda não possui planos</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Acesse uma barbearia para conferir os planos disponíveis
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+      </main>
 
+      {/* Modal de remarcar */}
       <Dialog open={isRescheduleModalOpen} onOpenChange={setIsRescheduleModalOpen}>
         <DialogContent className="sm:max-w-[625px] h-[80vh] overflow-scroll dialog-rebooking">
-          {" "}
           <DialogHeader>
             <DialogTitle>Remarcar Horário</DialogTitle>
             <DialogClose asChild>

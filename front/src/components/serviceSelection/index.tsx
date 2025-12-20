@@ -3,9 +3,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { PriceFormater } from "@/helper/priceFormater";
 import { Barber } from "@/types/barberShop";
-import { CheckCircle2, ArrowLeft, Star } from "lucide-react";
+import { CheckCircle2, ArrowLeft, Star, Ticket } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Service } from "@/types/Service";
+import { CustomerCredit } from "@/pages/loja/sections/BookingPane";
 
 // Interface de props que o componente espera receber do componente pai
 interface ServiceSelectionProps {
@@ -15,6 +16,8 @@ interface ServiceSelectionProps {
   onSelectBarber: (id: string) => void;
   services: Service[];
   barbers: Barber[];
+  customerCredits?: CustomerCredit[];
+  isAuthenticated?: boolean;
 }
 
 const sectionAnimation = {
@@ -31,7 +34,21 @@ export default function ServiceSelection({
   onSelectBarber,
   services,
   barbers,
+  customerCredits = [],
+  isAuthenticated = false,
 }: ServiceSelectionProps) {
+  // Função para extrair o ID do plano (seja string ou objeto populado)
+  const getPlanId = (plan?: { _id: string; name: string } | string): string | undefined => {
+    if (!plan) return undefined;
+    return typeof plan === "string" ? plan : plan._id;
+  };
+
+  // Função para buscar créditos disponíveis para um plano específico
+  const getCreditsForPlan = (plan?: { _id: string; name: string } | string) => {
+    const planId = getPlanId(plan);
+    if (!planId || !isAuthenticated) return null;
+    return customerCredits.find((c) => c.planId === planId);
+  };
   // Estado para controlar qual visualização está ativa: 'services' ou 'barbers'
   const [view, setView] = useState<"services" | "barbers">("services");
 
@@ -71,35 +88,56 @@ export default function ServiceSelection({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {services.map((service) => {
                 const isSelected = service._id === selectedService;
+                const planCredits = service.isPlanService ? getCreditsForPlan(service.plan) : null;
+                const hasCredits = planCredits && planCredits.creditsRemaining > 0;
+
                 return (
                   <Button
                     key={service._id}
                     type="button"
                     variant={isSelected ? "default" : "outline"}
                     onClick={() => handleServiceClick(service._id)}
-                    className={`h-auto p-4 flex justify-between items-center w-full text-left transition-all ${
+                    className={`h-auto p-4 flex flex-col items-start w-full text-left transition-all ${
                       isSelected
                         ? "bg-[var(--loja-theme-color)] text-white hover:bg-[var(--loja-theme-color)]/90 border-transparent shadow-lg"
                         : "bg-white"
                     }`}
                   >
-                    <div>
-                      <p className="font-semibold max-w-[260px] whitespace-break-spaces">{service.name}</p>
-                      <p className={`text-xs ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>{service.duration} min</p>
+                    <div className="flex justify-between items-center w-full">
+                      <div>
+                        <p className="font-semibold max-w-[200px] whitespace-break-spaces">{service.name}</p>
+                        <p className={`text-xs ${isSelected ? "text-white/80" : "text-muted-foreground"}`}>{service.duration} min</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {service.isPlanService ? (
+                          <span className={`flex items-center gap-1 font-bold text-sm ${isSelected ? "text-white" : "text-[var(--loja-theme-color)]"}`}>
+                            <Star size={16} className="fill-current" />
+                            Plano
+                          </span>
+                        ) : (
+                          <span className={`font-bold text-lg ${isSelected ? "text-white" : "text-[var(--loja-theme-color)]"}`}>
+                            {PriceFormater(service.price)}
+                          </span>
+                        )}
+                        {isSelected && <CheckCircle2 className="h-5 w-5 text-white" />}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {service.isPlanService ? (
-                        <span className={`flex items-center gap-1 font-bold text-sm ${isSelected ? "text-white" : "text-[var(--loja-theme-color)]"}`}>
-                          <Star size={16} className="fill-current" />
-                          Incluso no Plano
-                        </span>
-                      ) : (
-                        <span className={`font-bold text-lg ${isSelected ? "text-white" : "text-[var(--loja-theme-color)]"}`}>
-                          {PriceFormater(service.price)}
-                        </span>
-                      )}
-                      {isSelected && <CheckCircle2 className="h-5 w-5 text-white" />}
-                    </div>
+
+                    {/* Mostrar créditos disponíveis para serviços de plano */}
+                    {service.isPlanService && (
+                      <div className={`mt-2 flex items-center gap-1 text-xs ${isSelected ? "text-white/90" : "text-gray-600"}`}>
+                        <Ticket size={14} />
+                        {hasCredits ? (
+                          <span className="font-medium">
+                            {planCredits.creditsRemaining} crédito{planCredits.creditsRemaining !== 1 ? "s" : ""} disponível
+                          </span>
+                        ) : isAuthenticated ? (
+                          <span className="text-red-500">Sem créditos - Assine o plano</span>
+                        ) : (
+                          <span>Faça login para usar seus créditos</span>
+                        )}
+                      </div>
+                    )}
                   </Button>
                 );
               })}

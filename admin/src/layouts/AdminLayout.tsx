@@ -178,84 +178,114 @@ export function AdminLayout() {
     loyaltyProgramCount: barbershop.loyaltyProgramCount,
   };
 
-  const navItems = [
+  // Estrutura de navegação organizada por seções
+  const navSections = [
     {
-      to: "configuracoes",
-      label: "Minha Barbearia",
-      icon: <Settings className="mr-2 h-4 w-4" />,
-      roles: ["admin"],
-    },
-    {
-      to: "agendamentos",
-      label: "Agendamentos",
-      icon: <CalendarDays className="mr-2 h-4 w-4" />,
+      title: "Agenda",
       roles: ["admin", "barber"],
+      items: [
+        {
+          to: "agendamentos",
+          label: "Agendamentos",
+          icon: <CalendarDays className="mr-2 h-4 w-4" />,
+          roles: ["admin", "barber"],
+        },
+        {
+          to: "folgas",
+          label: "Folgas",
+          icon: <CalendarOff className="mr-2 h-4 w-4" />,
+          roles: ["admin", "barber"],
+        },
+        {
+          to: "agendamentos/lista",
+          label: "Histórico",
+          icon: <CalendarDays className="mr-2 h-4 w-4" />,
+          roles: ["admin", "barber"],
+        },
+      ],
     },
     {
-      to: "metricas-barbeiro",
-      label: "Metricas",
-      icon: <ChartBar className="mr-2 h-4 w-4" />,
-      roles: ["barber"],
-    },
-    {
-      to: "metricas",
-      label: "Métricas",
-      icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
-      roles: ["admin"],
-    },
-    {
-      to: "folgas",
-      label: "Folgas",
-      icon: <CalendarOff className="mr-2 h-4 w-4" />,
+      title: "Visualização",
       roles: ["admin", "barber"],
+      items: [
+        {
+          to: "metricas",
+          label: "Métricas",
+          icon: <LayoutDashboard className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+        {
+          to: "metricas-barbeiro",
+          label: "Métricas",
+          icon: <ChartBar className="mr-2 h-4 w-4" />,
+          roles: ["barber"],
+        },
+        {
+          to: "clientes",
+          label: "Clientes",
+          icon: <Users2 className="mr-2 h-4 w-4" />,
+          roles: ["admin", "barber"],
+        },
+      ],
     },
     {
-      to: "agendamentos/lista",
-      label: " Histórico",
-      icon: <CalendarDays className="mr-2 h-4 w-4" />,
-      roles: ["admin", "barber"],
-    },
-
-    {
-      to: "clientes",
-      label: "Clientes",
-      icon: <Users2 className="mr-2 h-4 w-4" />,
-      roles: ["admin", "barber"],
-    },
-    {
-      to: "funcionarios",
-      label: "Funcionários",
-      icon: <Contact className="mr-2 h-4 w-4" />,
+      title: "Cadastro",
       roles: ["admin"],
+      items: [
+        {
+          to: "funcionarios",
+          label: "Funcionários",
+          icon: <Contact className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+        {
+          to: "servicos",
+          label: "Serviços",
+          icon: <Scissors className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+        {
+          to: "produtos",
+          label: "Produtos",
+          icon: <ShoppingCart className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+        {
+          to: "planos",
+          label: "Planos",
+          icon: <Package className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+      ],
     },
     {
-      to: "servicos",
-      label: "Serviços",
-      icon: <Scissors className="mr-2 h-4 w-4" />,
+      title: "Configurações",
       roles: ["admin"],
-    },
-
-    {
-      to: "planos",
-      label: "Planos",
-      icon: <Package className="mr-2 h-4 w-4" />,
-      roles: ["admin"],
-    },
-    {
-      to: "produtos",
-      label: "Produtos",
-      icon: <ShoppingCart className="mr-2 h-4 w-4" />,
-      roles: ["admin"],
-    },
-    {
-      to: "recorrencia",
-      label: "Recorrência",
-      icon: <Repeat className="mr-2 h-4 w-4" />,
-      roles: ["admin"],
+      items: [
+        {
+          to: "configuracoes",
+          label: "Minha Barbearia",
+          icon: <Settings className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+        {
+          to: "recorrencia",
+          label: "Recorrência",
+          icon: <Repeat className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+      ],
     },
   ];
 
-  const visibleNavItems = navItems.filter((item) => user?.role && item.roles.includes(user.role));
+  // Filtra seções e itens baseado na role do usuário
+  const visibleSections = navSections
+    .filter((section) => user?.role && section.roles.includes(user.role))
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => user?.role && item.roles.includes(user.role)),
+    }))
+    .filter((section) => section.items.length > 0);
 
   // Função para calcular dias restantes do trial
   const calculateDaysRemaining = (trialEndsAt: string): number => {
@@ -294,14 +324,14 @@ export function AdminLayout() {
 
           {/* Indicador de Trial */}
           {barbershop.isTrial && barbershop.trialEndsAt && barbershop.accountStatus === "trial" && (
-            <div className="mt-3 p-2.5 bg-amber-500/20 border border-amber-500/50 rounded-lg">
+            <div className="mt-3 p-2.5 px-1 bg-amber-500/20 border border-amber-500/50 rounded-lg">
               <div className="flex items-center justify-center gap-2">
-                <div className="flex flex-col items-center text-center">
-                  <span className="text-xs text-amber-300 font-medium">Teste Grátis</span>
-                  <span className="text-lg font-bold text-amber-400">
+                <div className="">
+                  <span className="text-sm text-amber-300 font-medium">Teste Grátis</span>
+                  <span className="font-bold text-amber-400 mx-2">
                     {calculateDaysRemaining(barbershop.trialEndsAt)}
                   </span>
-                  <span className="text-xs text-amber-300">
+                  <span className="text-sm text-amber-300">
                     {calculateDaysRemaining(barbershop.trialEndsAt) === 1 ? "dia restante" : "dias restantes"}
                   </span>
                 </div>
@@ -325,27 +355,42 @@ export function AdminLayout() {
           )}
         </div>
       </div>
-      <nav className="flex flex-col space-y-1 mt-4 flex-grow px-3 overflow-x-auto">
-        {visibleNavItems.map((item) => {
-          const pathToCheck = `/${barbershopSlug}/${item.to}`;
-          const isActive = location.pathname === pathToCheck || (item.to === "dashboard" && location.pathname === `/${barbershopSlug}`);
+      <nav className="flex flex-col flex-grow px-3 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-neutral-700">
+        {visibleSections.map((section, sectionIndex) => (
+          <div key={section.title}>
+            {/* Separador visual entre seções */}
+            {sectionIndex > 0 && <div className="h-px bg-zinc-700/50 my-2" />}
 
-          return (
-            <Link
-              key={item.label}
-              to={item.to}
-              className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-md transition-all duration-200 ease-in-out
-                ${isActive
-                  ? "bg-rose-600 text-white shadow-lg transform scale-105"
-                  : "text-gray-300 hover:bg-zinc-800 hover:text-white hover:shadow-md"
-                }`}
-              onClick={() => setIsMobileSidebarOpen(false)} // Fecha ao clicar no item em mobile
-            >
-              {item.icon}
-              {item.label}
-            </Link>
-          );
-        })}
+            {/* Título da seção */}
+            <span className="px-3 text-[12px] font-semibold text-zinc-500 uppercase tracking-wider">
+              {section.title}
+            </span>
+
+            {/* Itens da seção */}
+            <div className="space-y-0.5">
+              {section.items.map((item) => {
+                const pathToCheck = `/${barbershopSlug}/${item.to}`;
+                const isActive = location.pathname === pathToCheck || (item.to === "dashboard" && location.pathname === `/${barbershopSlug}`);
+
+                return (
+                  <Link
+                    key={item.to}
+                    to={item.to}
+                    className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 ease-in-out
+                      ${isActive
+                        ? "bg-rose-600 text-white shadow-lg"
+                        : "text-gray-300 hover:bg-zinc-800 hover:text-white hover:shadow-md"
+                      }`}
+                    onClick={() => setIsMobileSidebarOpen(false)}
+                  >
+                    {item.icon}
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
       <div className="p-3 mt-auto">
         <Button
@@ -433,7 +478,7 @@ export function AdminLayout() {
       </Dialog>
 
       <div className="flex min-h-screen bg-gray-100">
-        <aside className="hidden lg:flex lg:flex-col lg:w-52 bg-neutral-950 text-gray-200 fixed h-full">
+        <aside className="hidden lg:flex lg:flex-col lg:w-60 bg-neutral-950 text-gray-200 fixed h-full">
           <SidebarContent />
         </aside>
 
@@ -469,7 +514,7 @@ export function AdminLayout() {
           )}
         </div>
 
-        <main className="flex-1 p-2 lg:p-6  overflow-y-auto lg:ml-52 pt-20">
+        <main className="flex-1 p-2 lg:p-6 overflow-y-auto lg:ml-60 pt-20">
           <Outlet context={outletContextData} />
         </main>
       </div>

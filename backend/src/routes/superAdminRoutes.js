@@ -13,13 +13,21 @@ const router = express.Router();
 // Calcula qual dia do trial a barbearia está
 function calcularDiaDoTrial(trialEndsAt) {
   if (!trialEndsAt) return null;
+
+  // Normaliza para início do dia (meia-noite) para cálculo consistente
   const agora = new Date();
+  agora.setHours(0, 0, 0, 0);
+
   const fim = new Date(trialEndsAt);
+  fim.setHours(0, 0, 0, 0);
+
   const msPerDay = 24 * 60 * 60 * 1000;
-  const diasRestantes = Math.ceil((fim - agora) / msPerDay);
+  const diasRestantes = Math.round((fim - agora) / msPerDay);
+
   if (diasRestantes <= 0) return null; // expirado
   if (diasRestantes > 7) return 1; // edge case
-  return 7 - diasRestantes + 1; // Dia 1 a 7
+
+  return 8 - diasRestantes; // Dia 1 a 7
 }
 
 // GET /api/superadmin/barbershops-overview

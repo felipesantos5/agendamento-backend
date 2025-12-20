@@ -42,6 +42,7 @@ import manualBookingRoutes from "./routes/admin/manualBookingRoute.js";
 import leadRoutes from "./routes/form/lead.routes.js";
 import authSuperAdminRoutes from "./routes/authSuperAdminRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
+import subscriptionPaymentRoutes from "./routes/subscriptionPaymentRoutes.js";
 
 import { protectAdmin, checkAccountStatus } from "./middleware/authAdminMiddleware.js";
 import { protectSuperAdmin } from "./middleware/authSuperAdminMiddleware.js";
@@ -130,6 +131,7 @@ app.use("/api/barbershops/:barbershopId/products", productRoutes);
 
 app.use("/api/barbershops/:barbershopId/time-blocks", protectAdmin, checkAccountStatus, timeBlockRoutes);
 app.use("/api/barbershops/:barbershopId/bookings", paymentRoutes);
+app.use("/api/barbershops/:barbershopId/subscriptions", subscriptionPaymentRoutes);
 app.use("/api/barbershops/:barbershopId/dashboard-metrics", protectAdmin, checkAccountStatus, dashboardRoutes);
 app.use("/api/barbershops/:barbershopId/barber-performance", protectAdmin, checkAccountStatus, barberPerformanceRoutes);
 app.use("/api/barbershops/:barbershopId/admin/bookings", protectAdmin, checkAccountStatus, manualBookingRoutes);
