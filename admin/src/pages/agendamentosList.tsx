@@ -193,7 +193,7 @@ export const AgendamentosList = () => {
                     <TableCell>{booking.service?.name || "Serviço Deletado"}</TableCell>
                     <TableCell>{translatePaymentStatus(booking.paymentStatus).text}</TableCell>
                     <TableCell className="">
-                      {PriceFormater(booking.service.price)}
+                      {booking.service ? PriceFormater(booking.service.price) : "N/A"}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {format(new Date(booking.time), "dd/MM/yyyy 'às' HH:mm", {
