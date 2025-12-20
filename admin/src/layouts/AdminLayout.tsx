@@ -355,7 +355,7 @@ export function AdminLayout() {
           )}
         </div>
       </div>
-      <nav className="flex flex-col flex-grow px-3 overflow-x-auto">
+      <nav className="flex flex-col flex-grow px-3 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-neutral-700">
         {visibleSections.map((section, sectionIndex) => (
           <div key={section.title}>
             {/* Separador visual entre seções */}
