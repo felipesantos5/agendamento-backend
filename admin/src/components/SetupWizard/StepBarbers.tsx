@@ -66,9 +66,9 @@ export function StepBarbers({ barbershopId, barbers, onBarbersChange }: StepBarb
     <div className="space-y-6">
       <div className="text-center mb-6">
         <h2 className="text-xl font-semibold text-gray-900 mb-2">Cadastre seus barbeiros</h2>
-        <p className="text-gray-500 text-sm">
+        {/* <p className="text-gray-500 text-sm">
           Adicione pelo menos 1 barbeiro. Você pode ajustar os horários depois.
-        </p>
+        </p> */}
       </div>
 
       {/* Formulário */}
