@@ -2,7 +2,7 @@ import cron from "node-cron";
 import Booking from "../models/Booking.js";
 import Barbershop from "../models/Barbershop.js";
 import Subscription from "../models/Subscription.js";
-import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
+import { sendWhatsAppConfirmation, sendWhatsAppForBarbershop } from "./evolutionWhatsapp.js";
 import { startOfDay, endOfDay, getHours } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
@@ -73,7 +73,7 @@ const sendDailyReminders = async (triggerHour) => {
       const greeting = triggerHour === 8 ? "Bom dia" : "Olá";
       const message = `${greeting}, ${booking.customer.name}! Lembrete do seu agendamento hoje na ${booking.barbershop.name} às ${appointmentTimeFormatted} com ${booking.barber.name} ✅\n\nPara mais informações, entre em contato com a barbearia: ${booking.barbershop.contact} 📱\nEndereço: ${barberShopAdress}💈`;
 
-      await sendWhatsAppConfirmation(customerPhone, message);
+      await sendWhatsAppForBarbershop(booking.barbershop._id, customerPhone, message);
       sentCount++;
 
       // Pausa aleatória

@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate, Navigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import apiClient from "@/services/api";
@@ -134,9 +135,8 @@ export function TrialSignupPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="password">Senha</Label>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   placeholder="Mínimo 6 caracteres"
                   required
                   value={password}
@@ -148,9 +148,8 @@ export function TrialSignupPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                <Input
+                <PasswordInput
                   id="confirmPassword"
-                  type="password"
                   placeholder="Digite a senha novamente"
                   required
                   value={confirmPassword}

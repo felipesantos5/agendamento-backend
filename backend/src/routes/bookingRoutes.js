@@ -9,7 +9,7 @@ import TimeBlock from "../models/TimeBlock.js";
 import Subscription from "../models/Subscription.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
-import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
+import { sendWhatsAppConfirmation, sendWhatsAppForBarbershop } from "../services/evolutionWhatsapp.js";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
@@ -202,7 +202,7 @@ router.post("/", appointmentLimiter, async (req, res) => {
       const whatsappLink = `https://wa.me/55${cleanPhoneNumber}`;
       const locationLink = `https://barbeariagendamento.com.br/localizacao/${barbershop._id}`;
       const message = `Olá, ${customer.name}! Seu agendamento na ${barbershop.name} foi confirmado com sucesso para ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia:\n${whatsappLink}\n\n📍 Ver no mapa:\n${locationLink}\n\nNosso time te aguarda! 💈`;
-      sendWhatsAppConfirmation(customer.phone, message);
+      sendWhatsAppForBarbershop(barbershopId, customer.phone, message);
 
       res.status(201).json(createdBooking);
     }
@@ -302,7 +302,7 @@ router.put(
 
         const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate}.`;
 
-        sendWhatsAppConfirmation(booking.customer.phone, message);
+        sendWhatsAppForBarbershop(barbershopId, booking.customer.phone, message);
       }
 
       // --- LÓGICA DE FIDELIDADE (CORRIGIDA) ---
@@ -337,7 +337,7 @@ router.put(
             // Notifica o cliente
             const rewardMsg = barbershop.loyaltyProgram.rewardDescription;
             const message = `Parabéns, ${customer.name}! 🎁\n\nVocê completou nosso cartão fidelidade e acaba de ganhar: *${rewardMsg}*!\n\nUse no seu próximo agendamento na ${barbershop.name}. 💈`;
-            sendWhatsAppConfirmation(customer.phone, message);
+            sendWhatsAppForBarbershop(barbershopId, customer.phone, message);
           }
 
           await customer.save(); // Salva o cliente com o array loyaltyData atualizado
@@ -716,7 +716,7 @@ router.delete("/:bookingId", async (req, res) => {
 
     const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate} foi cancelado.`;
 
-    sendWhatsAppConfirmation(booking.customer.phone, message);
+    sendWhatsAppForBarbershop(barbershopId, booking.customer.phone, message);
 
     res.status(200).json({ message: "Agendamento excluído com sucesso." });
   } catch (error) {
@@ -831,7 +831,7 @@ router.patch("/:bookingId/reschedule", async (req, res) => {
       locale: ptBR,
     });
     const message = `Olá, ${customer.name}! Seu agendamento foi reagendado para ${formattedNewTime}. Até lá! 💈`;
-    sendWhatsAppConfirmation(customer.phone, message); // Reutiliza sua função de notificação
+    sendWhatsAppForBarbershop(barbershopId, customer.phone, message); // Reutiliza sua função de notificação
 
     res.status(200).json({
       success: true,

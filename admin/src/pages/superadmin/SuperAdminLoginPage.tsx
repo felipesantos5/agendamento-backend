@@ -3,6 +3,7 @@ import { useNavigate, Navigate } from "react-router-dom";
 import { useSuperAdminAuth } from "@/contexts/SuperAdminAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
@@ -57,9 +58,8 @@ export function SuperAdminLoginPage() {
               <Label htmlFor="password" className="text-slate-200">
                 Senha
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Digite a senha root"

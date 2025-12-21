@@ -3,6 +3,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useNavigate, Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import apiClient from "@/services/api";
@@ -97,9 +98,8 @@ export function LoginPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

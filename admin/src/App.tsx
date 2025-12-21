@@ -23,6 +23,7 @@ import { ProductManagement } from "./pages/Products.tsx";
 import DashboardMetricsPage from "./pages/DashboardMetricsPage.tsx";
 import { BarberPerformancePage } from "./pages/BarberPerformancePage.tsx";
 import { RecurrencePage } from "./pages/RecurrencePage.tsx";
+import { WhatsAppConfigPage } from "./pages/WhatsAppConfigPage.tsx";
 import { SuperAdminLoginPage } from "./pages/superadmin/SuperAdminLoginPage";
 import { SuperAdminDashboardPage } from "./pages/superadmin/SuperAdminDashboardPage";
 
@@ -66,6 +67,7 @@ export default function App() {
               <Route path="planos" element={<PlansPage />} />
               <Route path="produtos" element={<ProductManagement />} />
               <Route path="recorrencia" element={<RecurrencePage />} />
+              <Route path="configuracoes/whatsapp" element={<WhatsAppConfigPage />} />
             </Route>
 
             <Route path="*" element={<>nao encontrado</>} />
