@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, MessageSquare, X, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { Loader2, MessageSquare, X, CheckCircle2, AlertCircle, Clock, RefreshCw } from "lucide-react";
 import { AdminOutletContext } from "@/types/AdminOutletContext";
 
 interface WhatsAppStatus {
@@ -36,6 +36,7 @@ export const WhatsAppConfigPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [isRefreshingQR, setIsRefreshingQR] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -115,6 +116,12 @@ export const WhatsAppConfigPage = () => {
       // Chama o endpoint para criar instância e obter QR code
       const response = await apiClient.post(`/api/barbershops/${barbershopId}/whatsapp/connect`);
 
+      console.log("[WhatsApp] Resposta da conexão:", response.data);
+
+      if (!response.data.qrcode) {
+        throw new Error("QR Code não foi retornado pela API");
+      }
+
       setQrCode(response.data.qrcode);
       setShowQRModal(true);
 
@@ -124,9 +131,29 @@ export const WhatsAppConfigPage = () => {
       startPolling();
     } catch (error: any) {
       console.error("Erro ao conectar WhatsApp:", error);
-      toast.error(error.response?.data?.error || "Erro ao conectar WhatsApp");
+      toast.error(error.response?.data?.error || error.message || "Erro ao conectar WhatsApp");
     } finally {
       setIsConnecting(false);
+    }
+  };
+
+  // Função para renovar o QR Code quando expirar
+  const handleRefreshQRCode = async () => {
+    setIsRefreshingQR(true);
+    try {
+      const response = await apiClient.get(`/api/barbershops/${barbershopId}/whatsapp/qrcode`);
+
+      console.log("[WhatsApp] Novo QR Code:", response.data);
+
+      if (response.data.qrcode) {
+        setQrCode(response.data.qrcode);
+        toast.success("Novo QR Code gerado!");
+      }
+    } catch (error: any) {
+      console.error("Erro ao renovar QR Code:", error);
+      toast.error(error.response?.data?.error || "Erro ao gerar novo QR Code");
+    } finally {
+      setIsRefreshingQR(false);
     }
   };
 
@@ -228,16 +255,6 @@ export const WhatsAppConfigPage = () => {
             </p>
           </fieldset>
 
-          {/* Informações adicionais quando desconectado */}
-          {whatsappStatus?.status === "disconnected" && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:bg-amber-950/20 dark:border-amber-800">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                <strong>Atenção:</strong> Enquanto seu WhatsApp não estiver conectado, as mensagens automáticas serão
-                enviadas através do nosso número padrão de demonstração.
-              </p>
-            </div>
-          )}
-
           {/* Ações */}
           <div className="flex gap-3">
             {whatsappStatus?.status !== "connected" ? (
@@ -292,6 +309,25 @@ export const WhatsAppConfigPage = () => {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <span>Aguardando conexão...</span>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefreshQRCode}
+                  disabled={isRefreshingQR}
+                  className="mt-2"
+                >
+                  {isRefreshingQR ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Gerando...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="mr-2 h-4 w-4" />
+                      Gerar novo QR Code
+                    </>
+                  )}
+                </Button>
                 <div className="text-xs text-center text-muted-foreground max-w-sm">
                   <p>
                     <strong>Como escanear:</strong>

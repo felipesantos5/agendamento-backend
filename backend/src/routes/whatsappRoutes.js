@@ -45,11 +45,8 @@ router.post("/:id/whatsapp/connect", protectAdmin, async (req, res) => {
       }
     }
 
-    // Cria nova instância
-    const { instanceName } = await createInstance(id);
-
-    // Obtém o QR Code
-    const { qrcode, pairingCode } = await getQRCode(instanceName);
+    // Cria nova instância (já retorna o QR code)
+    const { instanceName, qrcode, pairingCode } = await createInstance(id);
 
     // Atualiza o banco de dados
     barbershop.whatsappConfig = {

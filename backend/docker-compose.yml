@@ -10,6 +10,8 @@ services:
     env_file: .env
     environment:
       - TZ=America/Sao_Paulo
+      # Sobrescreve a URL da Evolution API para usar o nome do serviço Docker
+      - EVOLUTION_API_URL=http://evolution-api:8080
     depends_on:
       - evolution-api
     restart: unless-stopped
@@ -23,7 +25,7 @@ services:
     ports:
       - "8088:8080"
     env_file:
-      - .en
+      - .env
     volumes:
       - evolution_instancesv2:/evolution/instances
     depends_on:
@@ -33,11 +35,22 @@ services:
       - app_network
 
     environment:
-      - CONFIG_SESSION_PHONE_VERSION=2.3000.1029362725
+      # Autenticação da API - usa a mesma chave do backend
+      - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
+      # Versão do WhatsApp Web atualizada - verificar em https://web.whatsapp.com/check-update?version=0&platform=web
+      - CONFIG_SESSION_PHONE_VERSION=2.3000.1030444778
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_REDIS_ENABLED=true
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - CACHE_REDIS_PREFIX_KEY=evolution
+      - DATABASE_ENABLED=true
+      - DATABASE_PROVIDER=postgresql
+      - DATABASE_CONNECTION_URI=postgresql://${POSTGRES_USER_EVO}:${POSTGRES_PASSWORD_EVO}@postgresql-evo:5432/${POSTGRES_DB_EVO}
+      - DATABASE_SAVE_DATA_INSTANCE=true
+      - DATABASE_SAVE_DATA_NEW_MESSAGE=true
+      - DATABASE_SAVE_MESSAGE_UPDATE=true
+      - DATABASE_SAVE_DATA_CONTACTS=true
+      - DATABASE_SAVE_DATA_CHATS=true
 
   postgresql-evo:
     image: postgres:14-alpine
@@ -56,7 +69,7 @@ services:
     image: redis:latest
     container_name: redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes", "--port", "6379", "--requirepass", "${REDIS_PASSWORD}"]
+    command: ["redis-server", "--appendonly", "yes", "--port", "6379"]
     volumes:
       - redis_data:/data
     networks:

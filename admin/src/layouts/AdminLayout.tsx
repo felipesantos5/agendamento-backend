@@ -361,7 +361,7 @@ export function AdminLayout() {
           )}
         </div>
       </div>
-      <nav className="flex flex-col flex-grow px-3 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-neutral-700">
+      <nav className="flex flex-col flex-grow px-3 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-neutral-700">
         {visibleSections.map((section, sectionIndex) => (
           <div key={section.title}>
             {/* Separador visual entre seções */}
@@ -387,7 +387,10 @@ export function AdminLayout() {
                         ? "bg-rose-600 text-white shadow-lg"
                         : "text-gray-300 hover:bg-zinc-800 hover:text-white hover:shadow-md"
                       }`}
-                    onClick={() => setIsMobileSidebarOpen(false)}
+                    onClick={(e) => {
+                      e.currentTarget.blur();
+                      setIsMobileSidebarOpen(false);
+                    }}
                   >
                     {item.icon}
                     {item.label}

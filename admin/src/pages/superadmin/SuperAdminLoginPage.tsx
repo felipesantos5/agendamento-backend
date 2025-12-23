@@ -48,9 +48,6 @@ export function SuperAdminLoginPage() {
       <Card className="w-full max-w-sm bg-slate-800 border-slate-700">
         <CardHeader>
           <CardTitle className="text-white">Login</CardTitle>
-          <CardDescription className="text-slate-400">
-            Digite a senha de acesso root
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -62,7 +59,7 @@ export function SuperAdminLoginPage() {
                 id="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Digite a senha root"
+                placeholder="Digite a senha"
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
                 required
               />

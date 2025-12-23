@@ -467,9 +467,17 @@ export function MyBookingsPage() {
                             </p>
                             <p className="text-xs text-gray-500">
                               {format(new Date(booking.time), "dd/MM/yy 'às' HH:mm", { locale: ptBR })}
+                              {booking.barber?.name && ` • ${booking.barber.name}`}
                             </p>
                           </div>
-                          <Badge className={`${statusInfo.className} border text-xs`}>{statusInfo.text}</Badge>
+                          <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                            <Badge className={`${statusInfo.className} border text-xs`}>{statusInfo.text}</Badge>
+                            {booking.service?.price != null && (
+                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                R$ {booking.service.price.toFixed(2).replace(".", ",")}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
