@@ -101,9 +101,6 @@ app.use(express.json());
 app.use(express.static("public"));
 
 app.use("/api", healthcheckRoutes);
-// ✅ Servir arquivos estáticos da pasta 'public'
-// Se app.js está em src/ e public/ está na raiz do backend/
-app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
 
 // --- Montando as Rotas ---
 app.use("/barbershops", barbershopRoutes);
