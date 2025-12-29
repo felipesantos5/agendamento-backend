@@ -280,17 +280,19 @@ expireSubscriptions(); // Executa uma vez ao iniciar o servidor
 // Função para verificar e manter conexões WhatsApp ativas
 const checkWhatsAppConnections = async () => {
   try {
-    // Busca todas as barbearias com instância WhatsApp configurada
+    // Busca todas as barbearias com instância WhatsApp configurada E que estejam com status conectado
+    // Isso evita ficar verificando instâncias que sabemos que não existem
     const barbershops = await Barbershop.find({
       "whatsappConfig.instanceName": { $ne: null },
       "whatsappConfig.enabled": true,
+      "whatsappConfig.connectionStatus": "connected", // Só verifica instâncias que estão conectadas
     });
 
     if (barbershops.length === 0) {
       return;
     }
 
-    console.log(`[WhatsApp Monitor] Verificando ${barbershops.length} instância(s)...`);
+    console.log(`[WhatsApp Monitor] Verificando ${barbershops.length} instância(s) conectada(s)...`);
 
     for (const barbershop of barbershops) {
       try {
@@ -307,15 +309,12 @@ const checkWhatsAppConnections = async () => {
           barbershop.whatsappConfig.connectedNumber = connectedNumber;
         }
 
-        // Se estava conectado e agora está desconectado, tenta reiniciar
+        // Se estava conectado e agora está desconectado
         if (previousStatus === "connected" && status === "disconnected") {
-          console.log(`[WhatsApp Monitor] Instância ${instanceName} desconectou. Tentando reiniciar...`);
-          try {
-            await restartInstance(instanceName);
-            console.log(`[WhatsApp Monitor] Instância ${instanceName} reiniciada com sucesso`);
-          } catch (restartError) {
-            console.error(`[WhatsApp Monitor] Erro ao reiniciar ${instanceName}:`, restartError.message);
-          }
+          console.log(`[WhatsApp Monitor] Instância ${instanceName} desconectou.`);
+          // Limpa a configuração da instância para forçar uso do fallback
+          barbershop.whatsappConfig.connectedNumber = null;
+          console.log(`[WhatsApp Monitor] Status atualizado para 'disconnected'. Mensagens usarão instância padrão.`);
         }
 
         // Se está conectada, reconfigura webhook para garantir que está ativo
@@ -333,6 +332,15 @@ const checkWhatsAppConnections = async () => {
         await delay(1000);
       } catch (instanceError) {
         console.error(`[WhatsApp Monitor] Erro ao verificar instância ${barbershop.whatsappConfig?.instanceName}:`, instanceError.message);
+
+        // Se o erro for que a instância não existe, atualiza o status
+        if (instanceError.message.includes("não existe") || instanceError.message.includes("not exist")) {
+          console.log(`[WhatsApp Monitor] Instância ${barbershop.whatsappConfig?.instanceName} não existe mais. Atualizando status...`);
+          barbershop.whatsappConfig.connectionStatus = "disconnected";
+          barbershop.whatsappConfig.connectedNumber = null;
+          barbershop.whatsappConfig.lastCheckedAt = new Date();
+          await barbershop.save();
+        }
       }
     }
   } catch (error) {

@@ -250,15 +250,21 @@ export async function getConnectionStatus(instanceName) {
       instance: data,
     };
   } catch (error) {
-    console.error("[WhatsApp] Erro ao verificar status:", error.response?.data || error.message);
-
-    // Se o erro for 404, a instância não existe
+    // Se o erro for 404, a instância não existe - apenas loga em nível de info
     if (error.response?.status === 404) {
+      console.log(`[WhatsApp] Instância ${instanceName} não existe (404)`);
       return {
         status: "disconnected",
         connectedNumber: null,
       };
     }
+
+    // Para outros erros, loga como erro
+    console.error("[WhatsApp] Erro ao verificar status:", {
+      status: error.response?.status,
+      error: error.response?.data?.error || error.message,
+      response: error.response?.data
+    });
 
     throw new Error(`Falha ao verificar status: ${error.response?.data?.message || error.message}`);
   }

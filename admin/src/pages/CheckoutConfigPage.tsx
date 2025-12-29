@@ -110,7 +110,7 @@ export const CheckoutConfigPage = () => {
       <form onSubmit={handleSave}>
         <CardHeader>
           <CardTitle>Configurações de Checkout</CardTitle>
-          <CardDescription>
+          <CardDescription className="mb-2">
             Configure os pagamentos online com Mercado Pago para permitir que seus clientes paguem pelos agendamentos diretamente no site.
           </CardDescription>
         </CardHeader>
