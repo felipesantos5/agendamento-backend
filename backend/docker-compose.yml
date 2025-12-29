@@ -11,9 +11,9 @@ services:
     environment:
       - TZ=America/Sao_Paulo
       # Sobrescreve a URL da Evolution API para usar o nome do serviço Docker
-      - EVOLUTION_API_URL=http://evolution-api:8080
+      # - EVOLUTION_API_URL=http://evolution-api:8080
       # URL que a Evolution API usará para chamar o webhook (acessível do container)
-      - WEBHOOK_BASE_URL=http://backend:3001
+      # - WEBHOOK_BASE_URL=http://backend:3001
     depends_on:
       - evolution-api
     restart: unless-stopped
