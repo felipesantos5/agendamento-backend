@@ -2,7 +2,7 @@ process.on("uncaughtException", (error) => {
   console.error("🔥 ERRO NÃO TRATADO (Uncaught Exception):", error);
   // Em produção, é recomendado reiniciar a aplicação após um erro desses,
   // pois o estado dela pode estar corrompido.
-  // process.exit(1);
+  process.exit(1);
 });
 
 process.on("unhandledRejection", (reason, promise) => {
@@ -62,7 +62,7 @@ const __dirname = path.dirname(__filename);
 // Importe seu middleware
 // import { setBarbershopContext } from './middlewares/barbershopContext.js'; // Se for usar globalmente
 
-connectDB();
+// connectDB();
 
 const app = express();
 
@@ -152,6 +152,19 @@ app.use("/api/superadmin", protectSuperAdmin, superAdminRoutes);
 // });
 
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
-  console.log(`API rodando em http://localhost:${PORT}`);
-});
+
+const startServer = async () => {
+  try {
+    await connectDB(); // Espera o banco conectar DE VERDADE
+    
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+      console.log(`✅ API rodando e pronta em http://localhost:${PORT}`);
+    });
+  } catch (error) {
+    console.error("❌ Falha crítica ao iniciar:", error);
+    process.exit(1); // Mata o container para o Docker reiniciar
+  }
+};
+
+startServer();

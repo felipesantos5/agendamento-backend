@@ -14,15 +14,28 @@ const api = axios.create({
     "Content-Type": "application/json",
     apikey: EVOLUTION_API_KEY,
   },
+  timeout: 30000, // 30 segundos de timeout padrão
 });
 
 /**
  * Formata o QR code base64 para exibição
- * @param {string} base64 - String base64 do QR code
+ * @param {string|object} base64 - String base64 do QR code ou objeto com base64
  * @returns {string} - Base64 formatado com prefixo data:image
  */
 function formatQRCodeBase64(base64) {
   if (!base64) return null;
+
+  // Se for um objeto, tenta extrair a string base64
+  if (typeof base64 === 'object') {
+    console.log('[WhatsApp] QR code veio como objeto:', JSON.stringify(base64, null, 2));
+    base64 = base64.base64 || base64.code || base64.qrcode || JSON.stringify(base64);
+  }
+
+  // Garante que agora é uma string
+  if (typeof base64 !== 'string') {
+    console.error('[WhatsApp] QR code não é string nem objeto válido:', typeof base64);
+    return null;
+  }
 
   // Se já tem o prefixo data:image, retorna como está
   if (base64.startsWith("data:image")) {
@@ -79,8 +92,25 @@ export async function createInstance(barbershopId) {
 
     if (createResponse.data?.qrcode) {
       const qrcodeData = createResponse.data.qrcode;
-      qrcode = formatQRCodeBase64(qrcodeData.base64 || qrcodeData);
-      pairingCode = qrcodeData.pairingCode || qrcodeData.code || null;
+      console.log('[WhatsApp] Tipo do qrcodeData:', typeof qrcodeData);
+
+      // Tenta extrair base64 de diferentes estruturas possíveis
+      let base64String = null;
+
+      if (typeof qrcodeData === 'string') {
+        // Se já veio como string
+        base64String = qrcodeData;
+      } else if (typeof qrcodeData === 'object') {
+        // Se veio como objeto, tenta diferentes propriedades
+        base64String = qrcodeData.base64 || qrcodeData.code || qrcodeData.qrcode;
+      }
+
+      qrcode = formatQRCodeBase64(base64String);
+
+      // Extrai pairing code se disponível
+      if (typeof qrcodeData === 'object') {
+        pairingCode = qrcodeData.pairingCode || qrcodeData.code || null;
+      }
     }
 
     // Se não veio QR code na criação, busca via endpoint connect
@@ -116,8 +146,27 @@ export async function createInstance(barbershopId) {
       data: createResponse.data,
     };
   } catch (error) {
-    console.error("[WhatsApp] Erro ao criar instância:", error.response?.data || error.message);
-    throw new Error(`Falha ao criar instância: ${error.response?.data?.message || error.message}`);
+    console.error("[WhatsApp] Erro ao criar instância:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      code: error.code
+    });
+
+    let errorMessage = error.message;
+
+    // Tenta extrair mensagem mais descritiva do erro
+    if (error.response?.data) {
+      if (typeof error.response.data === 'object') {
+        errorMessage = error.response.data.message ||
+                      error.response.data.error ||
+                      JSON.stringify(error.response.data);
+      } else {
+        errorMessage = error.response.data;
+      }
+    }
+
+    throw new Error(`Falha ao criar instância: ${errorMessage}`);
   }
 }
 
@@ -137,18 +186,33 @@ export async function getQRCode(instanceName) {
     // Na Evolution API v2, o QR code pode vir em diferentes formatos:
     // 1. { base64: "...", code: "...", pairingCode: "..." }
     // 2. { qrcode: { base64: "...", code: "..." } }
+    // 3. { qrcode: "string_base64" }
+    // 4. "string_base64" direto
     const data = response.data;
 
     let base64 = null;
     let pairingCode = null;
 
+    console.log('[WhatsApp] Estrutura da resposta do connect:', {
+      hasBase64: !!data?.base64,
+      hasQrcode: !!data?.qrcode,
+      qrcodeType: typeof data?.qrcode,
+      dataType: typeof data
+    });
+
     // Tenta extrair de diferentes estruturas possíveis
     if (data?.base64) {
       base64 = data.base64;
       pairingCode = data.pairingCode || data.code;
-    } else if (data?.qrcode?.base64) {
-      base64 = data.qrcode.base64;
-      pairingCode = data.qrcode.pairingCode || data.qrcode.code;
+    } else if (data?.qrcode) {
+      // qrcode pode ser string ou objeto
+      if (typeof data.qrcode === 'string') {
+        base64 = data.qrcode;
+        pairingCode = data.pairingCode || data.code;
+      } else if (typeof data.qrcode === 'object') {
+        base64 = data.qrcode.base64 || data.qrcode.code || data.qrcode.qrcode;
+        pairingCode = data.qrcode.pairingCode || data.qrcode.code;
+      }
     } else if (typeof data === "string") {
       base64 = data;
     }

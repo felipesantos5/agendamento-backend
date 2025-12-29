@@ -45,7 +45,23 @@ export async function sendWhatsAppConfirmation(customerPhone, message, instanceN
   };
 
   try {
-    const response = await axios.post(url, payload, { headers });
+    // Aumenta timeout para 30 segundos e adiciona retry
+    const response = await axios.post(url, payload, {
+      headers,
+      timeout: 30000, // 30 segundos
+      validateStatus: (status) => status < 500, // Não joga exceção para erros 4xx
+    });
+
+    // Se retornou erro 4xx
+    if (response.status >= 400) {
+      console.error(`[WhatsApp] Erro ${response.status} ao enviar mensagem:`, response.data);
+      return {
+        success: false,
+        error: response.data?.message || response.data?.error || "Erro na API",
+        status: response.status,
+      };
+    }
+
     console.log(`[WhatsApp] Mensagem enviada com sucesso via instância: ${INSTANCE_NAME}`);
     return {
       success: true,
@@ -58,8 +74,11 @@ export async function sendWhatsAppConfirmation(customerPhone, message, instanceN
     if (error.response) {
       console.error(
         "Detalhes do Erro:",
-        error.response.data,
-        error.response.status
+        {
+          status: error.response.status,
+          error: error.response.data?.error || error.response.statusText,
+          response: error.response.data
+        }
       );
 
       if (error.response.status === 400) {
@@ -75,12 +94,25 @@ export async function sendWhatsAppConfirmation(customerPhone, message, instanceN
         error:
           error.response?.data?.message ||
           error.response?.data?.error ||
+          error.response?.statusText ||
           "Erro na API",
         status: error.response.status,
+      };
+    } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      // Erro de timeout
+      console.error("⏱️ Timeout ao enviar mensagem. A Evolution API demorou mais de 30 segundos para responder.");
+      console.error("- Instância:", INSTANCE_NAME);
+      console.error("- URL:", url);
+      return {
+        success: false,
+        error: "Timeout ao enviar mensagem (Evolution API não respondeu em 30s)",
+        status: 408, // Request Timeout
+        isTimeout: true,
       };
     } else {
       // Se não houver 'error.response', é um erro de conexão ou de configuração
       console.error("Erro de Conexão ou Configuração:", error.message);
+      console.error("Código do erro:", error.code);
       return {
         success: false,
         error: error.message,
@@ -114,8 +146,8 @@ export async function sendWhatsAppForBarbershop(barbershopId, customerPhone, mes
       console.log(`[WhatsApp] Tentando enviar via instância própria: ${instanceName}`);
       result = await sendWhatsAppConfirmation(customerPhone, message, instanceName);
 
-      // Se falhou por instância não existir (404) ou erro de conexão, faz fallback
-      if (!result.success && (result.status === 404 || result.status === 0)) {
+      // Se falhou por instância não existir (404), erro de conexão (0) ou timeout (408), faz fallback
+      if (!result.success && (result.status === 404 || result.status === 0 || result.status === 408 || result.isTimeout)) {
         console.log(`[WhatsApp] Instância própria falhou (${result.error}), usando fallback para instância padrão`);
 
         // Atualiza status da barbearia para disconnected
