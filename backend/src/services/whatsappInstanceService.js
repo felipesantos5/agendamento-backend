@@ -14,6 +14,7 @@ const api = axios.create({
     "Content-Type": "application/json",
     apikey: EVOLUTION_API_KEY,
   },
+  timeout: 30000, // 30 segundos de timeout padrão
 });
 
 /**
