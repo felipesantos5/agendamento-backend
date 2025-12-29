@@ -3,12 +3,11 @@ import { useNavigate } from "react-router-dom";
 import apiClient from "@/services/api";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { PriceFormater } from "@/helper/priceFormater";
 import { Spinner } from "@/components/ui/spinnerLoading";
 import { useCustomerAuth } from "@/contexts/CustomerAuthContext";
-import { Loader2, Store, Calendar, Infinity } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Loader2, Store } from "lucide-react";
 
 interface Plan {
   _id: string;
