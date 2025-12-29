@@ -8,6 +8,7 @@ import {
   disconnectInstance,
   deleteInstance,
   restartInstance,
+  setWebhook,
 } from "../services/whatsappInstanceService.js";
 import Barbershop from "../models/Barbershop.js";
 import { addClient, removeClient, sendEventToBarbershop } from "../services/sseService.js";
@@ -87,12 +88,24 @@ async function handleConnectionUpdate(barbershop, event, barbershopId) {
 
   if (newStatus === "connected" && connectedNumber) {
     barbershop.whatsappConfig.connectedNumber = connectedNumber;
-    if (!barbershop.whatsappConfig.connectedAt) {
+    const isFirstConnection = !barbershop.whatsappConfig.connectedAt;
+
+    if (isFirstConnection) {
       barbershop.whatsappConfig.connectedAt = new Date();
+
+      // Configura webhook apenas na PRIMEIRA conexão bem-sucedida
+      try {
+        console.log(`[WhatsApp Webhook] Primeira conexão detectada. Configurando webhook para: ${barbershop.whatsappConfig.instanceName}`);
+        await setWebhook(barbershop.whatsappConfig.instanceName);
+      } catch (webhookError) {
+        console.error(`[WhatsApp Webhook] Erro ao configurar webhook (não crítico):`, webhookError.message);
+      }
     }
   } else if (newStatus === "disconnected") {
-    // Limpa QR code cache quando desconecta
+    // Limpa QR code cache e reseta connectedAt quando desconecta
+    // Isso permite reconfigurar webhook na próxima conexão
     qrCodeCache.delete(barbershop.whatsappConfig.instanceName);
+    barbershop.whatsappConfig.connectedAt = null;
   }
 
   await barbershop.save();

@@ -12,6 +12,8 @@ services:
       - TZ=America/Sao_Paulo
       # Sobrescreve a URL da Evolution API para usar o nome do serviço Docker
       - EVOLUTION_API_URL=http://evolution-api:8080
+      # URL que a Evolution API usará para chamar o webhook (acessível do container)
+      - WEBHOOK_BASE_URL=http://backend:3001
     depends_on:
       - evolution-api
     restart: unless-stopped
@@ -37,8 +39,9 @@ services:
     environment:
       # Autenticação da API - usa a mesma chave do backend
       - AUTHENTICATION_API_KEY=${EVOLUTION_API_KEY}
-      # Versão do WhatsApp Web atualizada - verificar em https://web.whatsapp.com/check-update?version=0&platform=web
-      - CONFIG_SESSION_PHONE_VERSION=2.3000.1030444778
+      # Deixa vazio para auto-detect da versão mais recente do WhatsApp Web
+      # Se necessário especificar: use 2.3000.1020885143 (versão estável Jan 2025)
+      # - CONFIG_SESSION_PHONE_VERSION=2.3000.1020885143
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - CACHE_REDIS_ENABLED=true

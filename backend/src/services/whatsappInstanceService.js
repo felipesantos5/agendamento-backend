@@ -3,6 +3,9 @@ import axios from "axios";
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+// WEBHOOK_BASE_URL é usado pela Evolution API para chamar o webhook (precisa ser acessível do container)
+// Em Docker: http://backend:3001, em produção: https://api.barbeariagendamento.com.br
+const WEBHOOK_BASE_URL = process.env.WEBHOOK_BASE_URL || process.env.BACKEND_URL || "https://api.barbeariagendamento.com.br";
 const BACKEND_URL = process.env.BACKEND_URL || "https://api.barbeariagendamento.com.br";
 
 const api = axios.create({
@@ -53,35 +56,19 @@ export async function createInstance(barbershopId) {
       console.log(`[WhatsApp] Nenhuma instância anterior para deletar`);
     }
 
-    // URL do webhook para receber eventos da instância
-    const webhookUrl = `${BACKEND_URL}/api/whatsapp/webhook/${instanceName}`;
-    console.log(`[WhatsApp] Webhook URL: ${webhookUrl}`);
-
-    // Cria a nova instância com configuração de webhook
+    // Cria a nova instância SEM webhook primeiro
+    // O webhook será configurado DEPOIS da instância conectar
     const createResponse = await api.post("/instance/create", {
       instanceName,
       integration: "WHATSAPP-BAILEYS",
       qrcode: true,
+      // Configurações minimalistas para evitar conflitos
       rejectCall: false,
       groupsIgnore: true,
       alwaysOnline: false,
       readMessages: false,
       readStatus: false,
       syncFullHistory: false,
-      // Configuração de webhook para receber eventos em tempo real
-      webhook: {
-        url: webhookUrl,
-        byEvents: false,
-        base64: true,
-        headers: {
-          "x-api-key": EVOLUTION_API_KEY,
-        },
-        events: [
-          "CONNECTION_UPDATE",
-          "QRCODE_UPDATED",
-          "MESSAGES_UPSERT",
-        ],
-      },
     });
 
     console.log(`[WhatsApp] Resposta da criação:`, JSON.stringify(createResponse.data, null, 2));
@@ -98,14 +85,23 @@ export async function createInstance(barbershopId) {
 
     // Se não veio QR code na criação, busca via endpoint connect
     if (!qrcode) {
-      console.log(`[WhatsApp] QR code não veio na criação, buscando via connect...`);
+      console.log(`[WhatsApp] QR code não veio na criação, aguardando inicialização do Baileys...`);
 
-      // Aguarda um pouco antes de conectar
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Aguarda tempo suficiente para o Baileys inicializar (3-5 segundos)
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-      const connectResult = await getQRCode(instanceName);
-      qrcode = connectResult.qrcode;
-      pairingCode = connectResult.pairingCode;
+      try {
+        const connectResult = await getQRCode(instanceName);
+        qrcode = connectResult.qrcode;
+        pairingCode = connectResult.pairingCode;
+      } catch (qrError) {
+        console.error(`[WhatsApp] Erro ao obter QR code:`, qrError.message);
+        // Tenta uma segunda vez após mais 2 segundos
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const connectResult = await getQRCode(instanceName);
+        qrcode = connectResult.qrcode;
+        pairingCode = connectResult.pairingCode;
+      }
     }
 
     console.log(`[WhatsApp] Instância criada com sucesso: ${instanceName}`);
@@ -307,7 +303,7 @@ export async function disconnectInstance(instanceName) {
  */
 export async function setWebhook(instanceName) {
   try {
-    const webhookUrl = `${BACKEND_URL}/api/whatsapp/webhook/${instanceName}`;
+    const webhookUrl = `${WEBHOOK_BASE_URL}/api/whatsapp/webhook/${instanceName}`;
     console.log(`[WhatsApp] Configurando webhook para: ${instanceName}`);
     console.log(`[WhatsApp] Webhook URL: ${webhookUrl}`);
 
