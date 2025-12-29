@@ -17,6 +17,7 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage.tsx";
 import { AbsencesPage } from "./pages/folga.tsx";
 import { NewBookingPage } from "./pages/NewBookingPage.tsx";
 import { PlansPage } from "./pages/PlansPage.tsx";
+import { SubscriptionsPage } from "./pages/SubscriptionsPage.tsx";
 import { CustomersPage } from "./pages/CustomersPage.tsx";
 import { AgendamentosList } from "./pages/agendamentosList.tsx";
 import { ProductManagement } from "./pages/Products.tsx";
@@ -65,6 +66,7 @@ export default function App() {
               <Route path="servicos" element={<ServicesPage />} />
               <Route path="funcionarios" element={<BarberPage />} />
               <Route path="planos" element={<PlansPage />} />
+              <Route path="assinaturas" element={<SubscriptionsPage />} />
               <Route path="produtos" element={<ProductManagement />} />
               <Route path="recorrencia" element={<RecurrencePage />} />
               <Route path="configuracoes/whatsapp" element={<WhatsAppConfigPage />} />

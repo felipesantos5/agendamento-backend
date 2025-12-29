@@ -169,7 +169,7 @@ export function Loja() {
 
           {activeTab === "avaliacoes" && barbershop && <ReviewsPane barbershopId={barbershop._id} />}
 
-          {activeTab === "planos" && barbershop && <PlansPane barbershopId={barbershop._id} barbershopSlug={barbershop.slug} />}
+          {activeTab === "planos" && barbershop && <PlansPane barbershopId={barbershop._id} barbershopSlug={barbershop.slug} paymentsEnabled={barbershop.paymentsEnabled} />}
 
           {activeTab === "products" && <CustomerProductsPage />}
         </main>

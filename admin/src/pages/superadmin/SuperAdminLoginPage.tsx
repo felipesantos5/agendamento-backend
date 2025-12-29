@@ -2,10 +2,9 @@ import { useState, FormEvent } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useSuperAdminAuth } from "@/contexts/SuperAdminAuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
 
 export function SuperAdminLoginPage() {

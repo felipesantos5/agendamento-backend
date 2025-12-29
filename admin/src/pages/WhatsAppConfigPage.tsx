@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useOutletContext } from "react-router-dom";
 import { toast } from "sonner";
 import apiClient from "@/services/api";
@@ -17,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Loader2, MessageSquare, X, CheckCircle2, AlertCircle, Clock, RefreshCw } from "lucide-react";
+import { Loader2, MessageSquare, X, CheckCircle2, AlertCircle, Clock, RefreshCw, Timer } from "lucide-react";
 import { AdminOutletContext } from "@/types/AdminOutletContext";
 
 interface WhatsAppStatus {
@@ -29,6 +29,8 @@ interface WhatsAppStatus {
   lastCheckedAt?: string;
 }
 
+const QR_CODE_EXPIRY_TIME = 45; // QR code expira em ~45 segundos
+
 export const WhatsAppConfigPage = () => {
   const { barbershopId } = useOutletContext<AdminOutletContext>();
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus | null>(null);
@@ -39,9 +41,40 @@ export const WhatsAppConfigPage = () => {
   const [isRefreshingQR, setIsRefreshingQR] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
   const [showDisconnectDialog, setShowDisconnectDialog] = useState(false);
+  const [qrCodeTimer, setQrCodeTimer] = useState<number>(QR_CODE_EXPIRY_TIME);
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const pollingStartTimeRef = useRef<number>(0);
-  const MAX_POLLING_TIME = 120000; // 2 minutos
+  const qrTimerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
+  const MAX_POLLING_TIME = 180000; // 3 minutos
+
+  // Inicia o timer do QR code
+  const startQRTimer = useCallback(() => {
+    setQrCodeTimer(QR_CODE_EXPIRY_TIME);
+
+    if (qrTimerIntervalRef.current) {
+      clearInterval(qrTimerIntervalRef.current);
+    }
+
+    qrTimerIntervalRef.current = setInterval(() => {
+      setQrCodeTimer((prev) => {
+        if (prev <= 1) {
+          // QR code expirou, tenta renovar automaticamente
+          handleRefreshQRCode();
+          return QR_CODE_EXPIRY_TIME;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, []);
+
+  // Para o timer do QR code
+  const stopQRTimer = useCallback(() => {
+    if (qrTimerIntervalRef.current) {
+      clearInterval(qrTimerIntervalRef.current);
+      qrTimerIntervalRef.current = null;
+    }
+  }, []);
 
   // Busca o status inicial
   const fetchWhatsAppStatus = async () => {
@@ -83,9 +116,10 @@ export const WhatsAppConfigPage = () => {
 
         setWhatsappStatus(status);
 
-        // Se conectou, para o polling e fecha o modal
+        // Se conectou, para o polling, timer e fecha o modal
         if (status.status === "connected") {
           stopPolling();
+          stopQRTimer();
           setShowQRModal(false);
           toast.success(`WhatsApp conectado com sucesso! Número: ${status.connectedNumber}`);
         }
@@ -102,12 +136,16 @@ export const WhatsAppConfigPage = () => {
     }
   };
 
-  // Limpa o polling quando o componente desmonta
+  // Limpa timers e polling quando o componente desmonta
   useEffect(() => {
     return () => {
       stopPolling();
+      stopQRTimer();
+      if (eventSourceRef.current) {
+        eventSourceRef.current.close();
+      }
     };
-  }, []);
+  }, [stopQRTimer]);
 
   const handleConnect = async () => {
     setIsConnecting(true);
@@ -127,7 +165,8 @@ export const WhatsAppConfigPage = () => {
 
       toast.success("QR Code gerado! Escaneie com seu WhatsApp.");
 
-      // Inicia o polling para verificar quando conectar
+      // Inicia o timer do QR code e o polling
+      startQRTimer();
       startPolling();
     } catch (error: any) {
       console.error("Erro ao conectar WhatsApp:", error);
@@ -139,6 +178,9 @@ export const WhatsAppConfigPage = () => {
 
   // Função para renovar o QR Code quando expirar
   const handleRefreshQRCode = async () => {
+    // Evita múltiplas requisições simultâneas
+    if (isRefreshingQR) return;
+
     setIsRefreshingQR(true);
     try {
       const response = await apiClient.get(`/api/barbershops/${barbershopId}/whatsapp/qrcode`);
@@ -147,11 +189,21 @@ export const WhatsAppConfigPage = () => {
 
       if (response.data.qrcode) {
         setQrCode(response.data.qrcode);
+        // Reinicia o timer
+        setQrCodeTimer(QR_CODE_EXPIRY_TIME);
         toast.success("Novo QR Code gerado!");
       }
     } catch (error: any) {
       console.error("Erro ao renovar QR Code:", error);
-      toast.error(error.response?.data?.error || "Erro ao gerar novo QR Code");
+      // Se a instância já está conectada, para o timer e fecha o modal
+      if (error.response?.status === 400) {
+        stopQRTimer();
+        stopPolling();
+        setShowQRModal(false);
+        await fetchWhatsAppStatus();
+      } else {
+        toast.error(error.response?.data?.error || "Erro ao gerar novo QR Code");
+      }
     } finally {
       setIsRefreshingQR(false);
     }
@@ -178,8 +230,10 @@ export const WhatsAppConfigPage = () => {
 
   const handleCloseQRModal = () => {
     stopPolling();
+    stopQRTimer();
     setShowQRModal(false);
     setQrCode(null);
+    setQrCodeTimer(QR_CODE_EXPIRY_TIME);
   };
 
   if (isLoading) {
@@ -273,9 +327,6 @@ export const WhatsAppConfigPage = () => {
               </Button>
             ) : (
               <>
-                <Button onClick={fetchWhatsAppStatus} variant="outline" size="lg">
-                  Verificar Status
-                </Button>
                 <Button
                   variant="destructive"
                   size="lg"
@@ -302,13 +353,36 @@ export const WhatsAppConfigPage = () => {
           <div className="flex flex-col items-center gap-4 py-6">
             {qrCode ? (
               <>
-                <div className="p-4 bg-white rounded-lg border-4 border-gray-200">
+                <div className="p-4 bg-white rounded-lg border-4 border-gray-200 relative">
                   <img src={qrCode} alt="QR Code WhatsApp" className="w-64 h-64" />
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground animate-pulse">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Aguardando conexão...</span>
+
+                {/* Timer e barra de progresso */}
+                <div className="w-full max-w-xs">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Aguardando conexão...</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-sm font-medium">
+                      <Timer className="h-4 w-4" />
+                      <span className={qrCodeTimer <= 10 ? "text-red-500" : ""}>{qrCodeTimer}s</span>
+                    </div>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-1.5">
+                    <div
+                      className={`h-1.5 rounded-full transition-all duration-1000 ${qrCodeTimer <= 10 ? "bg-red-500" : "bg-green-500"
+                        }`}
+                      style={{ width: `${(qrCodeTimer / QR_CODE_EXPIRY_TIME) * 100}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground mt-1">
+                    {qrCodeTimer <= 10
+                      ? "QR Code expirando, será renovado automaticamente..."
+                      : "O QR Code será renovado automaticamente quando expirar"}
+                  </p>
                 </div>
+
                 <Button
                   variant="outline"
                   size="sm"
@@ -328,7 +402,8 @@ export const WhatsAppConfigPage = () => {
                     </>
                   )}
                 </Button>
-                <div className="text-xs text-center text-muted-foreground max-w-sm">
+
+                <div className="text-xs text-center text-muted-foreground max-w-sm mt-2">
                   <p>
                     <strong>Como escanear:</strong>
                   </p>

@@ -3,6 +3,7 @@ import axios from "axios";
 
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;
 const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY;
+const BACKEND_URL = process.env.BACKEND_URL || "https://api.barbeariagendamento.com.br";
 
 const api = axios.create({
   baseURL: EVOLUTION_API_URL,
@@ -52,17 +53,35 @@ export async function createInstance(barbershopId) {
       console.log(`[WhatsApp] Nenhuma instância anterior para deletar`);
     }
 
-    // Cria a nova instância
+    // URL do webhook para receber eventos da instância
+    const webhookUrl = `${BACKEND_URL}/api/whatsapp/webhook/${instanceName}`;
+    console.log(`[WhatsApp] Webhook URL: ${webhookUrl}`);
+
+    // Cria a nova instância com configuração de webhook
     const createResponse = await api.post("/instance/create", {
       instanceName,
       integration: "WHATSAPP-BAILEYS",
       qrcode: true,
       rejectCall: false,
-      groupsIgnore: false,
+      groupsIgnore: true,
       alwaysOnline: false,
       readMessages: false,
       readStatus: false,
       syncFullHistory: false,
+      // Configuração de webhook para receber eventos em tempo real
+      webhook: {
+        url: webhookUrl,
+        byEvents: false,
+        base64: true,
+        headers: {
+          "x-api-key": EVOLUTION_API_KEY,
+        },
+        events: [
+          "CONNECTION_UPDATE",
+          "QRCODE_UPDATED",
+          "MESSAGES_UPSERT",
+        ],
+      },
     });
 
     console.log(`[WhatsApp] Resposta da criação:`, JSON.stringify(createResponse.data, null, 2));
@@ -272,6 +291,70 @@ export async function disconnectInstance(instanceName) {
     }
 
     throw new Error(`Falha ao desconectar: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Configura ou atualiza o webhook de uma instância existente
+ * @param {string} instanceName - Nome da instância
+ * @returns {Promise<{message: string}>}
+ */
+export async function setWebhook(instanceName) {
+  try {
+    const webhookUrl = `${BACKEND_URL}/api/whatsapp/webhook/${instanceName}`;
+    console.log(`[WhatsApp] Configurando webhook para: ${instanceName}`);
+    console.log(`[WhatsApp] Webhook URL: ${webhookUrl}`);
+
+    const response = await api.post(`/webhook/set/${instanceName}`, {
+      enabled: true,
+      url: webhookUrl,
+      webhookByEvents: false,
+      webhookBase64: true,
+      events: [
+        "CONNECTION_UPDATE",
+        "QRCODE_UPDATED",
+        "MESSAGES_UPSERT",
+      ],
+    });
+
+    console.log(`[WhatsApp] Webhook configurado:`, JSON.stringify(response.data, null, 2));
+
+    return {
+      message: "Webhook configurado com sucesso",
+      data: response.data,
+    };
+  } catch (error) {
+    console.error("[WhatsApp] Erro ao configurar webhook:", error.response?.data || error.message);
+    throw new Error(`Falha ao configurar webhook: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+/**
+ * Reinicia uma instância (útil para reconexão)
+ * @param {string} instanceName - Nome da instância
+ * @returns {Promise<{message: string}>}
+ */
+export async function restartInstance(instanceName) {
+  try {
+    console.log(`[WhatsApp] Reiniciando instância: ${instanceName}`);
+
+    const response = await api.post(`/instance/restart/${instanceName}`);
+
+    console.log(`[WhatsApp] Instância reiniciada:`, JSON.stringify(response.data, null, 2));
+
+    return {
+      message: "Instância reiniciada com sucesso",
+      data: response.data,
+    };
+  } catch (error) {
+    console.error("[WhatsApp] Erro ao reiniciar instância:", error.response?.data || error.message);
+
+    // Se erro 404, a instância não existe
+    if (error.response?.status === 404) {
+      throw new Error("Instância não encontrada");
+    }
+
+    throw new Error(`Falha ao reiniciar: ${error.response?.data?.message || error.message}`);
   }
 }
 

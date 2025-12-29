@@ -17,7 +17,7 @@ export async function sendWhatsAppConfirmation(customerPhone, message, instanceN
 
   const cleanPhone = customerPhone.replace(/\D/g, "");
 
-  const url = `${EVOLUTION_API_URL}/message/sendText/${INSTANCE_NAME}`;
+  const url = `${EVOLUTION_API_URL}message/sendText/${INSTANCE_NAME}`;
 
   const payload = {
     number: `55${cleanPhone}`,

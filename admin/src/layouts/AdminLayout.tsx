@@ -20,6 +20,7 @@ import {
   Repeat,
   MessageSquare,
   AlertTriangle,
+  CreditCard,
 } from "lucide-react"; // Ícones de exemplo
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/services/api";
@@ -254,6 +255,12 @@ export function AdminLayout() {
           to: "planos",
           label: "Planos",
           icon: <Package className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+        {
+          to: "assinaturas",
+          label: "Assinaturas",
+          icon: <CreditCard className="mr-2 h-4 w-4" />,
           roles: ["admin"],
         },
       ],

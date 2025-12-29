@@ -109,6 +109,8 @@ app.use("/uploads", express.static(path.join(__dirname, "../public/uploads")));
 // --- Montando as Rotas ---
 app.use("/barbershops", barbershopRoutes);
 app.use("/api/barbershops", whatsappRoutes);
+// Webhook do WhatsApp Evolution API (rota separada sem autenticação)
+app.use("/api/whatsapp", whatsappRoutes);
 
 // O :barbershopId será acessível em barberRoutes via req.params.barbershopId se mergeParams=true
 app.use("/barbershops/:barbershopId/barbers", barberRoutes);
