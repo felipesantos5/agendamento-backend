@@ -7,9 +7,10 @@ import Service from "../models/Service.js";
 import BlockedDay from "../models/BlockedDay.js";
 import TimeBlock from "../models/TimeBlock.js";
 import Subscription from "../models/Subscription.js";
+import Plan from "../models/Plan.js";
 import mongoose from "mongoose";
 import { bookingSchema as BookingValidationSchema } from "../validations/bookingValidation.js";
-import { sendWhatsAppConfirmation } from "../services/evolutionWhatsapp.js";
+import { sendWhatsAppConfirmation, sendWhatsAppForBarbershop } from "../services/evolutionWhatsapp.js";
 import { formatBookingTime } from "../utils/formatBookingTime.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
@@ -80,25 +81,60 @@ router.post("/", appointmentLimiter, async (req, res) => {
     let activeSubscription = null;
 
     if (service.isPlanService && service.plan) {
+      // Busca o plano para verificar se tem limite mensal
+      const plan = await Plan.findById(service.plan);
+
+      // Busca assinatura ativa
       activeSubscription = await Subscription.findOne({
         customer: customer._id,
         plan: service.plan,
         barbershop: barbershopId,
         status: "active",
         endDate: { $gte: new Date() },
-        creditsRemaining: { $gt: 0 },
       });
 
-      if (activeSubscription) {
-        // Cliente tem créditos!
-        bookingPayload.paymentStatus = "plan_credit";
-        bookingPayload.status = "confirmed"; // Já entra como confirmado
-        bookingPayload.subscriptionUsed = activeSubscription._id;
-        bookingPayload.isPaymentMandatory = false;
+      if (activeSubscription && plan) {
+        // Verifica se tem créditos disponíveis
+        let hasCredits = false;
+
+        if (plan.isMonthlyLimit) {
+          // Limite MENSAL: verifica se precisa resetar o contador do mês
+          const now = new Date();
+          const currentMonthStart = activeSubscription.currentMonthStart ? new Date(activeSubscription.currentMonthStart) : now;
+
+          // Verifica se mudou o mês (compara ano e mês)
+          const isNewMonth = now.getMonth() !== currentMonthStart.getMonth() || now.getFullYear() !== currentMonthStart.getFullYear();
+
+          if (isNewMonth) {
+            // Reseta o contador mensal
+            activeSubscription.monthlyCreditsUsed = 0;
+            activeSubscription.currentMonthStart = now;
+          }
+
+          // Verifica se tem créditos disponíveis no mês
+          hasCredits = activeSubscription.monthlyCreditsUsed < plan.totalCredits;
+        } else {
+          // Limite TOTAL: usa o creditsRemaining como antes
+          hasCredits = activeSubscription.creditsRemaining > 0;
+        }
+
+        if (hasCredits) {
+          // Cliente tem créditos!
+          bookingPayload.paymentStatus = "plan_credit";
+          bookingPayload.status = "confirmed"; // Já entra como confirmado
+          bookingPayload.subscriptionUsed = activeSubscription._id;
+          bookingPayload.isPaymentMandatory = false;
+        } else {
+          // Cliente não tem créditos
+          const errorMsg = plan.isMonthlyLimit
+            ? "Você já utilizou todos os seus créditos deste mês. Aguarde o próximo mês para novos agendamentos."
+            : "Este serviço é exclusivo para assinantes do plano e você não possui créditos válidos.";
+          return res.status(403).json({ error: errorMsg });
+        }
       } else {
-        // Cliente não tem créditos, e o serviço é SÓ de plano
+        // Cliente não tem assinatura ativa
         return res.status(403).json({
-          error: "Este serviço é exclusivo para assinantes do plano e você não possui créditos válidos.",
+          error: "Este serviço é exclusivo para assinantes do plano e você não possui uma assinatura ativa.",
         });
       }
     } else {
@@ -118,10 +154,19 @@ router.post("/", appointmentLimiter, async (req, res) => {
     const createdBooking = await Booking.create(bookingPayload);
 
     if (activeSubscription) {
-      activeSubscription.creditsRemaining -= 1;
-      // Opcional: se os créditos chegarem a 0, poderia mudar o status
-      if (activeSubscription.creditsRemaining === 0) {
-        activeSubscription.status = "expired";
+      // Busca o plano para saber se é limite mensal
+      const plan = await Plan.findById(activeSubscription.plan);
+
+      if (plan && plan.isMonthlyLimit) {
+        // Limite MENSAL: incrementa o contador mensal
+        activeSubscription.monthlyCreditsUsed += 1;
+      } else {
+        // Limite TOTAL: decrementa o creditsRemaining
+        activeSubscription.creditsRemaining -= 1;
+        // Se os créditos totais chegarem a 0, expira a assinatura
+        if (activeSubscription.creditsRemaining === 0) {
+          activeSubscription.status = "expired";
+        }
       }
       await activeSubscription.save();
     }
@@ -202,7 +247,7 @@ router.post("/", appointmentLimiter, async (req, res) => {
       const whatsappLink = `https://wa.me/55${cleanPhoneNumber}`;
       const locationLink = `https://barbeariagendamento.com.br/localizacao/${barbershop._id}`;
       const message = `Olá, ${customer.name}! Seu agendamento na ${barbershop.name} foi confirmado com sucesso para ${formattedTime} ✅\n\nPara mais informações, entre em contato com a barbearia:\n${whatsappLink}\n\n📍 Ver no mapa:\n${locationLink}\n\nNosso time te aguarda! 💈`;
-      sendWhatsAppConfirmation(customer.phone, message);
+      sendWhatsAppForBarbershop(barbershopId, customer.phone, message);
 
       res.status(201).json(createdBooking);
     }
@@ -302,7 +347,7 @@ router.put(
 
         const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate}.`;
 
-        sendWhatsAppConfirmation(booking.customer.phone, message);
+        sendWhatsAppForBarbershop(barbershopId, booking.customer.phone, message);
       }
 
       // --- LÓGICA DE FIDELIDADE (CORRIGIDA) ---
@@ -337,7 +382,7 @@ router.put(
             // Notifica o cliente
             const rewardMsg = barbershop.loyaltyProgram.rewardDescription;
             const message = `Parabéns, ${customer.name}! 🎁\n\nVocê completou nosso cartão fidelidade e acaba de ganhar: *${rewardMsg}*!\n\nUse no seu próximo agendamento na ${barbershop.name}. 💈`;
-            sendWhatsAppConfirmation(customer.phone, message);
+            sendWhatsAppForBarbershop(barbershopId, customer.phone, message);
           }
 
           await customer.save(); // Salva o cliente com o array loyaltyData atualizado
@@ -716,7 +761,7 @@ router.delete("/:bookingId", async (req, res) => {
 
     const message = `Olá ${booking.customer.name},\nInformamos que seu agendamento foi cancelado na ${barbershop.name} para o dia ${formattedDate} foi cancelado.`;
 
-    sendWhatsAppConfirmation(booking.customer.phone, message);
+    sendWhatsAppForBarbershop(barbershopId, booking.customer.phone, message);
 
     res.status(200).json({ message: "Agendamento excluído com sucesso." });
   } catch (error) {
@@ -831,7 +876,7 @@ router.patch("/:bookingId/reschedule", async (req, res) => {
       locale: ptBR,
     });
     const message = `Olá, ${customer.name}! Seu agendamento foi reagendado para ${formattedNewTime}. Até lá! 💈`;
-    sendWhatsAppConfirmation(customer.phone, message); // Reutiliza sua função de notificação
+    sendWhatsAppForBarbershop(barbershopId, customer.phone, message); // Reutiliza sua função de notificação
 
     res.status(200).json({
       success: true,

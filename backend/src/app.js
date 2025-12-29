@@ -43,6 +43,7 @@ import leadRoutes from "./routes/form/lead.routes.js";
 import authSuperAdminRoutes from "./routes/authSuperAdminRoutes.js";
 import superAdminRoutes from "./routes/superAdminRoutes.js";
 import subscriptionPaymentRoutes from "./routes/subscriptionPaymentRoutes.js";
+import whatsappRoutes from "./routes/whatsappRoutes.js";
 
 import { protectAdmin, checkAccountStatus } from "./middleware/authAdminMiddleware.js";
 import { protectSuperAdmin } from "./middleware/authSuperAdminMiddleware.js";
@@ -104,6 +105,9 @@ app.use("/api", healthcheckRoutes);
 
 // --- Montando as Rotas ---
 app.use("/barbershops", barbershopRoutes);
+app.use("/api/barbershops", whatsappRoutes);
+// Webhook do WhatsApp Evolution API (rota separada sem autenticação)
+app.use("/api/whatsapp", whatsappRoutes);
 
 // O :barbershopId será acessível em barberRoutes via req.params.barbershopId se mergeParams=true
 app.use("/barbershops/:barbershopId/barbers", barberRoutes);

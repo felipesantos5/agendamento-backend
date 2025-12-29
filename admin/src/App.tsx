@@ -17,12 +17,15 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage.tsx";
 import { AbsencesPage } from "./pages/folga.tsx";
 import { NewBookingPage } from "./pages/NewBookingPage.tsx";
 import { PlansPage } from "./pages/PlansPage.tsx";
+import { SubscriptionsPage } from "./pages/SubscriptionsPage.tsx";
 import { CustomersPage } from "./pages/CustomersPage.tsx";
 import { AgendamentosList } from "./pages/agendamentosList.tsx";
 import { ProductManagement } from "./pages/Products.tsx";
 import DashboardMetricsPage from "./pages/DashboardMetricsPage.tsx";
 import { BarberPerformancePage } from "./pages/BarberPerformancePage.tsx";
 import { RecurrencePage } from "./pages/RecurrencePage.tsx";
+import { WhatsAppConfigPage } from "./pages/WhatsAppConfigPage.tsx";
+import { CheckoutConfigPage } from "./pages/CheckoutConfigPage.tsx";
 import { SuperAdminLoginPage } from "./pages/superadmin/SuperAdminLoginPage";
 import { SuperAdminDashboardPage } from "./pages/superadmin/SuperAdminDashboardPage";
 
@@ -64,8 +67,11 @@ export default function App() {
               <Route path="servicos" element={<ServicesPage />} />
               <Route path="funcionarios" element={<BarberPage />} />
               <Route path="planos" element={<PlansPage />} />
+              <Route path="assinaturas" element={<SubscriptionsPage />} />
               <Route path="produtos" element={<ProductManagement />} />
               <Route path="recorrencia" element={<RecurrencePage />} />
+              <Route path="configuracoes/checkout" element={<CheckoutConfigPage />} />
+              <Route path="configuracoes/whatsapp" element={<WhatsAppConfigPage />} />
             </Route>
 
             <Route path="*" element={<>nao encontrado</>} />

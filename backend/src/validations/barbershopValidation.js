@@ -47,6 +47,15 @@ export const BarbershopSchema = z.object({
       rewardDescription: z.string().trim().optional(),
     })
     .optional(),
+  // whatsapp
+  whatsappConfig: z
+    .object({
+      enabled: z.boolean().optional(),
+      instanceName: z.string().nullable().optional(),
+      connectionStatus: z.enum(["disconnected", "connecting", "connected"]).optional(),
+      connectedNumber: z.string().nullable().optional(),
+    })
+    .optional(),
 });
 
 export const BarbershopCreationSchema = BarbershopSchema.extend({

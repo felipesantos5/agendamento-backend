@@ -2,9 +2,9 @@ import { useState, FormEvent } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useSuperAdminAuth } from "@/contexts/SuperAdminAuthContext";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { ShieldCheck } from "lucide-react";
 
 export function SuperAdminLoginPage() {
@@ -47,9 +47,6 @@ export function SuperAdminLoginPage() {
       <Card className="w-full max-w-sm bg-slate-800 border-slate-700">
         <CardHeader>
           <CardTitle className="text-white">Login</CardTitle>
-          <CardDescription className="text-slate-400">
-            Digite a senha de acesso root
-          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -57,12 +54,11 @@ export function SuperAdminLoginPage() {
               <Label htmlFor="password" className="text-slate-200">
                 Senha
               </Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Digite a senha root"
+                placeholder="Digite a senha"
                 className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-500"
                 required
               />

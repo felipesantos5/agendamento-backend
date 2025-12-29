@@ -1,9 +1,11 @@
 import express from "express";
+import mongoose from "mongoose";
 import { MercadoPagoConfig, PreApproval } from "mercadopago";
 import Subscription from "../models/Subscription.js";
 import Plan from "../models/Plan.js";
 import Barbershop from "../models/Barbershop.js";
 import Customer from "../models/Customer.js";
+import Booking from "../models/Booking.js";
 import { protectCustomer } from "../middleware/authCustomerMiddleware.js";
 import { protectAdmin } from "../middleware/authAdminMiddleware.js";
 
@@ -372,16 +374,215 @@ router.post("/:subscriptionId/cancel", protectCustomer, async (req, res) => {
 router.get("/", protectAdmin, async (req, res) => {
   try {
     const { barbershopId } = req.params;
+    const { status, search, page = 1, limit = 20 } = req.query;
 
-    const subscriptions = await Subscription.find({ barbershop: barbershopId })
-      .populate("customer", "name phone")
-      .populate("plan", "name price totalCredits durationInDays")
-      .sort({ createdAt: -1 });
+    // Construir filtro
+    const filter = { barbershop: barbershopId };
 
-    res.json(subscriptions);
+    if (status && status !== "all") {
+      filter.status = status;
+    }
+
+    // Buscar assinaturas
+    let subscriptions = await Subscription.find(filter)
+      .populate("customer", "name phone imageUrl")
+      .populate("plan", "name price totalCredits durationInDays description")
+      .populate("barber", "name")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Filtrar por busca (nome ou telefone do cliente)
+    if (search && search.trim()) {
+      const searchLower = search.toLowerCase().trim();
+      subscriptions = subscriptions.filter((sub) => {
+        const customerName = sub.customer?.name?.toLowerCase() || "";
+        const customerPhone = sub.customer?.phone || "";
+        return customerName.includes(searchLower) || customerPhone.includes(searchLower);
+      });
+    }
+
+    // Calcular métricas para cada assinatura
+    const subscriptionsWithMetrics = await Promise.all(
+      subscriptions.map(async (sub) => {
+        // Buscar uso de créditos (bookings com plan_credit desta subscription)
+        const creditsUsed = sub.plan?.totalCredits ? sub.plan.totalCredits - sub.creditsRemaining : 0;
+
+        // Calcular dias restantes
+        const now = new Date();
+        const endDate = new Date(sub.endDate);
+        const daysRemaining = Math.max(0, Math.ceil((endDate - now) / (1000 * 60 * 60 * 24)));
+
+        return {
+          ...sub,
+          creditsUsed,
+          daysRemaining,
+        };
+      })
+    );
+
+    // Paginação
+    const total = subscriptionsWithMetrics.length;
+    const startIndex = (parseInt(page) - 1) * parseInt(limit);
+    const paginatedSubscriptions = subscriptionsWithMetrics.slice(startIndex, startIndex + parseInt(limit));
+
+    res.json({
+      subscriptions: paginatedSubscriptions,
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+        totalItems: total,
+        limit: parseInt(limit),
+      },
+    });
   } catch (error) {
     console.error("Erro ao listar subscriptions:", error);
     res.status(500).json({ error: "Falha ao listar assinaturas." });
+  }
+});
+
+// GET /api/barbershops/:barbershopId/subscriptions/stats
+// Retorna estatísticas gerais das assinaturas
+// IMPORTANTE: Este endpoint deve vir ANTES de /:subscriptionId para evitar conflito
+router.get("/stats", protectAdmin, async (req, res) => {
+  try {
+    const { barbershopId } = req.params;
+    const barbershopMongoId = new mongoose.Types.ObjectId(barbershopId);
+
+    const stats = await Subscription.aggregate([
+      { $match: { barbershop: barbershopMongoId } },
+      {
+        $facet: {
+          // Contagem por status
+          byStatus: [
+            {
+              $group: {
+                _id: "$status",
+                count: { $sum: 1 },
+              },
+            },
+          ],
+          // Total geral
+          totals: [
+            {
+              $group: {
+                _id: null,
+                total: { $sum: 1 },
+                activeCount: { $sum: { $cond: [{ $eq: ["$status", "active"] }, 1, 0] } },
+                expiredCount: { $sum: { $cond: [{ $eq: ["$status", "expired"] }, 1, 0] } },
+                canceledCount: { $sum: { $cond: [{ $eq: ["$status", "canceled"] }, 1, 0] } },
+                pendingCount: { $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] } },
+                withAutoRenew: { $sum: { $cond: ["$autoRenew", 1, 0] } },
+              },
+            },
+          ],
+          // Assinaturas recentes (últimos 30 dias)
+          recentSubscriptions: [
+            {
+              $match: {
+                createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
+              },
+            },
+            { $count: "count" },
+          ],
+        },
+      },
+    ]);
+
+    const totals = stats[0]?.totals[0] || {
+      total: 0,
+      activeCount: 0,
+      expiredCount: 0,
+      canceledCount: 0,
+      pendingCount: 0,
+      withAutoRenew: 0,
+    };
+
+    const recentCount = stats[0]?.recentSubscriptions[0]?.count || 0;
+
+    res.json({
+      total: totals.total,
+      active: totals.activeCount,
+      expired: totals.expiredCount,
+      canceled: totals.canceledCount,
+      pending: totals.pendingCount,
+      withAutoRenew: totals.withAutoRenew,
+      recentSubscriptions: recentCount,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar estatísticas:", error);
+    res.status(500).json({ error: "Falha ao buscar estatísticas." });
+  }
+});
+
+// GET /api/barbershops/:barbershopId/subscriptions/:subscriptionId/monthly-usage
+// Retorna o uso de créditos por mês para uma assinatura específica
+router.get("/:subscriptionId/monthly-usage", protectAdmin, async (req, res) => {
+  try {
+    const { barbershopId, subscriptionId } = req.params;
+
+    const subscription = await Subscription.findOne({
+      _id: subscriptionId,
+      barbershop: barbershopId,
+    }).populate("plan");
+
+    if (!subscription) {
+      return res.status(404).json({ error: "Assinatura não encontrada." });
+    }
+
+    // Buscar todos os bookings que usaram esta subscription, agrupados por mês
+    const monthlyUsage = await Booking.aggregate([
+      {
+        $match: {
+          subscriptionUsed: new mongoose.Types.ObjectId(subscriptionId),
+          paymentStatus: "plan_credit",
+        },
+      },
+      {
+        $group: {
+          _id: {
+            year: { $year: "$time" },
+            month: { $month: "$time" },
+          },
+          creditsUsed: { $sum: 1 },
+          bookings: {
+            $push: {
+              _id: "$_id",
+              time: "$time",
+              status: "$status",
+            },
+          },
+        },
+      },
+      {
+        $sort: { "_id.year": -1, "_id.month": -1 },
+      },
+      {
+        $project: {
+          _id: 0,
+          year: "$_id.year",
+          month: "$_id.month",
+          creditsUsed: 1,
+          bookings: 1,
+        },
+      },
+    ]);
+
+    // Total de créditos usados
+    const totalCreditsUsed = subscription.plan.totalCredits - subscription.creditsRemaining;
+
+    res.json({
+      subscriptionId,
+      plan: {
+        name: subscription.plan.name,
+        totalCredits: subscription.plan.totalCredits,
+      },
+      creditsRemaining: subscription.creditsRemaining,
+      totalCreditsUsed,
+      monthlyUsage,
+    });
+  } catch (error) {
+    console.error("Erro ao buscar uso mensal:", error);
+    res.status(500).json({ error: "Falha ao buscar uso mensal." });
   }
 });
 

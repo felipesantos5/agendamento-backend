@@ -1,0 +1,419 @@
+// src/routes/whatsappRoutes.js
+import express from "express";
+import {protectAdmin} from "../middleware/authAdminMiddleware.js";
+import {
+  createInstance,
+  getQRCode,
+  getConnectionStatus,
+  disconnectInstance,
+  deleteInstance,
+  restartInstance,
+} from "../services/whatsappInstanceService.js";
+import Barbershop from "../models/Barbershop.js";
+import { addClient, removeClient, sendEventToBarbershop } from "../services/sseService.js";
+
+const router = express.Router();
+
+// Armazena temporariamente os QR codes atualizados por instância
+const qrCodeCache = new Map();
+
+/**
+ * POST /api/whatsapp/webhook/:instanceName
+ * Webhook para receber eventos do Evolution API
+ */
+router.post("/webhook/:instanceName", async (req, res) => {
+  try {
+    const { instanceName } = req.params;
+    const event = req.body;
+
+    console.log(`[WhatsApp Webhook] Evento recebido para ${instanceName}:`, JSON.stringify(event, null, 2));
+
+    // Extrai o barbershopId do nome da instância (formato: barbershop_{id})
+    const barbershopId = instanceName.replace("barbershop_", "");
+
+    // Busca a barbearia
+    const barbershop = await Barbershop.findById(barbershopId);
+    if (!barbershop) {
+      console.log(`[WhatsApp Webhook] Barbearia não encontrada: ${barbershopId}`);
+      return res.status(200).json({ received: true });
+    }
+
+    // Processa diferentes tipos de eventos
+    const eventType = event.event;
+
+    if (eventType === "connection.update" || eventType === "CONNECTION_UPDATE") {
+      await handleConnectionUpdate(barbershop, event, barbershopId);
+    } else if (eventType === "qrcode.updated" || eventType === "QRCODE_UPDATED") {
+      await handleQRCodeUpdate(barbershop, event, instanceName, barbershopId);
+    }
+
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error("[WhatsApp Webhook] Erro ao processar evento:", error);
+    res.status(200).json({ received: true, error: error.message });
+  }
+});
+
+/**
+ * Processa evento de atualização de conexão
+ */
+async function handleConnectionUpdate(barbershop, event, barbershopId) {
+  const data = event.data || event;
+  const state = data.state || data.connection || data.status;
+  const statusReason = data.statusReason;
+
+  console.log(`[WhatsApp Webhook] Connection Update - State: ${state}, StatusReason: ${statusReason}`);
+
+  let newStatus = "disconnected";
+  let connectedNumber = null;
+
+  // Mapeia os estados do Evolution API
+  if (state === "open" || state === "connected") {
+    newStatus = "connected";
+    // Tenta extrair o número conectado
+    connectedNumber = data.ownerJid || data.wuid || data.owner;
+    if (connectedNumber && connectedNumber.includes("@")) {
+      connectedNumber = connectedNumber.split("@")[0];
+    }
+  } else if (state === "connecting" || state === "qr") {
+    newStatus = "connecting";
+  } else if (state === "close" || state === "disconnected" || statusReason === 401) {
+    newStatus = "disconnected";
+  }
+
+  // Atualiza o banco de dados
+  barbershop.whatsappConfig.connectionStatus = newStatus;
+  barbershop.whatsappConfig.lastCheckedAt = new Date();
+
+  if (newStatus === "connected" && connectedNumber) {
+    barbershop.whatsappConfig.connectedNumber = connectedNumber;
+    if (!barbershop.whatsappConfig.connectedAt) {
+      barbershop.whatsappConfig.connectedAt = new Date();
+    }
+  } else if (newStatus === "disconnected") {
+    // Limpa QR code cache quando desconecta
+    qrCodeCache.delete(barbershop.whatsappConfig.instanceName);
+  }
+
+  await barbershop.save();
+
+  // Envia evento SSE para o frontend
+  sendEventToBarbershop(barbershopId, "whatsapp_status", {
+    status: newStatus,
+    connectedNumber: barbershop.whatsappConfig.connectedNumber,
+    instanceName: barbershop.whatsappConfig.instanceName,
+  });
+
+  console.log(`[WhatsApp Webhook] Status atualizado para: ${newStatus}`);
+}
+
+/**
+ * Processa evento de atualização de QR Code
+ */
+async function handleQRCodeUpdate(barbershop, event, instanceName, barbershopId) {
+  const data = event.data || event;
+  let qrcode = data.qrcode?.base64 || data.base64 || data.qrcode;
+
+  console.log(`[WhatsApp Webhook] QR Code Update - QR recebido: ${qrcode ? "SIM" : "NÃO"}`);
+
+  if (qrcode) {
+    // Formata o QR code se necessário
+    if (!qrcode.startsWith("data:image")) {
+      qrcode = `data:image/png;base64,${qrcode}`;
+    }
+
+    // Armazena no cache
+    qrCodeCache.set(instanceName, {
+      qrcode,
+      pairingCode: data.pairingCode || data.code,
+      timestamp: Date.now(),
+    });
+
+    // Envia evento SSE para o frontend com o novo QR code
+    sendEventToBarbershop(barbershopId, "whatsapp_qrcode", {
+      qrcode,
+      pairingCode: data.pairingCode || data.code,
+    });
+
+    console.log(`[WhatsApp Webhook] QR Code atualizado e enviado via SSE`);
+  }
+}
+
+/**
+ * GET /api/whatsapp/qrcode-cache/:instanceName
+ * Obtém o QR code mais recente do cache (recebido via webhook)
+ */
+router.get("/qrcode-cache/:instanceName", async (req, res) => {
+  try {
+    const { instanceName } = req.params;
+    const cached = qrCodeCache.get(instanceName);
+
+    if (cached && Date.now() - cached.timestamp < 60000) {
+      return res.json({
+        qrcode: cached.qrcode,
+        pairingCode: cached.pairingCode,
+        cached: true,
+      });
+    }
+
+    res.status(404).json({ error: "QR Code não encontrado no cache" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/barbershops/:id/whatsapp/events
+ * Endpoint SSE para receber eventos do WhatsApp em tempo real
+ */
+router.get("/:id/whatsapp/events", protectAdmin, (req, res) => {
+  const { id } = req.params;
+  const userBarbershopId = req.adminUser?.barbershopId;
+
+  // Verifica se o usuário tem permissão
+  if (userBarbershopId !== id) {
+    return res.status(403).json({ error: "Não autorizado a escutar eventos desta barbearia." });
+  }
+
+  // Configura headers para SSE
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  // Adiciona o cliente à lista
+  addClient(id, res);
+
+  // Envia evento de conexão confirmada
+  res.write(`event: connected\ndata: ${JSON.stringify({ message: "Conectado ao stream de WhatsApp!" })}\n\n`);
+
+  // Ping periódico para manter a conexão viva
+  const keepAliveInterval = setInterval(() => {
+    res.write(": keep-alive\n\n");
+  }, 20000);
+
+  // Lida com desconexão
+  req.on("close", () => {
+    clearInterval(keepAliveInterval);
+    removeClient(id, res);
+    res.end();
+  });
+});
+
+/**
+ * POST /api/barbershops/:id/whatsapp/connect
+ * Conecta o WhatsApp da barbearia (cria instância e retorna QR code)
+ */
+router.post("/:id/whatsapp/connect", protectAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Busca a barbearia
+    const barbershop = await Barbershop.findById(id);
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada" });
+    }
+
+    // Verifica se já tem uma instância conectada
+    if (
+      barbershop.whatsappConfig?.connectionStatus === "connected" &&
+      barbershop.whatsappConfig?.instanceName
+    ) {
+      return res.status(400).json({
+        error: "WhatsApp já está conectado. Desconecte primeiro para reconectar.",
+      });
+    }
+
+    // Se já existe uma instância mas não conectada, deleta ela primeiro
+    if (barbershop.whatsappConfig?.instanceName) {
+      try {
+        await deleteInstance(barbershop.whatsappConfig.instanceName);
+      } catch (err) {
+        console.log("[WhatsApp] Erro ao deletar instância anterior (ignorando):", err.message);
+      }
+    }
+
+    // Cria nova instância (já retorna o QR code)
+    const { instanceName, qrcode, pairingCode } = await createInstance(id);
+
+    // Atualiza o banco de dados
+    barbershop.whatsappConfig = {
+      enabled: true,
+      instanceName,
+      connectionStatus: "connecting",
+      connectedNumber: null,
+      connectedAt: null,
+      lastCheckedAt: new Date(),
+    };
+
+    await barbershop.save();
+
+    res.json({
+      qrcode,
+      pairingCode,
+      instanceName,
+      message: "QR Code gerado. Escaneie com seu WhatsApp para conectar.",
+    });
+  } catch (error) {
+    console.error("[WhatsApp] Erro ao conectar:", error);
+    res.status(500).json({
+      error: "Erro ao conectar WhatsApp",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/barbershops/:id/whatsapp/status
+ * Verifica o status da conexão do WhatsApp
+ */
+router.get("/:id/whatsapp/status", protectAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const barbershop = await Barbershop.findById(id);
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada" });
+    }
+
+    // Se não tem instanceName, retorna desconectado
+    if (!barbershop.whatsappConfig?.instanceName) {
+      return res.json({
+        status: "disconnected",
+        enabled: false,
+        connectedNumber: null,
+        instanceName: null,
+      });
+    }
+
+    // Verifica o status na Evolution API
+    const { status, connectedNumber } = await getConnectionStatus(
+      barbershop.whatsappConfig.instanceName
+    );
+
+    // Atualiza o banco de dados
+    barbershop.whatsappConfig.connectionStatus = status;
+    barbershop.whatsappConfig.lastCheckedAt = new Date();
+
+    if (status === "connected" && connectedNumber) {
+      barbershop.whatsappConfig.connectedNumber = connectedNumber;
+      if (!barbershop.whatsappConfig.connectedAt) {
+        barbershop.whatsappConfig.connectedAt = new Date();
+      }
+    }
+
+    await barbershop.save();
+
+    res.json({
+      status,
+      enabled: barbershop.whatsappConfig.enabled,
+      connectedNumber: barbershop.whatsappConfig.connectedNumber,
+      instanceName: barbershop.whatsappConfig.instanceName,
+      connectedAt: barbershop.whatsappConfig.connectedAt,
+      lastCheckedAt: barbershop.whatsappConfig.lastCheckedAt,
+    });
+  } catch (error) {
+    console.error("[WhatsApp] Erro ao verificar status:", error);
+    res.status(500).json({
+      error: "Erro ao verificar status",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * GET /api/barbershops/:id/whatsapp/qrcode
+ * Obtém um novo QR Code (útil se o anterior expirou)
+ */
+router.get("/:id/whatsapp/qrcode", protectAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const barbershop = await Barbershop.findById(id);
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada" });
+    }
+
+    if (!barbershop.whatsappConfig?.instanceName) {
+      return res.status(400).json({
+        error: "Nenhuma instância criada. Use o endpoint /connect primeiro.",
+      });
+    }
+
+    // Obtém novo QR Code
+    const { qrcode, pairingCode } = await getQRCode(barbershop.whatsappConfig.instanceName);
+
+    res.json({
+      qrcode,
+      pairingCode,
+      instanceName: barbershop.whatsappConfig.instanceName,
+    });
+  } catch (error) {
+    console.error("[WhatsApp] Erro ao obter QR Code:", error);
+    res.status(500).json({
+      error: "Erro ao obter QR Code",
+      message: error.message,
+    });
+  }
+});
+
+/**
+ * DELETE /api/barbershops/:id/whatsapp/disconnect
+ * Desconecta e deleta a instância do WhatsApp
+ */
+router.delete("/:id/whatsapp/disconnect", protectAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const barbershop = await Barbershop.findById(id);
+    if (!barbershop) {
+      return res.status(404).json({ error: "Barbearia não encontrada" });
+    }
+
+    if (!barbershop.whatsappConfig?.instanceName) {
+      return res.status(400).json({
+        error: "Nenhuma instância conectada.",
+      });
+    }
+
+    const instanceName = barbershop.whatsappConfig.instanceName;
+
+    // Desconecta a instância
+    try {
+      await disconnectInstance(instanceName);
+    } catch (err) {
+      console.log("[WhatsApp] Erro ao desconectar (ignorando):", err.message);
+    }
+
+    // Deleta a instância
+    try {
+      await deleteInstance(instanceName);
+    } catch (err) {
+      console.log("[WhatsApp] Erro ao deletar (ignorando):", err.message);
+    }
+
+    // Limpa os dados no banco
+    barbershop.whatsappConfig = {
+      enabled: false,
+      instanceName: null,
+      connectionStatus: "disconnected",
+      connectedNumber: null,
+      connectedAt: null,
+      lastCheckedAt: new Date(),
+    };
+
+    await barbershop.save();
+
+    res.json({
+      message: "WhatsApp desconectado com sucesso",
+    });
+  } catch (error) {
+    console.error("[WhatsApp] Erro ao desconectar:", error);
+    res.status(500).json({
+      error: "Erro ao desconectar WhatsApp",
+      message: error.message,
+    });
+  }
+});
+
+export default router;

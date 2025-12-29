@@ -16,7 +16,7 @@ interface ShopHeaderProps {
 export function ShopHeader({ barbershop, onBookNowClick }: ShopHeaderProps) {
   return (
     <header className="flex flex-col items-center text-center p-4 sm:p-6 relative">
-      <Avatar className="w-36 h-36 border-4 border-white dark:border-gray-800 shadow-lg mb-4 mt-4">
+      <Avatar className="w-36 h-36 border-4 border-zinc-300 dark:border-gray-800 shadow-lg mb-4 mt-4">
         <AvatarImage src={barbershop.logoUrl} alt={barbershop.name} />
         <AvatarFallback>{barbershop.name.charAt(0)}</AvatarFallback>
       </Avatar>
