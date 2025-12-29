@@ -22,8 +22,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Edit, Trash2, Loader2, Calendar, Infinity } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { PlusCircle, Edit, Trash2, Loader2 } from "lucide-react";
 import { PriceFormater } from "@/helper/priceFormater";
 
 // Tipagem para um Plano
@@ -34,7 +33,6 @@ interface Plan {
   price: number;
   durationInDays: number;
   totalCredits: number;
-  isMonthlyLimit: boolean;
 }
 
 interface AdminOutletContext {
@@ -47,7 +45,6 @@ const initialPlanState: Omit<Plan, "_id"> = {
   price: 0,
   durationInDays: 30,
   totalCredits: 1,
-  isMonthlyLimit: false,
 };
 
 export function PlansPage() {
@@ -161,7 +158,6 @@ export function PlansPage() {
                 <TableHead>Nome do Plano</TableHead>
                 <TableHead>Descrição</TableHead>
                 <TableHead className="text-center">Créditos</TableHead>
-                <TableHead className="text-center">Tipo de Limite</TableHead>
                 <TableHead className="text-right">Preço</TableHead>
                 <TableHead className="w-[100px] text-center">Ações</TableHead>
               </TableRow>
@@ -169,7 +165,9 @@ export function PlansPage() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={5} className="text-center">
+                    {" "}
+                    {/* ColSpan 5 */}
                     Carregando...
                   </TableCell>
                 </TableRow>
@@ -178,28 +176,7 @@ export function PlansPage() {
                   <TableRow key={plan._id}>
                     <TableCell className="font-medium">{plan.name}</TableCell>
                     <TableCell className="text-muted-foreground">{plan.description}</TableCell>
-                    <TableCell className="text-center">{plan.totalCredits}</TableCell>
-                    <TableCell className="text-center">
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-                          plan.isMonthlyLimit
-                            ? "bg-blue-100 text-blue-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {plan.isMonthlyLimit ? (
-                          <>
-                            <Calendar className="h-3 w-3" />
-                            Mensal
-                          </>
-                        ) : (
-                          <>
-                            <Infinity className="h-3 w-3" />
-                            Total
-                          </>
-                        )}
-                      </span>
-                    </TableCell>
+                    <TableCell className="text-center">{plan.totalCredits}</TableCell> {/* NOVO CAMPO */}
                     <TableCell className="text-right">{PriceFormater(plan.price)}</TableCell>
                     <TableCell className="flex justify-center gap-2">
                       <Button variant="outline" size="icon" onClick={() => handleOpenEditPlanDialog(plan)}>
@@ -229,7 +206,9 @@ export function PlansPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">
+                  <TableCell colSpan={5} className="text-center">
+                    {" "}
+                    {/* ColSpan 5 */}
                     Nenhum plano cadastrado.
                   </TableCell>
                 </TableRow>
@@ -311,27 +290,6 @@ export function PlansPage() {
                   placeholder="Ex: 4"
                 />
               </div>
-            </div>
-
-            {/* SWITCH PARA LIMITE MENSAL */}
-            <div className="flex items-center justify-between p-4 border rounded-lg bg-muted/50">
-              <div className="space-y-0.5">
-                <Label htmlFor="isMonthlyLimit" className="text-base font-medium">
-                  Limite Mensal
-                </Label>
-                <p className="text-sm text-muted-foreground">
-                  {currentPlan.isMonthlyLimit
-                    ? `Os ${currentPlan.totalCredits || 0} créditos serão renovados todo mês automaticamente.`
-                    : `Os ${currentPlan.totalCredits || 0} créditos são válidos para todo o período do plano.`}
-                </p>
-              </div>
-              <Switch
-                id="isMonthlyLimit"
-                checked={currentPlan.isMonthlyLimit || false}
-                onCheckedChange={(checked) =>
-                  setCurrentPlan({ ...currentPlan, isMonthlyLimit: checked })
-                }
-              />
             </div>
           </div>
           <DialogFooter>

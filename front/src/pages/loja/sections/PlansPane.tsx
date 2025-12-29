@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from "framer-motion";
 interface PlansPaneProps {
   barbershopId: string;
   barbershopSlug: string;
-  paymentsEnabled?: boolean;
 }
 
 const sectionAnimation = {
@@ -14,7 +13,7 @@ const sectionAnimation = {
   transition: { duration: 0.3, ease: "easeInOut" },
 };
 
-export function PlansPane({ barbershopId, barbershopSlug, paymentsEnabled = false }: PlansPaneProps) {
+export function PlansPane({ barbershopId, barbershopSlug }: PlansPaneProps) {
   return (
     <AnimatePresence mode="wait">
       <motion.div
@@ -28,7 +27,7 @@ export function PlansPane({ barbershopId, barbershopSlug, paymentsEnabled = fals
           <h2 className="text-2xl font-semibold text-gray-900">Nossos Planos e Pacotes</h2>
         </div>
 
-        <PlansList barbershopId={barbershopId} barbershopSlug={barbershopSlug} paymentsEnabled={paymentsEnabled} />
+        <PlansList barbershopId={barbershopId} barbershopSlug={barbershopSlug} />
       </motion.div>
     </AnimatePresence>
   );

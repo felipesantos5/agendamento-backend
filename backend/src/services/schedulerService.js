@@ -2,8 +2,7 @@ import cron from "node-cron";
 import Booking from "../models/Booking.js";
 import Barbershop from "../models/Barbershop.js";
 import Subscription from "../models/Subscription.js";
-import { sendWhatsAppConfirmation, sendWhatsAppForBarbershop } from "./evolutionWhatsapp.js";
-import { getConnectionStatus, setWebhook, restartInstance } from "./whatsappInstanceService.js";
+import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
 import { startOfDay, endOfDay, getHours } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
@@ -74,7 +73,7 @@ const sendDailyReminders = async (triggerHour) => {
       const greeting = triggerHour === 8 ? "Bom dia" : "Olá";
       const message = `${greeting}, ${booking.customer.name}! Lembrete do seu agendamento hoje na ${booking.barbershop.name} às ${appointmentTimeFormatted} com ${booking.barber.name} ✅\n\nPara mais informações, entre em contato com a barbearia: ${booking.barbershop.contact} 📱\nEndereço: ${barberShopAdress}💈`;
 
-      await sendWhatsAppForBarbershop(booking.barbershop._id, customerPhone, message);
+      await sendWhatsAppConfirmation(customerPhone, message);
       sentCount++;
 
       // Pausa aleatória
@@ -149,45 +148,38 @@ cron.schedule(
   }
 );
 
-// ⚠️ WORKERS DE MENSAGENS - NÃO RODAM EM DESENVOLVIMENTO
-if (process.env.NODE_ENV !== 'development') {
-  cron.schedule(
-    "0 8 * * *",
-    () => {
-      sendDailyReminders(8);
-    },
-    {
-      scheduled: true,
-      timezone: "America/Sao_Paulo",
-    }
-  );
+cron.schedule(
+  "0 8 * * *",
+  () => {
+    sendDailyReminders(8);
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
 
-  cron.schedule(
-    "0 11 * * 2", // "Às 11:00, toda Terça-feira"
-    () => {
-      sendAutomatedReturnReminders();
-    },
-    {
-      scheduled: true,
-      timezone: "America/Sao_Paulo",
-    }
-  );
+cron.schedule(
+  "0 11 * * 2", // "Às 11:00, toda Terça-feira"
+  () => {
+    sendAutomatedReturnReminders();
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
 
-  cron.schedule(
-    "0 13 * * *",
-    () => {
-      sendDailyReminders(13);
-    },
-    {
-      scheduled: true,
-      timezone: "America/Sao_Paulo",
-    }
-  );
-
-  console.log("✅ Workers de mensagens automáticas ATIVADOS (Produção)");
-} else {
-  console.log("⚠️  Workers de mensagens automáticas DESATIVADOS (Desenvolvimento)");
-}
+cron.schedule(
+  "0 13 * * *",
+  () => {
+    sendDailyReminders(13);
+  },
+  {
+    scheduled: true,
+    timezone: "America/Sao_Paulo",
+  }
+);
 
 cron.schedule(
   "0 * * * *",
@@ -276,88 +268,3 @@ cron.schedule(
 updateExpiredBookings();
 deactivateExpiredTrials(); // Executa uma vez ao iniciar o servidor
 expireSubscriptions(); // Executa uma vez ao iniciar o servidor
-
-// Função para verificar e manter conexões WhatsApp ativas
-const checkWhatsAppConnections = async () => {
-  try {
-    // Busca todas as barbearias com instância WhatsApp configurada E que estejam com status conectado
-    // Isso evita ficar verificando instâncias que sabemos que não existem
-    const barbershops = await Barbershop.find({
-      "whatsappConfig.instanceName": { $ne: null },
-      "whatsappConfig.enabled": true,
-      "whatsappConfig.connectionStatus": "connected", // Só verifica instâncias que estão conectadas
-    });
-
-    if (barbershops.length === 0) {
-      return;
-    }
-
-    console.log(`[WhatsApp Monitor] Verificando ${barbershops.length} instância(s) conectada(s)...`);
-
-    for (const barbershop of barbershops) {
-      try {
-        const { instanceName } = barbershop.whatsappConfig;
-        const { status, connectedNumber } = await getConnectionStatus(instanceName);
-
-        const previousStatus = barbershop.whatsappConfig.connectionStatus;
-
-        // Atualiza o status no banco
-        barbershop.whatsappConfig.connectionStatus = status;
-        barbershop.whatsappConfig.lastCheckedAt = new Date();
-
-        if (status === "connected" && connectedNumber) {
-          barbershop.whatsappConfig.connectedNumber = connectedNumber;
-        }
-
-        // Se estava conectado e agora está desconectado
-        if (previousStatus === "connected" && status === "disconnected") {
-          console.log(`[WhatsApp Monitor] Instância ${instanceName} desconectou.`);
-          // Limpa a configuração da instância para forçar uso do fallback
-          barbershop.whatsappConfig.connectedNumber = null;
-          console.log(`[WhatsApp Monitor] Status atualizado para 'disconnected'. Mensagens usarão instância padrão.`);
-        }
-
-        // Se está conectada, reconfigura webhook para garantir que está ativo
-        if (status === "connected") {
-          try {
-            await setWebhook(instanceName);
-          } catch (webhookError) {
-            // Ignora erro de webhook, pode ser que já esteja configurado
-          }
-        }
-
-        await barbershop.save();
-
-        // Pequeno delay entre verificações
-        await delay(1000);
-      } catch (instanceError) {
-        console.error(`[WhatsApp Monitor] Erro ao verificar instância ${barbershop.whatsappConfig?.instanceName}:`, instanceError.message);
-
-        // Se o erro for que a instância não existe, atualiza o status
-        if (instanceError.message.includes("não existe") || instanceError.message.includes("not exist")) {
-          console.log(`[WhatsApp Monitor] Instância ${barbershop.whatsappConfig?.instanceName} não existe mais. Atualizando status...`);
-          barbershop.whatsappConfig.connectionStatus = "disconnected";
-          barbershop.whatsappConfig.connectedNumber = null;
-          barbershop.whatsappConfig.lastCheckedAt = new Date();
-          await barbershop.save();
-        }
-      }
-    }
-  } catch (error) {
-    console.error("[WhatsApp Monitor] Erro geral:", error);
-  }
-};
-
-// Verifica conexões WhatsApp a cada 5 minutos
-cron.schedule(
-  "*/5 * * * *",
-  () => {
-    checkWhatsAppConnections();
-  },
-  {
-    scheduled: true,
-    timezone: "America/Sao_Paulo",
-  }
-);
-
-console.log("✅ Monitor de conexões WhatsApp ativado (verifica a cada 5 minutos)");

@@ -3,7 +3,7 @@ import Booking from "../models/Booking.js";
 import Barbershop from "../models/Barbershop.js";
 import Customer from "../models/Customer.js";
 import mongoose from "mongoose";
-import { sendWhatsAppConfirmation, sendWhatsAppForBarbershop } from "./evolutionWhatsapp.js";
+import { sendWhatsAppConfirmation } from "./evolutionWhatsapp.js";
 import { subDays, startOfDay, startOfMonth } from "date-fns";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
 
@@ -143,7 +143,7 @@ export const sendAutomatedReturnReminders = async () => {
 
         const message = `Olá, ${customer.name}! Sentimos sua falta na ${barbershop.name}. Já faz ${DAYS_SINCE_LAST_CUT} dias desde seu último corte. 💈\n\nQue tal agendar seu retorno?\n${agendamentoLink}`;
 
-        await sendWhatsAppForBarbershop(barbershop._id, customer.phone, message); //
+        await sendWhatsAppConfirmation(customer.phone, message); //
 
         // ATUALIZA O CLIENTE no banco para registrar o envio (lógica anti-spam)
         await Customer.updateOne(

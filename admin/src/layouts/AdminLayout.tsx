@@ -20,7 +20,6 @@ import {
   Repeat,
   MessageSquare,
   AlertTriangle,
-  CreditCard,
 } from "lucide-react"; // Ícones de exemplo
 import { useAuth } from "@/contexts/AuthContext";
 import apiClient from "@/services/api";
@@ -257,12 +256,6 @@ export function AdminLayout() {
           icon: <Package className="mr-2 h-4 w-4" />,
           roles: ["admin"],
         },
-        {
-          to: "assinaturas",
-          label: "Assinaturas",
-          icon: <CreditCard className="mr-2 h-4 w-4" />,
-          roles: ["admin"],
-        },
       ],
     },
     {
@@ -273,18 +266,6 @@ export function AdminLayout() {
           to: "configuracoes",
           label: "Minha Barbearia",
           icon: <Settings className="mr-2 h-4 w-4" />,
-          roles: ["admin"],
-        },
-        {
-          to: "configuracoes/checkout",
-          label: "Checkout",
-          icon: <CreditCard className="mr-2 h-4 w-4" />,
-          roles: ["admin"],
-        },
-        {
-          to: "configuracoes/whatsapp",
-          label: "WhatsApp",
-          icon: <MessageSquare className="mr-2 h-4 w-4" />,
           roles: ["admin"],
         },
         {
@@ -374,7 +355,7 @@ export function AdminLayout() {
           )}
         </div>
       </div>
-      <nav className="flex flex-col flex-grow px-3 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-neutral-700">
+      <nav className="flex flex-col flex-grow px-3 overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-neutral-800 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-neutral-700">
         {visibleSections.map((section, sectionIndex) => (
           <div key={section.title}>
             {/* Separador visual entre seções */}
@@ -400,10 +381,7 @@ export function AdminLayout() {
                         ? "bg-rose-600 text-white shadow-lg"
                         : "text-gray-300 hover:bg-zinc-800 hover:text-white hover:shadow-md"
                       }`}
-                    onClick={(e) => {
-                      e.currentTarget.blur();
-                      setIsMobileSidebarOpen(false);
-                    }}
+                    onClick={() => setIsMobileSidebarOpen(false)}
                   >
                     {item.icon}
                     {item.label}

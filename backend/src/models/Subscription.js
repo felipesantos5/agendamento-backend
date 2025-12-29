@@ -35,15 +35,6 @@ const subscriptionSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
-    // Campos para controle de limite mensal
-    monthlyCreditsUsed: {
-      type: Number,
-      default: 0,
-    },
-    currentMonthStart: {
-      type: Date,
-      default: Date.now,
-    },
     barber: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Barber",

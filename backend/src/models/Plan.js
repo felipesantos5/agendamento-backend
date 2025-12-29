@@ -25,12 +25,6 @@ const planSchema = new mongoose.Schema(
       min: [1, "O plano deve ter pelo menos 1 crédito."],
       default: 1,
     },
-    // Se true, totalCredits é o limite MENSAL (reseta todo mês)
-    // Se false, totalCredits é o limite TOTAL do período do plano
-    isMonthlyLimit: {
-      type: Boolean,
-      default: false,
-    },
     barbershop: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Barbershop",

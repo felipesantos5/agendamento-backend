@@ -55,14 +55,14 @@ router.post("/login", superAdminLoginLimiter, async (req, res) => {
       return res.status(401).json({ error: "Senha incorreta." });
     }
 
-    // Gera token JWT com 7 dias de expiração
+    // Gera token JWT com 8 horas de expiração
     const token = jwt.sign(
       {
         isSuperAdmin: true,
         role: "superadmin",
       },
       JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "8h" }
     );
 
     // Define cookie HttpOnly
@@ -71,7 +71,7 @@ router.post("/login", superAdminLoginLimiter, async (req, res) => {
       httpOnly: true,
       secure: isProduction,
       sameSite: isProduction ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+      maxAge: 8 * 60 * 60 * 1000, // 8 horas
     });
 
     res.json({

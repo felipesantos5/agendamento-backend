@@ -6,13 +6,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
-import { Trash2, PlusCircle, Download } from "lucide-react"; // Ícones
+import { Trash2, PlusCircle, Download, EyeOff, Eye } from "lucide-react"; // Ícones
 import { PhoneFormat } from "@/helper/phoneFormater";
 import { CepFormat } from "@/helper/cepFormarter";
 import { ImageUploader } from "../components/ImageUploader";
 import apiClient from "@/services/api";
 import { ColorSelector } from "@/components/themeColorPicker";
 import { API_BASE_URL } from "@/config/BackendUrl";
+import { Switch } from "@/components/ui/switch";
 
 // Tipos para os dados da barbearia (espelhando seus schemas do backend)
 interface Address {
@@ -46,6 +47,9 @@ interface BarbershopData {
   themeColor: string;
   LogoBackgroundColor: string;
   qrcode: string;
+  mercadoPagoAccessToken?: string;
+  paymentsEnabled?: boolean;
+  requireOnlinePayment?: boolean; // <-- NOVO CAMPO
 }
 
 // ✅ ATUALIZADO (2/5): Estado inicial
@@ -69,6 +73,8 @@ const initialBarbershopState: Partial<BarbershopData> = {
   slug: "",
   qrcode: "",
   workingHours: [],
+  paymentsEnabled: false,
+  requireOnlinePayment: false, // <-- NOVO CAMPO
 };
 
 const daysOfWeek = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -90,6 +96,7 @@ export function BarbeariaConfigPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [qrCodeBlob, setQrCodeBlob] = useState<Blob | null>(null); // Armazena o blob da imagem
   const [qrCodeUrl, setQrCodeUrl] = useState(""); // Armazena a URL local (blob:)
+  const [showToken, setShowToken] = useState(false);
 
   useEffect(() => {
     if (!barbershopId) {
@@ -141,6 +148,32 @@ export function BarbeariaConfigPage() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handlePaymentEnabledChange = (checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      paymentsEnabled: checked,
+      // Se desativar os pagamentos, desativa também a obrigatoriedade
+      requireOnlinePayment: checked ? prev.requireOnlinePayment : false,
+    }));
+  };
+
+  // ✅ NOVO HANDLER (3/5): Para o novo switch
+  const handlePaymentMandatoryChange = (checked: boolean) => {
+    setFormData((prev) => ({
+      ...prev,
+      requireOnlinePayment: checked,
+    }));
+  };
+
+  const handleContactChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+    const digitsOnly = inputValue.replace(/\D/g, "");
+    setFormData((prev) => ({
+      ...prev,
+      contact: digitsOnly.slice(0, 11),
+    }));
+  };
+
   const handleCepChange = (e: ChangeEvent<HTMLInputElement>) => {
     const inputValue = e.target.value;
     const digitsOnly = inputValue.replace(/\D/g, "");
@@ -189,15 +222,6 @@ export function BarbeariaConfigPage() {
     setFormData((prev) => ({
       ...prev,
       workingHours: (prev?.workingHours || []).filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleContactChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const inputValue = e.target.value;
-    const digitsOnly = inputValue.replace(/\D/g, "");
-    setFormData((prev) => ({
-      ...prev,
-      contact: digitsOnly.slice(0, 11),
     }));
   };
 
@@ -488,6 +512,79 @@ export function BarbeariaConfigPage() {
             </div>
           </fieldset>
 
+          {/* ✅ ATUALIZADO (5/5): Fieldset de Pagamentos Online */}
+          <fieldset className="border p-4 rounded-md">
+            <legend className="text-lg font-semibold px-1">Pagamentos Online</legend>
+            <div className="space-y-4 mt-2">
+              {/* Toggle para ativar/desativar */}
+              <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <Label htmlFor="payments-enabled">Ativar checkout online</Label>
+                  <CardDescription>Permitir que clientes paguem pelo agendamento diretamente no site.</CardDescription>
+                </div>
+                <Switch id="payments-enabled" checked={formData.paymentsEnabled || false} onCheckedChange={handlePaymentEnabledChange} />
+              </div>
+
+              {/* Bloco condicional que só aparece se os pagamentos estiverem ativos */}
+              {formData.paymentsEnabled && (
+                <div className="space-y-4 pl-4 border-l-2 border-primary/50 pt-2 pb-2">
+                  {/* --- NOVO SWITCH (OBRIGATÓRIO) --- */}
+                  <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm bg-background">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="requireOnlinePayment" className="font-medium">
+                        Tornar pagamento OBRIGATÓRIO?
+                      </Label>
+                      <CardDescription className="text-xs">Se ativo, o cliente DEVERÁ pagar online para concluir o agendamento.</CardDescription>
+                    </div>
+                    <Switch
+                      id="requireOnlinePayment"
+                      checked={formData.requireOnlinePayment || false}
+                      onCheckedChange={handlePaymentMandatoryChange} // Usa o novo handler
+                    />
+                  </div>
+
+                  {/* --- FIM DO NOVO SWITCH --- */}
+
+                  {/* Campo para o Access Token do Mercado Pago */}
+                  <div className="space-y-2 flex flex-col pt-4">
+                    <Label htmlFor="mercadoPagoAccessToken">Access Token do Mercado Pago</Label>
+                    <div className="relative">
+                      <Input
+                        id="mercadoPagoAccessToken"
+                        name="mercadoPagoAccessToken"
+                        type={showToken ? "text" : "password"}
+                        value={formData.mercadoPagoAccessToken || ""}
+                        onChange={handleInputChange}
+                        placeholder="Cole seu Access Token aqui"
+                        className="pr-10"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="absolute inset-y-0 right-0 h-full px-3"
+                        onClick={() => setShowToken(!showToken)}
+                        aria-label={showToken ? "Esconder token" : "Mostrar token"}
+                      >
+                        {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    <a
+                      className="text-xs text-gray-700 underline"
+                      href="https://www.mercadopago.com.br/settings/account/applications/create-app"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Clique aqui para criar sua conta
+                    </a>
+                    <a className="text-xs text-gray-700 underline" href="https://youtu.be/341Dptvsov0" target="_blank" rel="noopener noreferrer">
+                      Video de tutorial explicativo
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          </fieldset>
         </CardContent>
         <CardFooter className="justify-end">
           <Button type="submit" disabled={isLoading || isUploading} className="cursor-pointer mt-4">
