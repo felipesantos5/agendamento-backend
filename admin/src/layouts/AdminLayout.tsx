@@ -276,6 +276,12 @@ export function AdminLayout() {
           roles: ["admin"],
         },
         {
+          to: "configuracoes/checkout",
+          label: "Checkout",
+          icon: <CreditCard className="mr-2 h-4 w-4" />,
+          roles: ["admin"],
+        },
+        {
           to: "configuracoes/whatsapp",
           label: "WhatsApp",
           icon: <MessageSquare className="mr-2 h-4 w-4" />,

@@ -142,8 +142,7 @@ export function PlansList({ barbershopId, barbershopSlug, paymentsEnabled = fals
               <CardTitle className="text-xl text-center">{plan.name}</CardTitle>
               {plan.description && <CardDescription className="text-center">{plan.description}</CardDescription>}
             </CardHeader>
-            <CardContent className="flex flex-col items-center gap-2">
-              {/* Info de créditos */}
+            {/* <CardContent className="flex flex-col items-center gap-2">
               {plan.totalCredits && (
                 <Badge variant="secondary" className="flex items-center gap-1">
                   {plan.isMonthlyLimit ? (
@@ -159,7 +158,7 @@ export function PlansList({ barbershopId, barbershopSlug, paymentsEnabled = fals
                   )}
                 </Badge>
               )}
-            </CardContent>
+            </CardContent> */}
             <CardFooter className="flex-col gap-3">
               <div className="text-4xl font-bold">
                 {PriceFormater(plan.price)}

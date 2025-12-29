@@ -210,19 +210,21 @@ export function CustomersPage() {
   };
 
   const handleSubscribeCustomer = async () => {
-    if (!selectedCustomerForPlan || !selectedPlanId || !selectedBarberId) {
-      const errorMessage = !selectedPlanId ? "Por favor, selecione um plano." : "Por favor, selecione um barbeiro.";
-      toast.error(errorMessage);
-      setAssignPlanError(errorMessage);
+    if (!selectedCustomerForPlan || !selectedPlanId) {
+      toast.error("Por favor, selecione um plano.");
+      setAssignPlanError("Por favor, selecione um plano.");
       return;
     }
     setIsSubscribing(true);
     setAssignPlanError("");
     try {
-      await apiClient.post(`${API_BASE_URL}/api/barbershops/${barbershopId}/admin/customers/${selectedCustomerForPlan._id}/subscribe`, {
+      const payload: { planId: string; barberId?: string } = {
         planId: selectedPlanId,
-        barberId: selectedBarberId,
-      });
+      };
+      if (selectedBarberId) {
+        payload.barberId = selectedBarberId;
+      }
+      await apiClient.post(`${API_BASE_URL}/api/barbershops/${barbershopId}/admin/customers/${selectedCustomerForPlan._id}/subscribe`, payload);
 
       toast.success(`${selectedCustomerForPlan.name} agora tem um novo plano!`);
       setIsAssignPlanModalOpen(false);
@@ -749,7 +751,7 @@ export function CustomersPage() {
           <DialogHeader>
             <DialogTitle>Adicionar Plano para {selectedCustomerForPlan?.name}</DialogTitle>
             <DialogDescription>
-              Selecione um plano e o barbeiro responsável pela venda. O novo plano será adicionado aos planos ativos do cliente.
+              Selecione um plano para o cliente. O barbeiro é opcional - se não especificado, o plano será válido para todos os barbeiros.
             </DialogDescription>
           </DialogHeader>
 
@@ -780,24 +782,29 @@ export function CustomersPage() {
             </div>
 
             <div>
-              <Label htmlFor="barberSelect">Barbeiro (Responsável)</Label>
+              <Label htmlFor="barberSelect">Barbeiro (Opcional)</Label>
+              <p className="text-xs text-muted-foreground mt-1 mb-2">
+                Deixe em branco para que o plano seja válido para qualquer barbeiro
+              </p>
               <Select value={selectedBarberId} onValueChange={setSelectedBarberId}>
-                <SelectTrigger id="barberSelect" className="mt-3 w-full">
-                  <SelectValue placeholder="Selecione um barbeiro..." />
+                <SelectTrigger id="barberSelect" className="w-full">
+                  <SelectValue placeholder="Todos os barbeiros (padrão)" />
                 </SelectTrigger>
                 <SelectContent>
-                  {allBarbers.length > 0 ? (
-                    allBarbers.map((barber) => (
-                      <SelectItem key={barber._id} value={barber._id}>
-                        <div className="flex items-center gap-2">
-                          <Contact className="h-4 w-4 text-muted-foreground" />
-                          {barber.name}
-                        </div>
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <div className="p-4 text-center text-sm text-muted-foreground">Nenhum barbeiro encontrado.</div>
-                  )}
+                  <SelectItem value="">
+                    <div className="flex items-center gap-2 font-medium">
+                      <Contact className="h-4 w-4 text-primary" />
+                      Todos os barbeiros
+                    </div>
+                  </SelectItem>
+                  {allBarbers.length > 0 && allBarbers.map((barber) => (
+                    <SelectItem key={barber._id} value={barber._id}>
+                      <div className="flex items-center gap-2">
+                        <Contact className="h-4 w-4 text-muted-foreground" />
+                        {barber.name}
+                      </div>
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -847,7 +854,7 @@ export function CustomersPage() {
                 Cancelar
               </Button>
             </DialogClose>
-            <Button onClick={handleSubscribeCustomer} disabled={isSubscribing || !selectedPlanId || !selectedBarberId}>
+            <Button onClick={handleSubscribeCustomer} disabled={isSubscribing || !selectedPlanId}>
               {isSubscribing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirmar
             </Button>

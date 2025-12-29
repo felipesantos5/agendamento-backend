@@ -25,6 +25,7 @@ import DashboardMetricsPage from "./pages/DashboardMetricsPage.tsx";
 import { BarberPerformancePage } from "./pages/BarberPerformancePage.tsx";
 import { RecurrencePage } from "./pages/RecurrencePage.tsx";
 import { WhatsAppConfigPage } from "./pages/WhatsAppConfigPage.tsx";
+import { CheckoutConfigPage } from "./pages/CheckoutConfigPage.tsx";
 import { SuperAdminLoginPage } from "./pages/superadmin/SuperAdminLoginPage";
 import { SuperAdminDashboardPage } from "./pages/superadmin/SuperAdminDashboardPage";
 
@@ -69,6 +70,7 @@ export default function App() {
               <Route path="assinaturas" element={<SubscriptionsPage />} />
               <Route path="produtos" element={<ProductManagement />} />
               <Route path="recorrencia" element={<RecurrencePage />} />
+              <Route path="configuracoes/checkout" element={<CheckoutConfigPage />} />
               <Route path="configuracoes/whatsapp" element={<WhatsAppConfigPage />} />
             </Route>
 
